@@ -1,5 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import * as Crypto from 'expo-crypto';
 import { api, loadStoredState, onForcedLogout, setSession } from '@/lib/api';
+import { storage } from '@/lib/storage';
 import type { User } from '@/lib/types';
 
 interface SessionResponse {
@@ -13,12 +15,27 @@ interface AuthState {
   user: User | null;
   login: (login: string, password: string) => Promise<void>;
   register: (data: { username: string; displayName: string; password: string; countryCode?: string }) => Promise<void>;
+  quickLogin: () => Promise<void>;
   logout: () => Promise<void>;
   refreshMe: () => Promise<User | null>;
   setUser: (u: User) => void;
 }
 
 const AuthContext = createContext<AuthState | null>(null);
+
+const KEY_DEVICE = 'amora.deviceKey';
+
+// Kode rahasia acak untuk HP ini (dipakai Login cepat). Dibuat sekali, disimpan terenkripsi.
+async function deviceKey(): Promise<string> {
+  const existing = await storage.get(KEY_DEVICE);
+  if (existing) return existing;
+  const bytes = Crypto.getRandomBytes(32);
+  let bin = '';
+  bytes.forEach((b) => (bin += String.fromCharCode(b)));
+  const key = btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  await storage.set(KEY_DEVICE, key);
+  return key;
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
@@ -56,6 +73,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       refreshMe,
       login: async (login, password) => {
         await startSession(await api.post<SessionResponse>('/api/auth/login', { login, password }));
+      },
+      quickLogin: async () => {
+        await startSession(await api.post<SessionResponse>('/api/auth/quick', { deviceKey: await deviceKey() }));
       },
       register: async (data) => {
         await startSession(await api.post<SessionResponse>('/api/auth/register', data));

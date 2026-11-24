@@ -1,8 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Link } from 'expo-router';
+import { Link, router } from 'expo-router';
 import type { ReactNode } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getServerUrl } from '@/lib/api';
 import { colors, gradients } from '@/lib/theme';
@@ -14,6 +14,11 @@ export function AuthShell({ title, subtitle, children }: { title: string; subtit
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <LinearGradient colors={gradients.header} style={StyleSheet.absoluteFill} />
+      {router.canGoBack() ? (
+        <Pressable onPress={() => router.back()} hitSlop={10} style={[s.back, { top: insets.top + 8 }]}>
+          <Ionicons name="chevron-back" size={26} color={colors.text} />
+        </Pressable>
+      ) : null}
       <ScrollView
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{ paddingTop: insets.top + 40, paddingBottom: insets.bottom + 24, paddingHorizontal: 24 }}
@@ -39,6 +44,7 @@ export function AuthShell({ title, subtitle, children }: { title: string; subtit
 }
 
 const s = StyleSheet.create({
+  back: { position: 'absolute', left: 12, zIndex: 2, width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   brand: { alignItems: 'center', gap: 10, marginBottom: 28 },
   logo: { width: 76, height: 76, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },
   appName: { fontSize: 30, fontWeight: '900', color: colors.text, letterSpacing: -0.5 },

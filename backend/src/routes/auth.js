@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const rateLimit = require('express-rate-limit');
@@ -55,6 +56,54 @@ router.post('/login', limiter, wrap(async (req, res) => {
   }
   if (user.status !== 'active') throw forbidden('Akun ditangguhkan', 'SUSPENDED');
   res.json(await issueSession(user));
+}));
+
+// Login cepat tanpa username/password. Akun terikat ke device key dari aplikasi.
+router.post('/quick', limiter, wrap(async (req, res) => {
+  const deviceKey = v.str(req.body.deviceKey, 'deviceKey', { min: 32, max: 128, pattern: /^[A-Za-z0-9_-]+$/ });
+  const country = v.str(req.body.countryCode, 'Negara', { optional: true, pattern: /^[A-Za-z]{2}$/ });
+  const deviceHash = crypto.createHash('sha256').update(deviceKey).digest('hex');
+
+  const { user, isNew } = await db.tx(async (client) => {
+    const { rows: found } = await client.query(
+      `UPDATE device_accounts SET last_used_at = now() WHERE device_hash = $1 RETURNING user_id`,
+      [deviceHash]
+    );
+    if (found.length) {
+      const { rows } = await client.query(`SELECT * FROM users WHERE id = $1`, [found[0].user_id]);
+      return { user: rows[0], isNew: false };
+    }
+    // Akun baru: username acak, password acak (tidak dipakai untuk login cepat)
+    const hash = await bcrypt.hash(crypto.randomBytes(24).toString('hex'), 10);
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const digits = String(crypto.randomInt(10000000, 99999999));
+      await client.query('SAVEPOINT pick_username');
+      try {
+        const { rows } = await client.query(
+          `INSERT INTO users (username, password_hash, display_name, country_code)
+           VALUES ($1, $2, $3, $4) RETURNING *`,
+          [`amora${digits}`, hash, `Amora ${digits.slice(-4)}`, country ? country.toUpperCase() : null]
+        );
+        await client.query(`INSERT INTO device_accounts (device_hash, user_id) VALUES ($1, $2)`, [deviceHash, rows[0].id]);
+        return { user: rows[0], isNew: true };
+      } catch (e) {
+        await client.query('ROLLBACK TO SAVEPOINT pick_username');
+        if (e.code !== '23505') throw e;
+        // Perangkat yang sama login bersamaan: pakai akun yang baru saja dibuat
+        if (e.constraint === 'device_accounts_pkey') {
+          const { rows } = await client.query(
+            `SELECT u.* FROM device_accounts d JOIN users u ON u.id = d.user_id WHERE d.device_hash = $1`,
+            [deviceHash]
+          );
+          if (rows.length) return { user: rows[0], isNew: false };
+        }
+      }
+    }
+    throw new Error('Gagal membuat akun, coba lagi');
+  });
+
+  if (!user || user.status !== 'active') throw forbidden('Akun ditangguhkan', 'SUSPENDED');
+  res.status(isNew ? 201 : 200).json({ ...(await issueSession(user)), isNew });
 }));
 
 router.post('/refresh', wrap(async (req, res) => {

@@ -16,8 +16,9 @@ function AuthGate() {
   useEffect(() => {
     if (!ready) return;
     const inAuth = segments[0] === '(auth)';
-    const isServer = segments[0] === 'server';
-    if (!user && !inAuth && !isServer) router.replace('/login');
+    // Halaman yang boleh dibuka sebelum login
+    const isPublic = ['server', 'privacy', 'terms'].includes(segments[0] ?? '');
+    if (!user && !inAuth && !isPublic) router.replace('/login');
     else if (user && inAuth) router.replace('/');
   }, [ready, user, segments, router]);
 

@@ -58,7 +58,7 @@ export default function Register() {
       <View style={{ alignItems: 'center' }}>
         <Text style={{ color: colors.textSub }}>
           Sudah punya akun?{' '}
-          <Link href="/login" style={{ color: colors.primary, fontWeight: '800' }}>
+          <Link href="/account" style={{ color: colors.primary, fontWeight: '800' }}>
             Masuk
           </Link>
         </Text>
