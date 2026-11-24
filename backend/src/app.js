@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const { ApiError } = require('./lib/errors');
 const { authenticate, requireRole } = require('./middleware/auth');
+const storage = require('./lib/storage');
 
 function createApp() {
   const app = express();
@@ -11,10 +12,12 @@ function createApp() {
   app.use(express.json({ limit: '100kb' }));
 
   app.get('/health', (req, res) => res.json({ ok: true }));
+  app.use('/uploads', express.static(storage.UPLOAD_DIR, { maxAge: '30d', immutable: true }));
 
   app.use('/api/auth', require('./routes/auth'));
   app.use('/api/me', authenticate, require('./routes/me'));
   app.use('/api/hosts', authenticate, require('./routes/hosts'));
+  app.use('/api/users', authenticate, require('./routes/social'));
   app.use('/api/host/settings', authenticate, requireRole('host'), require('./routes/hostSettings'));
   app.use('/api/wallet', authenticate, require('./routes/wallet'));
   app.use('/api/gifts', authenticate, require('./routes/gifts'));

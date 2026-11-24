@@ -69,4 +69,14 @@ function isOnline(userId) {
   return !!room && room.size > 0;
 }
 
-module.exports = { attach, emitTo, isOnline };
+// Semua id user yang sedang tersambung (online)
+function onlineUserIds() {
+  if (!io) return [];
+  const ids = [];
+  for (const [name, members] of io.sockets.adapter.rooms) {
+    if (name.startsWith('user:') && members.size > 0) ids.push(Number(name.slice(5)));
+  }
+  return ids;
+}
+
+module.exports = { attach, emitTo, isOnline, onlineUserIds };

@@ -38,6 +38,11 @@ npm run seed              # buat tabel + admin pertama (ADMIN_USERNAME/ADMIN_PAS
 npm start                 # tabel otomatis dibuat/diperbarui saat start
 ```
 
+Foto disimpan di folder `UPLOAD_DIR` (default `backend/uploads`) dan disajikan di `/uploads/...`.
+Set `PUBLIC_URL` ke alamat publik server (mis. `https://api.amora.app`) supaya link foto benar.
+Di hosting yang disk-nya tidak permanen, foto bisa hilang saat redeploy; untuk produksi
+sebaiknya diganti ke penyimpanan seperti Cloudinary / S3 / Cloudflare R2 (cukup ubah `src/lib/storage.js`).
+
 Database: PostgreSQL apa saja (Neon, Supabase, Railway, lokal). Untuk Neon/Supabase set `DATABASE_SSL=true`.
 
 ### Test
@@ -65,9 +70,16 @@ Access token berlaku 15 menit, refresh token 30 hari.
 ### Profil, host, dompet, gift
 | Method | Path | Keterangan |
 |---|---|---|
-| GET / PATCH | `/api/me` | Profil sendiri (`displayName, avatarUrl, bio, gender, birthDate` — minimal 18 tahun) |
-| GET | `/api/hosts?page=1` | Daftar host (tarif chat, WA tersedia/tidak, syarat) |
-| GET | `/api/hosts/:id` | Detail host |
+| GET / PATCH | `/api/me` | Profil sendiri (`displayName, bio, gender, birthDate, countryCode` — minimal 18 tahun) |
+| POST | `/api/me/avatar` | Ganti foto profil (multipart, field `file`, JPG/PNG/WEBP maks 5 MB) |
+| GET / POST | `/api/me/photos` | Album foto (maks 12; POST multipart field `file`) |
+| DELETE | `/api/me/photos/:id` | Hapus foto album |
+| GET | `/api/hosts?q=&country=ID&tab=all\|popular\|new\|online&page=1` | Daftar & cari host |
+| GET | `/api/hosts/countries` | Jumlah host per negara `[{ code, count }]` |
+| GET | `/api/hosts/:id` | Profil host: + `followers, following, likes, isFollowing, isLiked, photos, avgReplyMinutes, conversation` |
+| GET | `/api/hosts/:id/gifts` | Dinding hadiah: `{ gifts, topSenders }` |
+| POST / DELETE | `/api/users/:id/follow` | Ikuti / berhenti mengikuti |
+| POST / DELETE | `/api/users/:id/like` | Suka / batal suka (host saja) |
 | GET / PATCH | `/api/host/settings` | **Host saja**: `{ chatPrice, waEnabled, waNumber, waUnlockThreshold }` + batas min/maks |
 | GET | `/api/wallet` | `{ coins, diamonds, heldCoins }` |
 | GET | `/api/wallet/ledger?before=<id>` | Riwayat transaksi |

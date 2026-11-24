@@ -19,6 +19,7 @@ function publicUser(u, { self = false } = {}) {
     gender: u.gender,
     age: age(u.birth_date),
     role: u.role,
+    countryCode: u.country_code ? u.country_code.trim() : null,
     online: realtime.isOnline(Number(u.id)),
     lastSeenAt: u.last_seen_at,
   };

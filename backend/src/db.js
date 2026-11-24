@@ -1,4 +1,7 @@
-const { Pool } = require('pg');
+const { Pool, types } = require('pg');
+
+// Kolom DATE dikembalikan apa adanya ("1998-07-25"), tanpa diubah ke zona waktu server
+types.setTypeParser(1082, (value) => value);
 const config = require('./config');
 
 const pool = new Pool({

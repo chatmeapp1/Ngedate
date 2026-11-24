@@ -27,14 +27,15 @@ router.post('/register', limiter, wrap(async (req, res) => {
   const password = v.str(req.body.password, 'Password', { min: 6, max: 100 });
   const displayName = v.str(req.body.displayName ?? username, 'Nama', { min: 1, max: 50 });
   const email = v.str(req.body.email, 'Email', { max: 120, optional: true, pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/ });
+  const country = v.str(req.body.countryCode, 'Negara', { optional: true, pattern: /^[A-Za-z]{2}$/ });
 
   const hash = await bcrypt.hash(password, 10);
   let user;
   try {
     const { rows } = await db.query(
-      `INSERT INTO users (username, email, password_hash, display_name)
-       VALUES ($1, $2, $3, $4) RETURNING *`,
-      [username, email ? email.toLowerCase() : null, hash, displayName]
+      `INSERT INTO users (username, email, password_hash, display_name, country_code)
+       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+      [username, email ? email.toLowerCase() : null, hash, displayName, country ? country.toUpperCase() : null]
     );
     user = rows[0];
   } catch (e) {
