@@ -1,4 +1,14 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type Dispatch,
+  type ReactNode,
+  type SetStateAction,
+} from 'react';
 import * as Crypto from 'expo-crypto';
 import { api, loadStoredState, onForcedLogout, setSession } from '@/lib/api';
 import { storage } from '@/lib/storage';
@@ -18,7 +28,7 @@ interface AuthState {
   quickLogin: () => Promise<void>;
   logout: () => Promise<void>;
   refreshMe: () => Promise<User | null>;
-  setUser: (u: User) => void;
+  setUser: Dispatch<SetStateAction<User | null>>;
 }
 
 const AuthContext = createContext<AuthState | null>(null);

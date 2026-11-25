@@ -27,6 +27,16 @@ router.get('/', wrap(async (req, res) => {
   res.json(await chat.listConversations(req.user.id, { before: req.query.before }));
 }));
 
+// Total pesan belum dibaca (badge di tab Pesan)
+router.get('/unread-count', wrap(async (req, res) => {
+  const { rows } = await db.query(
+    `SELECT COALESCE(SUM(CASE WHEN user_id = $1 THEN user_unread ELSE host_unread END), 0)::int AS total
+     FROM conversations WHERE user_id = $1 OR host_id = $1`,
+    [req.user.id]
+  );
+  res.json({ total: rows[0].total });
+}));
+
 // Buka (atau buat) percakapan dengan host
 router.post('/', wrap(async (req, res) => {
   res.json(await chat.getOrCreateConversation(req.user.id, req.body.hostId));
@@ -43,6 +53,13 @@ router.get('/:id/messages', wrap(async (req, res) => {
 router.post('/:id/messages', wrap(async (req, res) => {
   const result = await chat.sendText(req.user.id, req.params.id, req.body.body);
   await pushMessage(result, result.message);
+  if (result.settled) {
+    // Beri tahu user: pesannya yang ditahan sekarang sudah dibayar karena host membalas
+    realtime.emitTo(result.userId, 'chat:settled', {
+      conversationId: result.conversationId,
+      messageIds: result.settled.messageIds,
+    });
+  }
   await pushBalances(result.settled ? [result.userId, result.hostId] : [req.user.id]);
   res.status(201).json({ message: result.message, settled: result.settled });
 }));

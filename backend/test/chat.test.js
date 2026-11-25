@@ -171,7 +171,10 @@ test('host membalas: koin yang ditahan dibagi 50% host / 50% platform', async ()
   const r = await api('POST', `/api/conversations/${convId}/messages`, { token: host.token, body: { body: 'Halo juga' } });
   assert.equal(r.status, 201);
   assert.equal(r.body.message.paymentStatus, 'free', 'pesan host gratis');
-  assert.deepEqual(r.body.settled, { messages: 2, coins: 200, hostIncome: 100 });
+  assert.equal(r.body.settled.messages, 2);
+  assert.equal(r.body.settled.coins, 200);
+  assert.equal(r.body.settled.hostIncome, 100);
+  assert.equal(r.body.settled.messageIds.length, 2);
   assert.equal((await balance(host.id)).diamonds, 100);
   assert.equal((await balance(user.id)).coins, 19800, 'koin user tidak berubah saat dibagi');
 
@@ -312,4 +315,35 @@ test('akun yang di-suspend langsung tidak bisa dipakai', async () => {
   assert.equal(me.status, 403);
   const refresh = await api('POST', '/api/auth/refresh', { body: { refreshToken: s.refresh } });
   assert.equal(refresh.status, 401);
+});
+
+test('jumlah belum dibaca & info lawan bicara', async () => {
+  const before = await api('GET', '/api/conversations/unread-count', { token: host.token });
+  assert.equal(before.status, 200);
+  const conv = await api('GET', `/api/conversations/${convId}`, { token: host.token });
+  assert.ok(conv.body.unread >= 1, 'host punya pesan belum dibaca di percakapan ini');
+  await api('POST', `/api/conversations/${convId}/read`, { token: host.token });
+  const after = await api('GET', '/api/conversations/unread-count', { token: host.token });
+  assert.equal(after.body.total, before.body.total - conv.body.unread);
+
+  const c = await api('GET', `/api/conversations/${convId}`, { token: user.token });
+  assert.equal(c.body.peer.role, 'host');
+  assert.equal(typeof c.body.peer.online, 'boolean');
+  assert.equal(typeof c.body.peer.verified, 'boolean');
+});
+
+test('socket: user diberi tahu saat pesannya dibayar (host membalas)', async () => {
+  const login = await api('POST', '/api/auth/login', { body: { login: 'budi', password: 'rahasia123' } });
+  const sock = ioClient(base, { auth: { token: login.body.accessToken }, transports: ['websocket'], reconnection: false });
+  await new Promise((resolve, reject) => {
+    sock.on('connect', resolve);
+    sock.on('connect_error', reject);
+  });
+  const sent = await api('POST', `/api/conversations/${convId}/messages`, { token: user.token, body: { body: 'dibalas ya' } });
+  const settled = new Promise((resolve) => sock.on('chat:settled', resolve));
+  await api('POST', `/api/conversations/${convId}/messages`, { token: host.token, body: { body: 'siap' } });
+  const evt = await settled;
+  assert.equal(evt.conversationId, convId);
+  assert.ok(evt.messageIds.includes(sent.body.message.id));
+  sock.close();
 });

@@ -6,6 +6,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Loading } from '@/components/ui';
 import { UpdateWatcher } from '@/components/UpdateWatcher';
 import { AuthProvider, useAuth } from '@/context/auth';
+import { RealtimeProvider } from '@/context/realtime';
 import { colors } from '@/lib/theme';
 
 // Arahkan ke halaman login jika belum masuk, dan sebaliknya
@@ -27,8 +28,12 @@ function AuthGate() {
     // Wajib lengkapi profil dulu setelah login pertama
     const needsProfile = !user.profileCompleted && user.role !== 'admin';
     // Host baru wajib verifikasi wajah (kecuali sedang ditinjau)
+    // (host yang sudah disetujui admin, mis. dijadikan host langsung oleh admin, tidak dipaksa)
     const needsVerification =
-      user.role === 'host' && !user.verified && ['none', 'rejected'].includes(user.verificationStatus ?? 'none');
+      user.role === 'host' &&
+      !user.verified &&
+      user.hostStatus !== 'approved' &&
+      ['none', 'rejected'].includes(user.verificationStatus ?? 'none');
     if (needsProfile) {
       if (first !== 'onboarding' && !isPublic) router.replace('/onboarding');
     } else if (needsVerification) {
@@ -58,9 +63,11 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <AuthProvider>
-        <StatusBar style="dark" />
-        <AuthGate />
-        <UpdateWatcher />
+        <RealtimeProvider>
+          <StatusBar style="dark" />
+          <AuthGate />
+          <UpdateWatcher />
+        </RealtimeProvider>
       </AuthProvider>
     </SafeAreaProvider>
   );

@@ -1,11 +1,13 @@
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar, Empty, Loading } from '@/components/ui';
+import { Verified } from '@/components/Verified';
 import { api, errorMessage } from '@/lib/api';
+import { onRealtime } from '@/lib/realtime';
 import { colors } from '@/lib/theme';
-import type { Conversation } from '@/lib/types';
+import type { Conversation, Message } from '@/lib/types';
 
 function time(iso: string | null) {
   if (!iso) return '';
@@ -37,6 +39,16 @@ export default function Messages() {
     }, [load])
   );
 
+  // Pesan baru: perbarui percakapan itu & pindahkan ke paling atas
+  useEffect(
+    () =>
+      onRealtime<{ conversation: Conversation; message: Message }>('message:new', (e) => {
+        if (!e.conversation) return;
+        setList((cur) => [e.conversation, ...(cur ?? []).filter((c) => c.id !== e.conversation.id)]);
+      }),
+    []
+  );
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg, paddingTop: insets.top + 12 }}>
       <Text style={s.title}>Pesan</Text>
@@ -65,12 +77,18 @@ export default function Messages() {
               style={({ pressed }) => [s.row, pressed && { backgroundColor: colors.surfaceAlt }]}
               onPress={() => router.push({ pathname: '/chat/[id]', params: { id: String(item.id) } })}
             >
-              <Avatar uri={item.peer?.avatarUrl} name={item.peer?.displayName} size={54} />
+              <View>
+                <Avatar uri={item.peer?.avatarUrl} name={item.peer?.displayName} size={54} />
+                {item.peer?.online ? <View style={s.onlineDot} /> : null}
+              </View>
               <View style={{ flex: 1, gap: 3 }}>
                 <View style={s.line}>
-                  <Text style={s.name} numberOfLines={1}>
-                    {item.peer?.displayName ?? 'Pengguna'}
-                  </Text>
+                  <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <Text style={[s.name, { flex: 0, flexShrink: 1 }]} numberOfLines={1}>
+                      {item.peer?.displayName ?? 'Pengguna'}
+                    </Text>
+                    {item.peer?.verified ? <Verified size={14} /> : null}
+                  </View>
                   <Text style={s.time}>{time(item.lastMessageAt)}</Text>
                 </View>
                 <View style={s.line}>
@@ -99,6 +117,17 @@ const s = StyleSheet.create({
   name: { flex: 1, fontSize: 16, fontWeight: '800', color: colors.text },
   time: { fontSize: 12, color: colors.textDim },
   preview: { flex: 1, color: colors.textSub, fontSize: 14 },
+  onlineDot: {
+    position: 'absolute',
+    right: 1,
+    bottom: 1,
+    width: 13,
+    height: 13,
+    borderRadius: 7,
+    backgroundColor: colors.online,
+    borderWidth: 2,
+    borderColor: colors.bg,
+  },
   badge: { minWidth: 20, height: 20, borderRadius: 10, backgroundColor: colors.pink, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6 },
   badgeText: { color: '#fff', fontSize: 11, fontWeight: '800' },
 });

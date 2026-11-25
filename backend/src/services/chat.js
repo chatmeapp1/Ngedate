@@ -4,6 +4,7 @@ const { getSettings } = require('./settings');
 const { containsContact } = require('../lib/contactFilter');
 const { ApiError, badRequest, forbidden, notFound } = require('../lib/errors');
 const v = require('../lib/validate');
+const realtime = require('../realtime');
 
 const MAX_TEXT = 1000;
 const MAX_GIFT_COUNT = 999;
@@ -48,6 +49,9 @@ function mapConversation(r, viewerId) {
           displayName: r.peer_display_name,
           avatarUrl: r.peer_avatar_url,
           lastSeenAt: r.peer_last_seen_at,
+          verified: !!r.peer_verified,
+          role: r.peer_role,
+          online: realtime.isOnline(Number(r.peer_id)),
         }
       : undefined,
     giftTotal: Number(r.gift_total),
@@ -105,7 +109,8 @@ async function getOrCreateConversation(userId, hostIdRaw) {
 async function getConversation(viewerId, convId) {
   const { rows } = await db.query(
     `SELECT c.*, p.id AS peer_id, p.display_name AS peer_display_name,
-            p.avatar_url AS peer_avatar_url, p.last_seen_at AS peer_last_seen_at
+            p.avatar_url AS peer_avatar_url, p.last_seen_at AS peer_last_seen_at,
+            p.verified AS peer_verified, p.role AS peer_role
      FROM conversations c
      JOIN users p ON p.id = CASE WHEN c.user_id = $2 THEN c.host_id ELSE c.user_id END
      WHERE c.id = $1 AND (c.user_id = $2 OR c.host_id = $2)`,
@@ -124,7 +129,8 @@ async function listConversations(viewerId, { before } = {}) {
   }
   const { rows } = await db.query(
     `SELECT c.*, p.id AS peer_id, p.display_name AS peer_display_name,
-            p.avatar_url AS peer_avatar_url, p.last_seen_at AS peer_last_seen_at
+            p.avatar_url AS peer_avatar_url, p.last_seen_at AS peer_last_seen_at,
+            p.verified AS peer_verified, p.role AS peer_role
      FROM conversations c
      JOIN users p ON p.id = CASE WHEN c.user_id = $1 THEN c.host_id ELSE c.user_id END
      WHERE (c.user_id = $1 OR c.host_id = $1) AND c.last_message_at IS NOT NULL ${cursor}
@@ -196,7 +202,7 @@ async function settleHeld(client, conv, settings) {
     id: Number(conv.id),
     note: `${rows.length} pesan dibalas`,
   });
-  return { messages: rows.length, coins: total, hostIncome: host };
+  return { messages: rows.length, coins: total, hostIncome: host, messageIds: rows.map((r) => Number(r.id)) };
 }
 
 async function sendText(senderId, convIdRaw, bodyRaw) {

@@ -73,12 +73,43 @@ export interface Conversation {
   userId: number;
   hostId: number;
   role: 'user' | 'host';
-  peer?: { id: number; displayName: string; avatarUrl: string | null; lastSeenAt: string | null };
+  peer?: {
+    id: number;
+    displayName: string;
+    avatarUrl: string | null;
+    lastSeenAt: string | null;
+    verified?: boolean;
+    role?: Role;
+    online?: boolean;
+  };
   giftTotal: number;
   waUnlocked: boolean;
   unread: number;
   lastMessageAt: string | null;
   lastMessagePreview: string | null;
+}
+
+export interface Message {
+  id: number;
+  conversationId: number;
+  senderId: number | null;
+  type: 'text' | 'gift' | 'system';
+  body: string | null;
+  gift: { id: number; name: string; imageUrl: string | null; animationUrl: string | null; soundUrl: string | null; count: number } | null;
+  price: number;
+  paymentStatus: 'free' | 'held' | 'paid' | 'refunded';
+  createdAt: string;
+  /** hanya di aplikasi: pesan yang sedang dikirim */
+  pending?: boolean;
+}
+
+export interface WhatsappStatus {
+  enabled: boolean;
+  threshold: number | null;
+  giftTotal: number;
+  unlocked: boolean;
+  number: string | null;
+  link: string | null;
 }
 
 export interface Wallet {
