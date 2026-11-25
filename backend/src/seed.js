@@ -7,14 +7,14 @@ const db = require('./db');
 const { migrate } = require('./migrate');
 
 const GIFTS = [
-  ['Mawar', 10, 'normal', 1],
-  ['Hati', 99, 'normal', 2],
-  ['Cokelat', 500, 'normal', 3],
-  ['Boneka', 2000, 'normal', 4],
-  ['Cincin', 10000, 'luxury', 5],
-  ['Mobil Sport', 50000, 'luxury', 6],
-  ['Kapal Pesiar', 200000, 'luxury', 7],
-  ['Istana', 1000000, 'luxury', 8],
+  ['Mawar', 10, 'normal', 1, '🌹'],
+  ['Hati', 99, 'normal', 2, '❤️'],
+  ['Cokelat', 500, 'normal', 3, '🍫'],
+  ['Boneka', 2000, 'normal', 4, '🧸'],
+  ['Cincin', 10000, 'luxury', 5, '💍'],
+  ['Mobil Sport', 50000, 'luxury', 6, '🏎️'],
+  ['Kapal Pesiar', 200000, 'luxury', 7, '🛥️'],
+  ['Istana', 1000000, 'luxury', 8, '🏰'],
 ];
 
 async function seed() {
@@ -37,10 +37,11 @@ async function seed() {
 
   const { rows } = await db.query(`SELECT COUNT(*)::int AS n FROM gifts`);
   if (rows[0].n === 0) {
-    for (const [name, price, category, sort] of GIFTS) {
-      await db.query(`INSERT INTO gifts (name, price, category, sort_order) VALUES ($1, $2, $3, $4)`, [
-        name, price, category, sort,
-      ]);
+    for (const [name, price, category, sort, icon] of GIFTS) {
+      await db.query(
+        `INSERT INTO gifts (name, price, category, sort_order, icon) VALUES ($1, $2, $3, $4, $5)`,
+        [name, price, category, sort, icon]
+      );
     }
     console.log(`[seed] ${GIFTS.length} gift contoh ditambahkan`);
   }

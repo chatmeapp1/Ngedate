@@ -83,6 +83,7 @@ function giftFields(b, optional) {
   return {
     name: v.str(b.name, 'Nama gift', { max: 50, optional }),
     price: v.int(b.price, 'Harga', { min: 1, max: 1e9, optional }),
+    icon: v.str(b.icon, 'Ikon', { max: 16, optional: true }),
     image_url: v.str(b.imageUrl, 'Gambar', { max: 500, optional: true }),
     animation_url: v.str(b.animationUrl, 'Animasi', { max: 500, optional: true }),
     sound_url: v.str(b.soundUrl, 'Suara', { max: 500, optional: true }),
@@ -95,9 +96,9 @@ function giftFields(b, optional) {
 router.post('/gifts', wrap(async (req, res) => {
   const f = giftFields(req.body || {}, false);
   const { rows } = await db.query(
-    `INSERT INTO gifts (name, price, image_url, animation_url, sound_url, category, sort_order, active)
-     VALUES ($1, $2, $3, $4, $5, COALESCE($6, 'normal'), COALESCE($7, 0), COALESCE($8, true)) RETURNING *`,
-    [f.name, f.price, f.image_url, f.animation_url, f.sound_url, f.category, f.sort_order, f.active]
+    `INSERT INTO gifts (name, price, image_url, animation_url, sound_url, category, sort_order, active, icon)
+     VALUES ($1, $2, $3, $4, $5, COALESCE($6, 'normal'), COALESCE($7, 0), COALESCE($8, true), $9) RETURNING *`,
+    [f.name, f.price, f.image_url, f.animation_url, f.sound_url, f.category, f.sort_order, f.active, f.icon]
   );
   res.status(201).json(mapGift(rows[0]));
 }));

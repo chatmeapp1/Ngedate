@@ -24,6 +24,9 @@ function mapMessage(r) {
       ? {
           id: r.gift_id,
           name: r.gift_name,
+          icon: r.gift_icon,
+          category: r.gift_category,
+          price: r.gift_price != null ? Number(r.gift_price) : null,
           imageUrl: r.gift_image_url,
           animationUrl: r.gift_animation_url,
           soundUrl: r.gift_sound_url,
@@ -63,7 +66,8 @@ function mapConversation(r, viewerId) {
 }
 
 const MESSAGE_SELECT = `
-  SELECT m.*, g.name AS gift_name, g.image_url AS gift_image_url,
+  SELECT m.*, g.name AS gift_name, g.image_url AS gift_image_url, g.icon AS gift_icon,
+         g.category AS gift_category, g.price AS gift_price,
          g.animation_url AS gift_animation_url, g.sound_url AS gift_sound_url
   FROM messages m LEFT JOIN gifts g ON g.id = m.gift_id`;
 

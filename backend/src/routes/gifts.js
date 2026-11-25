@@ -9,6 +9,7 @@ function mapGift(g) {
     id: g.id,
     name: g.name,
     price: Number(g.price),
+    icon: g.icon,
     imageUrl: g.image_url,
     animationUrl: g.animation_url,
     soundUrl: g.sound_url,

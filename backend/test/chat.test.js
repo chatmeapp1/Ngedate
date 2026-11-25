@@ -53,7 +53,7 @@ before(async () => {
   await migrate();
   const hash = await bcrypt.hash('admin123', 4);
   await db.query(`INSERT INTO users (username, password_hash, display_name, role) VALUES ('admin', $1, 'Admin', 'admin')`, [hash]);
-  const { rows } = await db.query(`INSERT INTO gifts (name, price) VALUES ('Cokelat', 500) RETURNING id`);
+  const { rows } = await db.query(`INSERT INTO gifts (name, price, icon) VALUES ('Cokelat', 500, '🍫') RETURNING id`);
   giftId = rows[0].id;
 
   server = http.createServer(createApp());
@@ -210,6 +210,9 @@ test('gift: koin dipotong, host dapat 50%, WA terbuka setelah total gift >= syar
   const g1 = await api('POST', `/api/conversations/${convId}/gifts`, { token: user.token, body: { giftId, count: 10 } });
   assert.equal(g1.status, 201, JSON.stringify(g1.body));
   assert.equal(g1.body.giftTotal, 5000);
+  assert.equal(g1.body.message.gift.icon, '🍫');
+  assert.equal(g1.body.message.gift.price, 500);
+  assert.equal(g1.body.message.gift.count, 10);
   assert.equal(g1.body.waUnlocked, false);
   assert.equal((await balance(user.id)).coins, 19800 - 5000);
   assert.equal((await balance(host.id)).diamonds, hostBefore + 2500);
@@ -346,4 +349,13 @@ test('socket: user diberi tahu saat pesannya dibayar (host membalas)', async () 
   assert.equal(evt.conversationId, convId);
   assert.ok(evt.messageIds.includes(sent.body.message.id));
   sock.close();
+});
+
+test('daftar gift & dinding gift menyertakan ikon', async () => {
+  const list = await api('GET', '/api/gifts', { token: user.token });
+  assert.equal(list.status, 200);
+  assert.ok(list.body.some((g) => g.icon === '🍫'));
+  const wall = await api('GET', `/api/hosts/${host.id}/gifts`, { token: user.token });
+  assert.equal(wall.status, 200);
+  assert.equal(wall.body.gifts[0].icon, '🍫');
 });

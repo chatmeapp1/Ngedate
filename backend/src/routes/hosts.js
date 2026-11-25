@@ -156,7 +156,7 @@ router.get('/:id/gifts', wrap(async (req, res) => {
   const hostId = v.id(req.params.id);
   const [gifts, senders] = await Promise.all([
     db.query(
-      `SELECT g.id, g.name, g.image_url, g.price, SUM(m.gift_count)::int AS count
+      `SELECT g.id, g.name, g.icon, g.image_url, g.price, SUM(m.gift_count)::int AS count
        FROM messages m JOIN conversations c ON c.id = m.conversation_id JOIN gifts g ON g.id = m.gift_id
        WHERE c.host_id = $1 AND m.type = 'gift'
        GROUP BY g.id ORDER BY g.price DESC`,
@@ -171,7 +171,7 @@ router.get('/:id/gifts', wrap(async (req, res) => {
     ),
   ]);
   res.json({
-    gifts: gifts.rows.map((g) => ({ id: g.id, name: g.name, imageUrl: g.image_url, price: Number(g.price), count: g.count })),
+    gifts: gifts.rows.map((g) => ({ id: g.id, name: g.name, icon: g.icon, imageUrl: g.image_url, price: Number(g.price), count: g.count })),
     topSenders: senders.rows.map((u) => ({ user: publicUser(u), total: Number(u.total) })),
   });
 }));
