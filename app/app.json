@@ -62,13 +62,30 @@
           "microphonePermission": false,
           "recordAudioAndroid": false
         }
-      ]
+      ],
+      "expo-updates"
     ],
     "experiments": {
       "typedRoutes": false
     },
     "extra": {
-      "apiUrl": ""
+      "apiUrl": "",
+      "eas": {
+        "projectId": "143ecaba-6bd8-45ad-9168-7a90f771884e"
+      }
+    },
+    "owner": "meong11",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/143ecaba-6bd8-45ad-9168-7a90f771884e",
+      "enabled": true,
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0,
+      "requestHeaders": {
+        "expo-channel-name": "production"
+      }
     }
   }
 }

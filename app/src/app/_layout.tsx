@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Loading } from '@/components/ui';
+import { UpdateWatcher } from '@/components/UpdateWatcher';
 import { AuthProvider, useAuth } from '@/context/auth';
 import { colors } from '@/lib/theme';
 
@@ -59,6 +60,7 @@ export default function RootLayout() {
       <AuthProvider>
         <StatusBar style="dark" />
         <AuthGate />
+        <UpdateWatcher />
       </AuthProvider>
     </SafeAreaProvider>
   );

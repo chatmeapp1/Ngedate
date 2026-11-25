@@ -6,6 +6,8 @@ import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar, Coin } from '@/components/ui';
 import { Verified } from '@/components/Verified';
+import { versionLabel } from '@/components/UpdateWatcher';
+import Constants from 'expo-constants';
 import { useAuth } from '@/context/auth';
 import { countryName, flag } from '@/lib/countries';
 import { number } from '@/lib/format';
@@ -98,6 +100,7 @@ export default function Me() {
           }
         />
       </View>
+      <Text style={s.version}>{versionLabel(Constants.expoConfig?.version)}</Text>
     </ScrollView>
   );
 }
@@ -115,4 +118,5 @@ const s = StyleSheet.create({
   group: { backgroundColor: colors.surface, marginHorizontal: 16, marginTop: 16, borderRadius: radius.md, overflow: 'hidden' },
   item: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, height: 56 },
   itemText: { flex: 1, color: colors.text, fontSize: 15, fontWeight: '600' },
+  version: { textAlign: 'center', color: colors.textDim, fontSize: 12, marginTop: 20 },
 });

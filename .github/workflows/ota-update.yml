@@ -1,0 +1,60 @@
+name: OTA update (Amora)
+
+# Setiap perubahan aplikasi di main dikirim sebagai update OTA ke HP pengguna
+# (tanpa build APK). Butuh secret EXPO_TOKEN di Settings -> Secrets -> Actions.
+#
+# PENTING: OTA hanya untuk perubahan JavaScript/UI/gambar. Kalau menambah paket
+# native, mengubah izin/ikon/app.json bagian native, naikkan "version" di
+# app/app.json lalu pasang APK baru (runtimeVersion mengikuti versi aplikasi).
+
+on:
+  push:
+    branches: [main]
+    paths: ['app/**', '.github/workflows/ota-update.yml']
+  workflow_dispatch:
+
+concurrency:
+  group: ota-update
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+    steps:
+      - name: Cek EXPO_TOKEN
+        id: token
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "::warning::Secret EXPO_TOKEN belum diatur, OTA update dilewati."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+        working-directory: .
+
+      - uses: actions/checkout@v4
+        if: steps.token.outputs.ok == 'true'
+
+      - uses: actions/setup-node@v4
+        if: steps.token.outputs.ok == 'true'
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - run: npm ci
+        if: steps.token.outputs.ok == 'true'
+
+      - run: npx tsc --noEmit
+        if: steps.token.outputs.ok == 'true'
+
+      - name: Publish OTA update
+        if: steps.token.outputs.ok == 'true'
+        run: |
+          MSG="$(git log -1 --pretty=%s)"
+          npx eas-cli@latest update --channel production --platform android --message "$MSG" --non-interactive
