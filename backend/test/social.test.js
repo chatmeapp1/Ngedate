@@ -223,3 +223,21 @@ test('dinding hadiah & percakapan user di profil host', async () => {
   assert.ok(p.body.conversation);
   assert.equal(p.body.conversation.waUnlocked, false);
 });
+
+test('wilayah: selalu 6 kartu, jumlah host & filter wilayah', async () => {
+  const r = await api('GET', '/api/hosts/regions', { token: user.token });
+  assert.equal(r.status, 200);
+  assert.deepEqual(r.body.map((x) => x.key), ['asia', 'arab', 'india', 'latino', 'afrika', 'barat']);
+  const asia = r.body.find((x) => x.key === 'asia');
+  assert.equal(asia.count, 3, 'ID + ID + PH');
+  assert.ok(asia.coverUrl, 'foto host teratas');
+  assert.equal(r.body.find((x) => x.key === 'barat').count, 0);
+  assert.equal(r.body.find((x) => x.key === 'barat').coverUrl, null);
+
+  const list = await api('GET', '/api/hosts?region=asia', { token: user.token });
+  assert.equal(list.body.length, 3);
+  const none = await api('GET', '/api/hosts?region=latino', { token: user.token });
+  assert.equal(none.body.length, 0);
+  const bad = await api('GET', '/api/hosts?region=mars', { token: user.token });
+  assert.equal(bad.status, 400);
+});

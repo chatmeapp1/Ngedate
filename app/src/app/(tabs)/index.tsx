@@ -5,13 +5,13 @@ import { useCallback, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HostGrid } from '@/components/HostGrid';
+import { RegionCard } from '@/components/RegionCard';
 import { Chip, Coin } from '@/components/ui';
 import { useAuth } from '@/context/auth';
 import { api } from '@/lib/api';
-import { countryName, flag } from '@/lib/countries';
-import { compact, number } from '@/lib/format';
-import { colors, countryCardGradients, gradients, radius } from '@/lib/theme';
-import type { CountryCount, HostTab } from '@/lib/types';
+import { compact } from '@/lib/format';
+import { colors, gradients, radius } from '@/lib/theme';
+import type { HostTab, RegionCount, RegionKey } from '@/lib/types';
 import { useHosts } from '@/lib/useHosts';
 
 const TABS: { key: HostTab; label: string; icon: 'globe-outline' | 'flame-outline' | 'flash-outline' | 'radio-button-on' }[] = [
@@ -21,22 +21,29 @@ const TABS: { key: HostTab; label: string; icon: 'globe-outline' | 'flame-outlin
   { key: 'online', label: 'Online', icon: 'radio-button-on' },
 ];
 
+// 6 wilayah selalu tampil, walaupun belum ada host
+const EMPTY_REGIONS: RegionCount[] = (['asia', 'arab', 'india', 'latino', 'afrika', 'barat'] as RegionKey[]).map((key) => ({
+  key,
+  count: 0,
+  coverUrl: null,
+}));
+
 export default function Home() {
   const insets = useSafeAreaInsets();
   const { user, refreshMe } = useAuth();
   const [tab, setTab] = useState<HostTab>('all');
-  const [countries, setCountries] = useState<CountryCount[]>([]);
+  const [regions, setRegions] = useState<RegionCount[]>(EMPTY_REGIONS);
   const list = useHosts({ tab });
 
-  const loadCountries = useCallback(() => {
-    api.get<CountryCount[]>('/api/hosts/countries').then(setCountries).catch(() => {});
+  const loadRegions = useCallback(() => {
+    api.get<RegionCount[]>('/api/hosts/regions').then(setRegions).catch(() => {});
   }, []);
 
   useFocusEffect(
     useCallback(() => {
-      loadCountries();
+      loadRegions();
       refreshMe();
-    }, [loadCountries, refreshMe])
+    }, [loadRegions, refreshMe])
   );
 
   const header = (
@@ -55,37 +62,13 @@ export default function Home() {
           </View>
         </View>
 
-        {countries.length ? (
-          <View style={s.countryGrid}>
-            {countries.slice(0, 6).map((c, i) => {
-              const g = countryCardGradients[i % countryCardGradients.length];
-              return (
-                <Pressable
-                  key={c.code}
-                  style={s.countryCell}
-                  onPress={() => router.push({ pathname: '/country/[code]', params: { code: c.code } })}
-                >
-                  <LinearGradient colors={g} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.countryCard}>
-                    <Text style={s.countryFlag}>{flag(c.code)}</Text>
-                    <Text style={s.countryName} numberOfLines={1}>
-                      {countryName(c.code)}
-                    </Text>
-                    <View style={s.countryCount}>
-                      <Ionicons name="people" size={12} color="rgba(255,255,255,0.9)" />
-                      <Text style={s.countryCountText}>{number(c.count)}</Text>
-                    </View>
-                  </LinearGradient>
-                </Pressable>
-              );
-            })}
-          </View>
-        ) : null}
-        {countries.length > 6 ? (
-          <Pressable onPress={() => router.push('/countries')} style={s.more}>
-            <Text style={s.moreText}>Semua negara ({countries.length})</Text>
-            <Ionicons name="chevron-forward" size={14} color={colors.primary} />
-          </Pressable>
-        ) : null}
+        <View style={s.regionGrid}>
+          {regions.map((r) => (
+            <View key={r.key} style={s.regionCell}>
+              <RegionCard region={r} onPress={() => router.push({ pathname: '/region/[key]', params: { key: r.key } })} />
+            </View>
+          ))}
+        </View>
       </LinearGradient>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.tabs}>
@@ -104,7 +87,7 @@ export default function Home() {
         refreshing={list.refreshing}
         error={list.error}
         onRefresh={() => {
-          loadCountries();
+          loadRegions();
           list.reload(true);
         }}
         onEndReached={list.loadMore}
@@ -116,7 +99,7 @@ export default function Home() {
 }
 
 const s = StyleSheet.create({
-  hero: { paddingHorizontal: 16, paddingBottom: 12 },
+  hero: { paddingHorizontal: 16, paddingBottom: 8 },
   titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
   title: { fontSize: 30, fontWeight: '900', color: colors.text, letterSpacing: -0.5 },
   coins: {
@@ -130,14 +113,7 @@ const s = StyleSheet.create({
   },
   coinsText: { fontWeight: '800', color: colors.text },
   iconBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
-  countryGrid: { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -5 },
-  countryCell: { width: '33.333%', padding: 5 },
-  countryCard: { height: 92, borderRadius: radius.md, padding: 12, justifyContent: 'space-between', overflow: 'hidden' },
-  countryFlag: { position: 'absolute', right: -6, bottom: -10, fontSize: 54, opacity: 0.9 },
-  countryName: { color: '#fff', fontWeight: '800', fontSize: 16 },
-  countryCount: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  countryCountText: { color: 'rgba(255,255,255,0.95)', fontWeight: '700', fontSize: 13 },
-  more: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-end', gap: 2, marginTop: 6 },
-  moreText: { color: colors.primary, fontWeight: '700', fontSize: 13 },
+  regionGrid: { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -5 },
+  regionCell: { width: '33.333%', padding: 5 },
   tabs: { gap: 10, paddingHorizontal: 16, paddingVertical: 12 },
 });

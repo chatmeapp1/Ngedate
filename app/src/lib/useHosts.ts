@@ -5,8 +5,8 @@ import type { Host, HostTab } from '@/lib/types';
 const PAGE_SIZE = 30;
 
 // Daftar host dengan halaman berikutnya (scroll tanpa batas) & tarik untuk muat ulang
-export function useHosts(params: { tab?: HostTab; country?: string; q?: string; enabled?: boolean }) {
-  const { tab = 'all', country, q, enabled = true } = params;
+export function useHosts(params: { tab?: HostTab; country?: string; region?: string; q?: string; enabled?: boolean }) {
+  const { tab = 'all', country, region, q, enabled = true } = params;
   const [hosts, setHosts] = useState<Host[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -19,10 +19,11 @@ export function useHosts(params: { tab?: HostTab; country?: string; q?: string; 
     (p: number) => {
       const sp = new URLSearchParams({ tab, page: String(p) });
       if (country) sp.set('country', country);
+      if (region) sp.set('region', region);
       if (q) sp.set('q', q);
       return api.get<Host[]>(`/api/hosts?${sp.toString()}`);
     },
-    [tab, country, q]
+    [tab, country, region, q]
   );
 
   const reload = useCallback(

@@ -106,3 +106,11 @@ export interface HostSettings {
 }
 
 export type HostTab = 'all' | 'popular' | 'new' | 'online';
+
+export type RegionKey = 'asia' | 'arab' | 'india' | 'latino' | 'afrika' | 'barat';
+
+export interface RegionCount {
+  key: RegionKey;
+  count: number;
+  coverUrl: string | null;
+}

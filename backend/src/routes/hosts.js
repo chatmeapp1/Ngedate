@@ -4,6 +4,7 @@ const v = require('../lib/validate');
 const realtime = require('../realtime');
 const { wrap, notFound } = require('../lib/errors');
 const { hostCard, publicUser } = require('./serializers');
+const { REGIONS, REGION_KEYS } = require('../lib/regions');
 
 const router = express.Router();
 const PAGE_SIZE = 30;
@@ -16,6 +17,7 @@ const HOST_FROM = `FROM users u LEFT JOIN host_profiles hp ON hp.user_id = u.id
  * Daftar host.
  *   q        cari nama / username / ID
  *   country  kode negara (ID, PH, VN, ...)
+ *   region   asia | arab | india | latino | afrika | barat
  *   tab      all | popular | new | online
  *   page     mulai dari 1
  */
@@ -24,6 +26,10 @@ router.get('/', wrap(async (req, res) => {
   const q = v.str(req.query.q, 'q', { max: 50, optional: true });
   const country = v.str(req.query.country, 'country', { optional: true, pattern: /^[A-Za-z]{2}$/ });
   const tab = v.str(req.query.tab ?? 'all', 'tab', { pattern: /^(all|popular|new|online)$/ });
+  const region = v.str(req.query.region, 'region', {
+    optional: true,
+    pattern: new RegExp(`^(${REGION_KEYS.join('|')})$`),
+  });
 
   const online = realtime.onlineUserIds();
   const params = [online];
@@ -37,6 +43,10 @@ router.get('/', wrap(async (req, res) => {
   if (country) {
     params.push(country.toUpperCase());
     where.push(`u.country_code = $${params.length}`);
+  }
+  if (region) {
+    params.push(REGIONS[region]);
+    where.push(`u.country_code = ANY($${params.length}::char(2)[])`);
   }
   if (tab === 'online') where.push(`u.id = ANY($1::bigint[])`);
 
@@ -70,6 +80,29 @@ router.get('/countries', wrap(async (req, res) => {
      GROUP BY u.country_code ORDER BY count DESC, code`
   );
   res.json(rows.map((r) => ({ code: r.code.trim(), count: r.count })));
+}));
+
+// Kartu wilayah di Beranda: selalu 6 wilayah, beserta jumlah host & foto host teratas
+router.get('/regions', wrap(async (req, res) => {
+  const result = [];
+  for (const key of REGION_KEYS) {
+    const { rows } = await db.query(
+      `SELECT COUNT(*) OVER ()::int AS total, u.avatar_url
+       FROM users u
+       LEFT JOIN LATERAL (
+         SELECT COALESCE(SUM(m.price), 0) AS score FROM conversations c
+         JOIN messages m ON m.conversation_id = c.id AND m.type = 'gift'
+         WHERE c.host_id = u.id AND m.created_at > now() - interval '30 days'
+       ) pop ON true
+       WHERE u.role = 'host' AND u.status = 'active' AND u.host_status = 'approved'
+         AND u.country_code = ANY($1::char(2)[])
+       ORDER BY (u.avatar_url IS NOT NULL) DESC, pop.score DESC, u.last_seen_at DESC NULLS LAST, u.id
+       LIMIT 1`,
+      [REGIONS[key]]
+    );
+    result.push({ key, count: rows[0] ? rows[0].total : 0, coverUrl: rows[0] ? rows[0].avatar_url : null });
+  }
+  res.json(result);
 }));
 
 // Profil host lengkap

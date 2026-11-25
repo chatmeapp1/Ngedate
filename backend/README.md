@@ -74,7 +74,8 @@ Access token berlaku 15 menit, refresh token 30 hari.
 | POST | `/api/me/avatar` | Ganti foto profil (multipart, field `file`, JPG/PNG/WEBP maks 5 MB) |
 | GET / POST | `/api/me/photos` | Album foto (maks 12; POST multipart field `file`) |
 | DELETE | `/api/me/photos/:id` | Hapus foto album |
-| GET | `/api/hosts?q=&country=ID&tab=all\|popular\|new\|online&page=1` | Daftar & cari host |
+| GET | `/api/hosts?q=&country=ID&region=asia&tab=all\|popular\|new\|online&page=1` | Daftar & cari host |
+| GET | `/api/hosts/regions` | 6 wilayah (asia, arab, india, latino, afrika, barat) `[{ key, count, coverUrl }]` — selalu lengkap, `coverUrl` = foto host teratas |
 | GET | `/api/hosts/countries` | Jumlah host per negara `[{ code, count }]` |
 | GET | `/api/hosts/:id` | Profil host: + `followers, following, likes, isFollowing, isLiked, photos, avgReplyMinutes, conversation` |
 | GET | `/api/hosts/:id/gifts` | Dinding hadiah: `{ gifts, topSenders }` |
