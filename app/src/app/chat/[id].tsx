@@ -15,12 +15,15 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { GiftIcon } from '@/components/GiftIcon';
+import { GiftSheet } from '@/components/GiftSheet';
 import { Avatar, Coin } from '@/components/ui';
 import { Verified } from '@/components/Verified';
 import { useAuth } from '@/context/auth';
 import { useRealtime } from '@/context/realtime';
 import { ApiError, api, errorMessage } from '@/lib/api';
 import { compact, lastSeen, number } from '@/lib/format';
+import { playGift, playWaUnlocked } from '@/lib/giftFx';
 import { emitRealtime, onRealtime } from '@/lib/realtime';
 import { colors, gradients, radius } from '@/lib/theme';
 import type { Conversation, Host, Message, WhatsappStatus } from '@/lib/types';
@@ -48,11 +51,14 @@ export default function ChatRoom() {
   const [sending, setSending] = useState(false);
   const [typing, setTyping] = useState(false);
   const [wa, setWa] = useState<WhatsappStatus | null>(null);
+  const [giftOpen, setGiftOpen] = useState(false);
   const noMore = useRef(false);
   const lastTypingSent = useRef(0);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const myId = user?.id;
+  const peerName = useRef<string | undefined>(undefined);
+  peerName.current = conv?.peer?.displayName;
   const isUser = conv?.role === 'user';
   const price = isUser ? host?.chatPrice ?? 0 : 0;
 
@@ -139,6 +145,20 @@ export default function ChatRoom() {
           setTyping(false);
           markRead();
         }
+        if (e.message.type === 'gift' && e.message.gift) {
+          const g = e.message.gift;
+          playGift({
+            messageId: e.message.id,
+            name: g.name,
+            icon: g.icon,
+            imageUrl: g.imageUrl,
+            count: g.count,
+            price: g.price,
+            category: g.category,
+            total: e.message.price,
+            from: e.message.senderId !== myId ? peerName.current : undefined,
+          });
+        }
         if (e.message.type !== 'text') loadWa();
       }),
       onRealtime<{ conversationId: number; messageIds: number[] }>('chat:settled', (e) => {
@@ -154,7 +174,14 @@ export default function ChatRoom() {
         typingTimer.current = setTimeout(() => setTyping(false), 3500);
       }),
       onRealtime<{ conversationId: number }>('wa:unlocked', (e) => {
-        if (e.conversationId === convId) loadWa();
+        if (e.conversationId !== convId) return;
+        api
+          .get<WhatsappStatus>(`/api/conversations/${convId}/whatsapp`)
+          .then((w) => {
+            setWa(w);
+            playWaUnlocked(convId, peerName.current, w.link);
+          })
+          .catch(() => {});
       }),
     ];
     return () => offs.forEach((off) => off());
@@ -193,7 +220,16 @@ export default function ChatRoom() {
     }
   };
 
-  const openGift = () => Alert.alert('Segera hadir', 'Kirim gift akan tersedia di update berikutnya.');
+  const openGift = () => setGiftOpen(true);
+  const getConvId = useCallback(async () => convId, [convId]);
+  const onGiftSent = useCallback(
+    (r: { message: Message; systemMessage?: Message | null }) => {
+      addMessage(r.message);
+      if (r.systemMessage) addMessage(r.systemMessage);
+      loadWa();
+    },
+    [addMessage, loadWa]
+  );
 
   // Host: koin yang menunggu dibalas
   const heldForHost = useMemo(
@@ -321,6 +357,16 @@ export default function ChatRoom() {
           </LinearGradient>
         </Pressable>
       </View>
+
+      {isUser ? (
+        <GiftSheet
+          visible={giftOpen}
+          onClose={() => setGiftOpen(false)}
+          getConversationId={getConvId}
+          hostName={peer?.displayName}
+          onSent={onGiftSent}
+        />
+      ) : null}
     </KeyboardAvoidingView>
   );
 }
@@ -394,7 +440,7 @@ function Bubble({ message: m, mine, showPayment }: { message: Message; mine: boo
     return (
       <View style={[s.row, mine ? s.rowMine : s.rowTheirs]}>
         <LinearGradient colors={['#FFF1DB', '#FFE4F1']} style={s.giftCard}>
-          <Text style={{ fontSize: 34 }}>🎁</Text>
+          <GiftIcon icon={m.gift?.icon} imageUrl={m.gift?.imageUrl} size={42} />
           <View>
             <Text style={s.giftName}>
               {m.gift?.name ?? 'Gift'} x{m.gift?.count ?? 1}

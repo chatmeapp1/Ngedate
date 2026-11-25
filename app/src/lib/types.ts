@@ -64,7 +64,7 @@ export interface CountryCount {
 }
 
 export interface GiftWall {
-  gifts: { id: number; name: string; imageUrl: string | null; price: number; count: number }[];
+  gifts: { id: number; name: string; icon: string | null; imageUrl: string | null; price: number; count: number }[];
   topSenders: { user: User; total: number }[];
 }
 
@@ -95,7 +95,17 @@ export interface Message {
   senderId: number | null;
   type: 'text' | 'gift' | 'system';
   body: string | null;
-  gift: { id: number; name: string; imageUrl: string | null; animationUrl: string | null; soundUrl: string | null; count: number } | null;
+  gift: {
+    id: number;
+    name: string;
+    icon: string | null;
+    category: string | null;
+    price: number | null;
+    imageUrl: string | null;
+    animationUrl: string | null;
+    soundUrl: string | null;
+    count: number;
+  } | null;
   price: number;
   paymentStatus: 'free' | 'held' | 'paid' | 'refunded';
   createdAt: string;
@@ -144,4 +154,24 @@ export interface RegionCount {
   key: RegionKey;
   count: number;
   coverUrl: string | null;
+}
+
+export interface Gift {
+  id: number;
+  name: string;
+  price: number;
+  icon: string | null;
+  imageUrl: string | null;
+  animationUrl: string | null;
+  soundUrl: string | null;
+  category: string;
+  sortOrder: number;
+  active: boolean;
+}
+
+export interface SendGiftResult {
+  message: Message;
+  systemMessage: Message | null;
+  giftTotal: number;
+  waUnlocked: boolean;
 }

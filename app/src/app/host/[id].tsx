@@ -6,6 +6,8 @@ import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { GiftIcon } from '@/components/GiftIcon';
+import { GiftSheet } from '@/components/GiftSheet';
 import { Avatar, Coin, Empty, Loading } from '@/components/ui';
 import { Verified } from '@/components/Verified';
 import { useAuth } from '@/context/auth';
@@ -14,7 +16,7 @@ import { countryName, flag } from '@/lib/countries';
 import { compact, lastSeen, number, replyTime } from '@/lib/format';
 import { openChat } from '@/lib/openChat';
 import { colors, gradients, radius } from '@/lib/theme';
-import type { GiftWall, HostProfile } from '@/lib/types';
+import type { Conversation, GiftWall, HostProfile } from '@/lib/types';
 
 export default function HostProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -26,6 +28,7 @@ export default function HostProfileScreen() {
   const [tab, setTab] = useState<'album' | 'gifts'>('album');
   const [viewer, setViewer] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [giftOpen, setGiftOpen] = useState(false);
 
   const load = useCallback(() => {
     api.get<HostProfile>(`/api/hosts/${id}`).then(setHost).catch((e) => setError(errorMessage(e)));
@@ -33,6 +36,12 @@ export default function HostProfileScreen() {
   }, [id]);
 
   useFocusEffect(load);
+
+  // Gift dari profil: buat percakapan dulu jika belum ada
+  const getConvId = useCallback(async () => {
+    const conv = await api.post<Conversation>('/api/conversations', { hostId: Number(id) });
+    return conv.id;
+  }, [id]);
 
   if (!host) {
     return (
@@ -222,7 +231,7 @@ export default function HostProfileScreen() {
             <View style={s.giftGrid}>
               {wall.gifts.map((g) => (
                 <View key={g.id} style={s.giftCell}>
-                  {g.imageUrl ? <Image source={{ uri: g.imageUrl }} style={{ width: 44, height: 44 }} contentFit="contain" /> : <Text style={{ fontSize: 30 }}>🎁</Text>}
+                  <GiftIcon icon={g.icon} imageUrl={g.imageUrl} size={40} />
                   <Text style={s.giftName} numberOfLines={1}>
                     {g.name}
                   </Text>
@@ -258,12 +267,11 @@ export default function HostProfileScreen() {
           <Pressable onPress={() => toggle('like')} style={[s.circle, { backgroundColor: host.isLiked ? colors.pink : '#FFE4EF' }]}>
             <Ionicons name={host.isLiked ? 'heart' : 'heart-outline'} size={26} color={host.isLiked ? '#fff' : colors.pink} />
           </Pressable>
-          <Pressable
-            onPress={() => Alert.alert('Segera hadir', 'Kirim gift akan tersedia di update berikutnya.')}
-            style={[s.circle, { backgroundColor: '#FFF1DB' }]}
-          >
-            <Ionicons name="gift" size={24} color="#F59E0B" />
-          </Pressable>
+          {user?.role === 'user' ? (
+            <Pressable onPress={() => setGiftOpen(true)} style={[s.circle, { backgroundColor: '#FFF1DB' }]}>
+              <Ionicons name="gift" size={24} color="#F59E0B" />
+            </Pressable>
+          ) : null}
           <Pressable style={{ flex: 1 }} onPress={() => openChat(host.id)}>
             <LinearGradient colors={gradients.brand} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.msgBtn}>
               <Ionicons name="chatbubble-ellipses" size={22} color="#fff" />
@@ -291,6 +299,16 @@ export default function HostProfileScreen() {
           {viewer ? <Image source={{ uri: viewer }} style={{ width: '100%', height: '80%' }} contentFit="contain" /> : null}
         </Pressable>
       </Modal>
+
+      {user?.role === 'user' && !isSelf ? (
+        <GiftSheet
+          visible={giftOpen}
+          onClose={() => setGiftOpen(false)}
+          getConversationId={getConvId}
+          hostName={host.displayName}
+          onSent={() => load()}
+        />
+      ) : null}
     </View>
   );
 }
