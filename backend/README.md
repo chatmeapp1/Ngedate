@@ -109,6 +109,33 @@ Access token berlaku 15 menit, refresh token 30 hari.
 | GET / PATCH | `/api/admin/settings` | `host_share, chat_price_min/max, wa_threshold_min/max, reply_window_hours` |
 | GET | `/api/admin/stats` | Pendapatan platform, jumlah user, koin yang sedang ditahan |
 
+### Onboarding & verifikasi wajah
+| Method | Path | Keterangan |
+|---|---|---|
+| GET | `/api/onboarding/agency/:code` | Cek kode undangan agency → `{ name }` |
+| POST | `/api/onboarding/complete` | `{ gender, displayName, birthDate, inviteCode? }` — sekali saja. `male` → user; `female` → host `pending` (wajib kode agency). Foto profil wajib diunggah dulu |
+| POST | `/api/onboarding/verification/challenge` | Host: 3 gerakan acak `{ challengeId, steps:[{key,text}], expiresAt }` (berlaku 3 menit, sekali pakai) |
+| POST | `/api/onboarding/verification` | Multipart: `challengeId` + 3 file di field `photos` (urut sesuai gerakan) |
+| GET | `/api/onboarding/verification` | Status verifikasi terakhir |
+
+Aturan: jenis kelamin dikunci setelah diisi (`409 GENDER_LOCKED`). Host baru tidak tampil di daftar
+sampai verifikasi wajah disetujui admin (lalu mendapat `verified: true` / centang biru).
+Foto profil & album host masuk antrean cek admin; publik hanya melihat foto yang disetujui.
+
+### Admin: agency, verifikasi, cek foto
+| Method | Path | Body |
+|---|---|---|
+| GET / POST | `/api/admin/agencies` | `{ name, code?, commissionRate (0..host_share), contact? }` — kode otomatis jika kosong |
+| PATCH | `/api/admin/agencies/:id` | `{ name?, commissionRate?, active?, contact? }` |
+| GET | `/api/admin/verifications?status=pending` | Foto verifikasi + gerakan yang diminta + foto profil |
+| POST | `/api/admin/verifications/:id/approve` / `reject` | `reject`: `{ reason }` |
+| GET | `/api/admin/photos/pending` | `{ album, avatars }` |
+| POST | `/api/admin/photos/:id/approve` / `reject` | `reject`: `{ reason }` |
+| POST | `/api/admin/users/:id/avatar/approve` / `reject` | Foto profil host yang baru |
+
+Bagi hasil dengan agency: komisi agency diambil dari bagian host.
+Contoh `host_share 0.5` + komisi agency `0.1` → host 40%, agency 10%, platform 50%.
+
 ## Realtime (socket.io)
 
 ```js

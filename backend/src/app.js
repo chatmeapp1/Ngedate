@@ -16,6 +16,7 @@ function createApp() {
 
   app.use('/api/auth', require('./routes/auth'));
   app.use('/api/me', authenticate, require('./routes/me'));
+  app.use('/api/onboarding', authenticate, require('./routes/onboarding'));
   app.use('/api/hosts', authenticate, require('./routes/hosts'));
   app.use('/api/users', authenticate, require('./routes/social'));
   app.use('/api/host/settings', authenticate, requireRole('host'), require('./routes/hostSettings'));

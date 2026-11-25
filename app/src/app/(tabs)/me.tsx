@@ -5,6 +5,7 @@ import type { ComponentProps } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar, Coin } from '@/components/ui';
+import { Verified } from '@/components/Verified';
 import { useAuth } from '@/context/auth';
 import { countryName, flag } from '@/lib/countries';
 import { number } from '@/lib/format';
@@ -32,9 +33,12 @@ export default function Me() {
         <View style={s.profile}>
           <Avatar uri={user.avatarUrl} name={user.displayName} size={76} />
           <View style={{ flex: 1, gap: 4 }}>
-            <Text style={s.name} numberOfLines={1}>
-              {user.displayName}
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={[s.name, { flexShrink: 1 }]} numberOfLines={1}>
+                {user.displayName}
+              </Text>
+              {user.verified ? <Verified size={20} /> : null}
+            </View>
             <Text style={s.meta}>
               ID {user.id} · {flag(user.countryCode)} {countryName(user.countryCode)}
             </Text>
@@ -68,6 +72,13 @@ export default function Me() {
           <>
             <Item icon="eye-outline" label="Lihat profil saya" onPress={() => router.push({ pathname: '/host/[id]', params: { id: String(user.id) } })} />
             <Item icon="options-outline" label="Pengaturan host (tarif & WhatsApp)" onPress={() => router.push('/host-settings')} />
+            {!user.verified ? (
+              <Item
+                icon="scan-outline"
+                label={user.verificationStatus === 'pending' ? 'Verifikasi wajah (sedang ditinjau)' : 'Verifikasi wajah'}
+                onPress={() => router.push('/verification')}
+              />
+            ) : null}
           </>
         ) : null}
         <Item icon="wallet-outline" label="Dompet" onPress={() => router.push('/wallet')} />

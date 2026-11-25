@@ -5,6 +5,9 @@ const wallet = require('../services/wallet');
 const realtime = require('../realtime');
 const { getSettings, updateSettings } = require('../services/settings');
 const { wrap, badRequest, notFound } = require('../lib/errors');
+const crypto = require('crypto');
+const storage = require('../lib/storage');
+const { describe } = require('../lib/gestures');
 const { publicUser } = require('./serializers');
 const { mapGift } = require('./gifts');
 
@@ -32,7 +35,11 @@ router.patch('/users/:id/role', wrap(async (req, res) => {
   );
   if (!rows.length) throw notFound('User tidak ditemukan');
   if (role === 'host') {
+    // Dijadikan host langsung oleh admin: langsung disetujui & tampil
+    await db.query(`UPDATE users SET host_status = 'approved', profile_completed = true WHERE id = $1`, [userId]);
     await db.query(`INSERT INTO host_profiles (user_id) VALUES ($1) ON CONFLICT DO NOTHING`, [userId]);
+  } else {
+    await db.query(`UPDATE users SET host_status = NULL WHERE id = $1`, [userId]);
   }
   res.json(publicUser(rows[0], { self: true }));
 }));
@@ -137,6 +144,204 @@ router.get('/stats', wrap(async (req, res) => {
     users: Object.fromEntries(users.map((r) => [r.role, Number(r.n)])),
     heldCoins: Number(held[0].held),
   });
+}));
+
+// ---------------------------------------------------------------------------
+// Agency
+// ---------------------------------------------------------------------------
+function mapAgency(a) {
+  return {
+    id: Number(a.id),
+    name: a.name,
+    code: a.code,
+    commissionRate: Number(a.commission_rate),
+    active: a.active,
+    earningsTotal: Number(a.earnings_total),
+    contact: a.contact,
+    hosts: a.hosts === undefined ? undefined : Number(a.hosts),
+    createdAt: a.created_at,
+  };
+}
+
+async function checkRate(rate) {
+  if (rate === undefined) return;
+  const n = Number(rate);
+  const { host_share } = await getSettings();
+  if (!(n >= 0 && n <= Number(host_share))) {
+    throw badRequest(`Komisi agency harus 0 sampai ${host_share} (tidak boleh melebihi bagian host)`);
+  }
+}
+
+router.get('/agencies', wrap(async (req, res) => {
+  const { rows } = await db.query(
+    `SELECT a.*, (SELECT COUNT(*) FROM users u WHERE u.agency_id = a.id) AS hosts FROM agencies a ORDER BY a.id`
+  );
+  res.json(rows.map(mapAgency));
+}));
+
+router.post('/agencies', wrap(async (req, res) => {
+  const b = req.body || {};
+  const name = v.str(b.name, 'Nama agency', { min: 2, max: 80 });
+  let code = v.str(b.code, 'Kode', { min: 4, max: 16, optional: true, pattern: /^[A-Za-z0-9]+$/ });
+  code = code ? code.toUpperCase() : crypto.randomBytes(4).toString('hex').toUpperCase().slice(0, 6);
+  await checkRate(b.commissionRate);
+  const contact = v.str(b.contact, 'Kontak', { max: 120, optional: true });
+  try {
+    const { rows } = await db.query(
+      `INSERT INTO agencies (name, code, commission_rate, contact) VALUES ($1, $2, COALESCE($3, 0.1), $4) RETURNING *`,
+      [name, code, b.commissionRate ?? null, contact ?? null]
+    );
+    res.status(201).json(mapAgency(rows[0]));
+  } catch (e) {
+    if (e.code === '23505') throw badRequest('Kode agency sudah dipakai', 'CODE_TAKEN');
+    throw e;
+  }
+}));
+
+router.patch('/agencies/:id', wrap(async (req, res) => {
+  const b = req.body || {};
+  await checkRate(b.commissionRate);
+  const { rows } = await db.query(
+    `UPDATE agencies SET
+       name = COALESCE($2, name),
+       commission_rate = COALESCE($3, commission_rate),
+       active = COALESCE($4, active),
+       contact = COALESCE($5, contact)
+     WHERE id = $1 RETURNING *`,
+    [
+      v.id(req.params.id),
+      v.str(b.name, 'Nama agency', { min: 2, max: 80, optional: true }) ?? null,
+      b.commissionRate ?? null,
+      v.bool(b.active, 'Aktif', { optional: true }) ?? null,
+      v.str(b.contact, 'Kontak', { max: 120, optional: true }) ?? null,
+    ]
+  );
+  if (!rows.length) throw notFound('Agency tidak ditemukan');
+  res.json(mapAgency(rows[0]));
+}));
+
+// ---------------------------------------------------------------------------
+// Verifikasi wajah host
+// ---------------------------------------------------------------------------
+router.get('/verifications', wrap(async (req, res) => {
+  const status = v.str(req.query.status ?? 'pending', 'status', { pattern: /^(pending|approved|rejected)$/ });
+  const { rows } = await db.query(
+    `SELECT vf.*, u.display_name, u.username, u.avatar_url, u.birth_date, a.name AS agency_name
+     FROM verifications vf JOIN users u ON u.id = vf.user_id LEFT JOIN agencies a ON a.id = u.agency_id
+     WHERE vf.status = $1 ORDER BY vf.id LIMIT 100`,
+    [status]
+  );
+  res.json(rows.map((r) => ({
+    id: Number(r.id),
+    userId: Number(r.user_id),
+    displayName: r.display_name,
+    username: r.username,
+    avatarUrl: r.avatar_url,
+    birthDate: r.birth_date,
+    agencyName: r.agency_name,
+    steps: describe(r.steps),
+    photoUrls: r.photo_urls,
+    durationMs: r.duration_ms,
+    status: r.status,
+    rejectReason: r.reject_reason,
+    createdAt: r.created_at,
+  })));
+}));
+
+router.post('/verifications/:id/approve', wrap(async (req, res) => {
+  const id = v.id(req.params.id);
+  await db.tx(async (client) => {
+    const { rows } = await client.query(
+      `UPDATE verifications SET status = 'approved', reviewed_by = $2, reviewed_at = now()
+       WHERE id = $1 AND status = 'pending' RETURNING user_id`,
+      [id, req.user.id]
+    );
+    if (!rows.length) throw notFound('Verifikasi tidak ditemukan atau sudah ditinjau');
+    // Host terverifikasi: centang biru, tampil di daftar host
+    await client.query(
+      `UPDATE users SET verified = true, host_status = 'approved', updated_at = now() WHERE id = $1`,
+      [rows[0].user_id]
+    );
+  });
+  res.json({ ok: true });
+}));
+
+router.post('/verifications/:id/reject', wrap(async (req, res) => {
+  const id = v.id(req.params.id);
+  const reason = v.str(req.body.reason, 'Alasan', { min: 3, max: 200 });
+  const { rows } = await db.query(
+    `UPDATE verifications SET status = 'rejected', reject_reason = $3, reviewed_by = $2, reviewed_at = now()
+     WHERE id = $1 AND status = 'pending' RETURNING user_id`,
+    [id, req.user.id, reason]
+  );
+  if (!rows.length) throw notFound('Verifikasi tidak ditemukan atau sudah ditinjau');
+  res.json({ ok: true });
+}));
+
+// ---------------------------------------------------------------------------
+// Cek foto host (album & foto profil baru)
+// ---------------------------------------------------------------------------
+router.get('/photos/pending', wrap(async (req, res) => {
+  const [album, avatars] = await Promise.all([
+    db.query(
+      `SELECT p.id, p.url, p.user_id, u.display_name FROM user_photos p JOIN users u ON u.id = p.user_id
+       WHERE p.status = 'pending' ORDER BY p.id LIMIT 200`
+    ),
+    db.query(
+      `SELECT id AS user_id, pending_avatar_url AS url, display_name FROM users
+       WHERE pending_avatar_url IS NOT NULL ORDER BY updated_at LIMIT 200`
+    ),
+  ]);
+  res.json({
+    album: album.rows.map((r) => ({ id: Number(r.id), url: r.url, userId: Number(r.user_id), displayName: r.display_name })),
+    avatars: avatars.rows.map((r) => ({ userId: Number(r.user_id), url: r.url, displayName: r.display_name })),
+  });
+}));
+
+router.post('/photos/:id/approve', wrap(async (req, res) => {
+  const { rowCount } = await db.query(
+    `UPDATE user_photos SET status = 'approved', reject_reason = NULL WHERE id = $1`,
+    [v.id(req.params.id)]
+  );
+  if (!rowCount) throw notFound('Foto tidak ditemukan');
+  res.json({ ok: true });
+}));
+
+router.post('/photos/:id/reject', wrap(async (req, res) => {
+  const reason = v.str(req.body.reason, 'Alasan', { min: 3, max: 200 });
+  const { rowCount } = await db.query(
+    `UPDATE user_photos SET status = 'rejected', reject_reason = $2 WHERE id = $1`,
+    [v.id(req.params.id), reason]
+  );
+  if (!rowCount) throw notFound('Foto tidak ditemukan');
+  res.json({ ok: true });
+}));
+
+router.post('/users/:id/avatar/approve', wrap(async (req, res) => {
+  const userId = v.id(req.params.id);
+  const { rows } = await db.query(
+    `SELECT avatar_url, pending_avatar_url FROM users WHERE id = $1`, [userId]
+  );
+  if (!rows.length || !rows[0].pending_avatar_url) throw notFound('Tidak ada foto profil yang menunggu');
+  await db.query(
+    `UPDATE users SET avatar_url = pending_avatar_url, pending_avatar_url = NULL, updated_at = now() WHERE id = $1`,
+    [userId]
+  );
+  if (rows[0].avatar_url) await storage.remove(rows[0].avatar_url);
+  res.json({ ok: true });
+}));
+
+router.post('/users/:id/avatar/reject', wrap(async (req, res) => {
+  const userId = v.id(req.params.id);
+  const { rows } = await db.query(
+    `UPDATE users u SET pending_avatar_url = NULL, updated_at = now()
+     FROM (SELECT pending_avatar_url AS old FROM users WHERE id = $1) o
+     WHERE u.id = $1 AND o.old IS NOT NULL RETURNING o.old`,
+    [userId]
+  );
+  if (!rows.length) throw notFound('Tidak ada foto profil yang menunggu');
+  await storage.remove(rows[0].old);
+  res.json({ ok: true });
 }));
 
 module.exports = router;

@@ -10,6 +10,9 @@ export interface User {
   age: number | null;
   role: Role;
   countryCode: string | null;
+  verified: boolean;
+  language: string;
+  tags: string[];
   online: boolean;
   lastSeenAt: string | null;
   // hanya untuk profil sendiri
@@ -18,6 +21,11 @@ export interface User {
   coins?: number;
   diamonds?: number;
   status?: string;
+  profileCompleted?: boolean;
+  hostStatus?: 'pending' | 'approved' | 'rejected' | null;
+  pendingAvatarUrl?: string | null;
+  agencyName?: string | null;
+  verificationStatus?: 'none' | 'pending' | 'approved' | 'rejected';
 }
 
 export interface Host extends User {
@@ -29,6 +37,14 @@ export interface Host extends User {
 export interface Photo {
   id: number;
   url: string;
+  status?: 'pending' | 'approved' | 'rejected';
+  rejectReason?: string | null;
+}
+
+export interface VerificationChallenge {
+  challengeId: number;
+  steps: { key: string; text: string }[];
+  expiresAt: string;
 }
 
 export interface HostProfile extends Host {

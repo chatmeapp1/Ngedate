@@ -83,12 +83,14 @@ async function getOrCreateConversation(userId, hostIdRaw) {
   if (hostId === userId) throw badRequest('Tidak bisa chat dengan diri sendiri');
 
   const { rows: people } = await db.query(
-    `SELECT id, role, status FROM users WHERE id = ANY($1::bigint[])`,
+    `SELECT id, role, status, host_status FROM users WHERE id = ANY($1::bigint[])`,
     [[userId, hostId]]
   );
   const me = people.find((p) => Number(p.id) === userId);
   const host = people.find((p) => Number(p.id) === hostId);
-  if (!host || host.role !== 'host' || host.status !== 'active') throw notFound('Host tidak ditemukan');
+  if (!host || host.role !== 'host' || host.status !== 'active' || host.host_status !== 'approved') {
+    throw notFound('Host tidak ditemukan');
+  }
   if (!me || me.role !== 'user') throw forbidden('Hanya user yang bisa memulai chat dengan host');
 
   const { rows } = await db.query(
@@ -189,13 +191,11 @@ async function settleHeld(client, conv, settings) {
   );
   if (!rows.length) return null;
   const total = rows.reduce((sum, r) => sum + Number(r.price), 0);
-  const { host, platform } = wallet.split(total, settings.host_share);
-  await wallet.creditDiamonds(client, Number(conv.host_id), host, 'chat_income', {
+  const { host } = await wallet.payHost(client, Number(conv.host_id), total, settings, 'chat', {
     type: 'conversation',
-    id: conv.id,
+    id: Number(conv.id),
     note: `${rows.length} pesan dibalas`,
   });
-  await wallet.recordPlatform(client, platform, 'chat', { type: 'conversation', id: conv.id });
   return { messages: rows.length, coins: total, hostIncome: host };
 }
 
@@ -273,9 +273,10 @@ async function sendGift(senderId, convIdRaw, giftIdRaw, countRaw) {
       paymentStatus: 'paid',
     });
     await wallet.debitCoins(client, senderId, total, 'gift_send', { type: 'message', id: messageId });
-    const { host, platform } = wallet.split(total, settings.host_share);
-    await wallet.creditDiamonds(client, Number(conv.host_id), host, 'gift_income', { type: 'message', id: messageId });
-    await wallet.recordPlatform(client, platform, 'gift', { type: 'message', id: messageId });
+    const { host } = await wallet.payHost(client, Number(conv.host_id), total, settings, 'gift', {
+      type: 'message',
+      id: messageId,
+    });
 
     const { rows: upd } = await client.query(
       `UPDATE conversations SET gift_total = gift_total + $2 WHERE id = $1 RETURNING gift_total`,

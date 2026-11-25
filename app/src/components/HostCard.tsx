@@ -4,6 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { memo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Avatar, Coin } from '@/components/ui';
+import { Verified } from '@/components/Verified';
 import { countryName, flag } from '@/lib/countries';
 import { compact } from '@/lib/format';
 import { colors, gradients, radius } from '@/lib/theme';
@@ -42,10 +43,13 @@ function HostCardBase({ host, onPress, onMessage }: { host: Host; onPress: () =>
 
       <View style={s.bottom}>
         <View style={{ flex: 1 }}>
-          <Text style={s.name} numberOfLines={1}>
-            {host.displayName}
-            {host.age ? <Text style={s.age}>  {host.age}</Text> : null}
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <Text style={[s.name, { flexShrink: 1 }]} numberOfLines={1}>
+              {host.displayName}
+              {host.age ? <Text style={s.age}>  {host.age}</Text> : null}
+            </Text>
+            {host.verified ? <Verified size={15} /> : null}
+          </View>
           <View style={s.price}>
             {host.chatPrice > 0 ? (
               <>

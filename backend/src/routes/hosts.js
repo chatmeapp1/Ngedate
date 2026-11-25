@@ -10,7 +10,7 @@ const PAGE_SIZE = 30;
 
 const HOST_COLUMNS = `u.*, hp.chat_price, hp.wa_enabled, hp.wa_number, hp.wa_unlock_threshold`;
 const HOST_FROM = `FROM users u LEFT JOIN host_profiles hp ON hp.user_id = u.id
-                   WHERE u.role = 'host' AND u.status = 'active'`;
+                   WHERE u.role = 'host' AND u.status = 'active' AND u.host_status = 'approved'`;
 
 /**
  * Daftar host.
@@ -56,7 +56,7 @@ router.get('/', wrap(async (req, res) => {
   params.push((page - 1) * PAGE_SIZE);
   const sql = `SELECT ${HOST_COLUMNS}
     FROM users u LEFT JOIN host_profiles hp ON hp.user_id = u.id ${popularJoin}
-    WHERE u.role = 'host' AND u.status = 'active' ${where.length ? 'AND ' + where.join(' AND ') : ''}
+    WHERE u.role = 'host' AND u.status = 'active' AND u.host_status = 'approved' ${where.length ? 'AND ' + where.join(' AND ') : ''}
     ORDER BY ${order}
     LIMIT ${PAGE_SIZE} OFFSET $${params.length}`;
   const { rows } = await db.query(sql, params);
@@ -89,7 +89,7 @@ router.get('/:id', wrap(async (req, res) => {
          EXISTS (SELECT 1 FROM likes WHERE user_id = $2 AND target_id = $1) AS is_liked`,
       [hostId, viewer]
     ),
-    db.query(`SELECT id, url FROM user_photos WHERE user_id = $1 ORDER BY sort_order, id`, [hostId]),
+    db.query(`SELECT id, url FROM user_photos WHERE user_id = $1 AND status = 'approved' ORDER BY sort_order, id`, [hostId]),
     db.query(
       `SELECT AVG(EXTRACT(EPOCH FROM (m.settled_at - m.created_at))) / 60 AS minutes, COUNT(*)::int AS n
        FROM messages m JOIN conversations c ON c.id = m.conversation_id

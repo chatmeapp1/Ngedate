@@ -43,7 +43,7 @@ async function register(username, countryCode) {
 
 async function makeHost(username, country) {
   const h = await register(username, country);
-  await db.query(`UPDATE users SET role = 'host' WHERE id = $1`, [h.id]);
+  await db.query(`UPDATE users SET role = 'host', host_status = 'approved', profile_completed = true WHERE id = $1`, [h.id]);
   await db.query(`INSERT INTO host_profiles (user_id, chat_price) VALUES ($1, 100)`, [h.id]);
   return h;
 }
@@ -157,32 +157,59 @@ test('negara & umur di profil sendiri', async () => {
   assert.equal(minor.body.error.code, 'UNDERAGE');
 });
 
-test('upload avatar & album foto, tampil di profil host', async () => {
+test('foto host masuk antrean cek admin, tampil setelah disetujui', async () => {
+  const bcrypt = require('bcryptjs');
+  await db.query(
+    `INSERT INTO users (username, password_hash, display_name, role) VALUES ('admin', $1, 'Admin', 'admin')`,
+    [await bcrypt.hash('admin123', 4)]
+  );
+  const admin = (await api('POST', '/api/auth/login', { body: { login: 'admin', password: 'admin123' } })).body.accessToken;
+
+  // Foto profil host: menunggu, foto lama (kosong) tetap dipakai
   const a = await api('POST', '/api/me/avatar', { token: idHost.token, form: imageForm() });
   assert.equal(a.status, 200, JSON.stringify(a.body));
-  assert.match(a.body.avatarUrl, /\/uploads\/.+\.png$/);
-  const file = await fetch(a.body.avatarUrl);
-  assert.equal(file.status, 200);
+  assert.equal(a.body.avatarUrl, null);
+  assert.match(a.body.pendingAvatarUrl, /\/uploads\/.+\.png$/);
+  assert.equal((await fetch(a.body.pendingAvatarUrl)).status, 200);
 
   const p1 = await api('POST', '/api/me/photos', { token: idHost.token, form: imageForm() });
   const p2 = await api('POST', '/api/me/photos', { token: idHost.token, form: imageForm() });
   assert.equal(p1.status, 201);
+  assert.equal(p1.body.status, 'pending');
 
   const bad = await api('POST', '/api/me/photos', { token: idHost.token, form: imageForm('text/plain', Buffer.from('halo')) });
   assert.equal(bad.status, 400);
   assert.equal(bad.body.error.code, 'INVALID_FILE');
 
-  const profile = await api('GET', `/api/hosts/${idHost.id}`, { token: user.token });
-  assert.deepEqual(profile.body.photos.map((x) => x.id), [p1.body.id, p2.body.id]);
+  // Belum disetujui: publik tidak melihat apa-apa
+  let profile = await api('GET', `/api/hosts/${idHost.id}`, { token: user.token });
+  assert.equal(profile.body.photos.length, 0);
+  assert.equal(profile.body.avatarUrl, null);
+
+  // Admin menyetujui foto profil & satu foto album, menolak yang lain
+  const pending = await api('GET', '/api/admin/photos/pending', { token: admin });
+  assert.equal(pending.body.album.length, 2);
+  assert.equal(pending.body.avatars[0].userId, idHost.id);
+  assert.equal((await api('POST', `/api/admin/users/${idHost.id}/avatar/approve`, { token: admin })).status, 200);
+  assert.equal((await api('POST', `/api/admin/photos/${p1.body.id}/approve`, { token: admin })).status, 200);
+  const rej = await api('POST', `/api/admin/photos/${p2.body.id}/reject`, { token: admin, body: { reason: 'Foto buram' } });
+  assert.equal(rej.status, 200);
+
+  profile = await api('GET', `/api/hosts/${idHost.id}`, { token: user.token });
+  assert.deepEqual(profile.body.photos.map((x) => x.id), [p1.body.id]);
+  assert.match(profile.body.avatarUrl, /\/uploads\//);
+
+  // Pemilik melihat status & alasan penolakan
+  const mine = await api('GET', '/api/me/photos', { token: idHost.token });
+  assert.deepEqual(mine.body.map((x) => [x.status, x.rejectReason]), [['approved', null], ['rejected', 'Foto buram']]);
+
+  // Foto user biasa langsung tampil
+  const up = await api('POST', '/api/me/photos', { token: user.token, form: imageForm() });
+  assert.equal(up.body.status, 'approved');
 
   // Orang lain tidak bisa menghapus foto host
   await api('DELETE', `/api/me/photos/${p1.body.id}`, { token: user.token });
-  const still = await api('GET', `/api/hosts/${idHost.id}`, { token: user.token });
-  assert.equal(still.body.photos.length, 2);
-
-  await api('DELETE', `/api/me/photos/${p1.body.id}`, { token: idHost.token });
-  const after1 = await api('GET', '/api/me/photos', { token: idHost.token });
-  assert.equal(after1.body.length, 1);
+  assert.equal((await api('GET', `/api/hosts/${idHost.id}`, { token: user.token })).body.photos.length, 1);
 });
 
 test('dinding hadiah & percakapan user di profil host', async () => {

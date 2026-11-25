@@ -57,9 +57,39 @@ function split(amount, hostShare) {
   return { host, platform: amount - host };
 }
 
+/**
+ * Bagi koin ke host, agency host (jika ada), dan platform.
+ *   host_share = bagian host sebelum komisi agency (mis. 0.5)
+ *   komisi agency (mis. 0.1 dari total) diambil dari bagian host
+ *   -> host 40%, agency 10%, platform 50%
+ */
+async function payHost(client, hostId, total, settings, source, ref) {
+  const hostGross = Math.floor(total * Number(settings.host_share));
+  const { rows } = await client.query(
+    `SELECT a.id, a.commission_rate FROM users u JOIN agencies a ON a.id = u.agency_id
+     WHERE u.id = $1 AND a.active`,
+    [hostId]
+  );
+  const agency = rows[0];
+  const agencyCut = agency ? Math.min(hostGross, Math.floor(total * Number(agency.commission_rate))) : 0;
+  const host = hostGross - agencyCut;
+  const platform = total - hostGross;
+
+  await creditDiamonds(client, hostId, host, `${source}_income`, ref);
+  if (agencyCut > 0) {
+    await client.query(
+      `INSERT INTO agency_earnings (agency_id, host_id, amount, source, ref_type, ref_id) VALUES ($1, $2, $3, $4, $5, $6)`,
+      [agency.id, hostId, agencyCut, source, ref.type || null, ref.id || null]
+    );
+    await client.query(`UPDATE agencies SET earnings_total = earnings_total + $2 WHERE id = $1`, [agency.id, agencyCut]);
+  }
+  await recordPlatform(client, platform, source, ref);
+  return { host, agency: agencyCut, platform };
+}
+
 async function balances(client, userId) {
   const { rows } = await client.query(`SELECT coins, diamonds FROM users WHERE id = $1`, [userId]);
   return rows.length ? { coins: Number(rows[0].coins), diamonds: Number(rows[0].diamonds) } : null;
 }
 
-module.exports = { lockUsers, debitCoins, creditCoins, creditDiamonds, debitDiamonds, recordPlatform, split, balances };
+module.exports = { lockUsers, debitCoins, creditCoins, creditDiamonds, debitDiamonds, recordPlatform, split, payHost, balances };

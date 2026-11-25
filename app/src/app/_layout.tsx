@@ -15,11 +15,26 @@ function AuthGate() {
 
   useEffect(() => {
     if (!ready) return;
-    const inAuth = segments[0] === '(auth)';
-    // Halaman yang boleh dibuka sebelum login
-    const isPublic = ['server', 'privacy', 'terms'].includes(segments[0] ?? '');
-    if (!user && !inAuth && !isPublic) router.replace('/login');
-    else if (user && inAuth) router.replace('/');
+    const first = segments[0] ?? '';
+    const inAuth = first === '(auth)';
+    // Halaman yang boleh dibuka kapan saja
+    const isPublic = ['server', 'privacy', 'terms'].includes(first);
+    if (!user) {
+      if (!inAuth && !isPublic) router.replace('/login');
+      return;
+    }
+    // Wajib lengkapi profil dulu setelah login pertama
+    const needsProfile = !user.profileCompleted && user.role !== 'admin';
+    // Host baru wajib verifikasi wajah (kecuali sedang ditinjau)
+    const needsVerification =
+      user.role === 'host' && !user.verified && ['none', 'rejected'].includes(user.verificationStatus ?? 'none');
+    if (needsProfile) {
+      if (first !== 'onboarding' && !isPublic) router.replace('/onboarding');
+    } else if (needsVerification) {
+      if (first !== 'verification' && !isPublic) router.replace('/verification');
+    } else if (inAuth || first === 'onboarding') {
+      router.replace('/');
+    }
   }, [ready, user, segments, router]);
 
   if (!ready) {

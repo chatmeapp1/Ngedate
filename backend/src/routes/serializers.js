@@ -20,6 +20,9 @@ function publicUser(u, { self = false } = {}) {
     age: age(u.birth_date),
     role: u.role,
     countryCode: u.country_code ? u.country_code.trim() : null,
+    verified: !!u.verified,
+    language: u.language || 'id',
+    tags: u.tags || [],
     online: realtime.isOnline(Number(u.id)),
     lastSeenAt: u.last_seen_at,
   };
@@ -29,6 +32,11 @@ function publicUser(u, { self = false } = {}) {
     out.coins = Number(u.coins);
     out.diamonds = Number(u.diamonds);
     out.status = u.status;
+    out.profileCompleted = !!u.profile_completed;
+    out.hostStatus = u.host_status || null;
+    out.pendingAvatarUrl = u.pending_avatar_url || null;
+    out.agencyName = u.agency_name || null;
+    out.verificationStatus = u.verification_status || 'none';
   }
   return out;
 }

@@ -1,11 +1,22 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COUNTRY_LIST, countryName, flag } from '@/lib/countries';
 import { colors, radius } from '@/lib/theme';
 
-export function CountryPicker({ value, onChange, label = 'Negara' }: { value?: string | null; onChange: (code: string) => void; label?: string }) {
+export function CountryPicker({
+  value,
+  onChange,
+  label = 'Negara',
+  children,
+}: {
+  value?: string | null;
+  onChange: (code: string) => void;
+  label?: string;
+  /** Ganti tampilan pemicu bawaan (mis. baris di halaman edit profil) */
+  children?: (open: () => void) => ReactNode;
+}) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState('');
   const insets = useSafeAreaInsets();
@@ -15,13 +26,19 @@ export function CountryPicker({ value, onChange, label = 'Negara' }: { value?: s
   );
 
   return (
-    <View style={{ gap: 6 }}>
-      <Text style={s.label}>{label}</Text>
-      <Pressable style={s.field} onPress={() => setOpen(true)}>
-        <Text style={{ fontSize: 18 }}>{flag(value)}</Text>
-        <Text style={[s.value, !value && { color: colors.textDim }]}>{value ? countryName(value) : 'Pilih negara'}</Text>
-        <Ionicons name="chevron-down" size={18} color={colors.textDim} />
-      </Pressable>
+    <View style={children ? undefined : { gap: 6 }}>
+      {children ? (
+        children(() => setOpen(true))
+      ) : (
+        <>
+          <Text style={s.label}>{label}</Text>
+          <Pressable style={s.field} onPress={() => setOpen(true)}>
+            <Text style={{ fontSize: 18 }}>{flag(value)}</Text>
+            <Text style={[s.value, !value && { color: colors.textDim }]}>{value ? countryName(value) : 'Pilih negara'}</Text>
+            <Ionicons name="chevron-down" size={18} color={colors.textDim} />
+          </Pressable>
+        </>
+      )}
 
       <Modal visible={open} animationType="slide" onRequestClose={() => setOpen(false)}>
         <View style={[s.sheet, { paddingTop: insets.top + 8 }]}>

@@ -7,6 +7,7 @@ import { useCallback, useState } from 'react';
 import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar, Coin, Empty, Loading } from '@/components/ui';
+import { Verified } from '@/components/Verified';
 import { useAuth } from '@/context/auth';
 import { api, errorMessage } from '@/lib/api';
 import { countryName, flag } from '@/lib/countries';
@@ -95,9 +96,12 @@ export default function HostProfileScreen() {
 
           <View style={s.identity}>
             <View style={{ flex: 1 }}>
-              <Text style={s.name} numberOfLines={1}>
-                {host.displayName}
-              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Text style={[s.name, { flexShrink: 1 }]} numberOfLines={1}>
+                  {host.displayName}
+                </Text>
+                {host.verified ? <Verified size={22} /> : null}
+              </View>
               <View style={s.badges}>
                 {host.age ? (
                   <View style={[s.badge, { backgroundColor: host.gender === 'male' ? '#3B82F6' : colors.pink }]}>
@@ -140,6 +144,15 @@ export default function HostProfileScreen() {
         </View>
 
         {host.bio ? <Text style={s.bio}>{host.bio}</Text> : null}
+        {host.tags.length ? (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingHorizontal: 16, paddingTop: 10 }}>
+            {host.tags.map((t) => (
+              <View key={t} style={{ paddingHorizontal: 10, height: 26, borderRadius: 13, backgroundColor: '#F3E8FF', justifyContent: 'center' }}>
+                <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 12 }}>#{t}</Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
 
         {/* Statistik */}
         <View style={s.stats}>

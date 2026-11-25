@@ -38,8 +38,8 @@
         "expo-image-picker",
         {
           "photosPermission": "Amora butuh akses galeri untuk memilih foto profil dan album.",
-          "cameraPermission": false,
-          "microphonePermission": false
+          "microphonePermission": false,
+          "cameraPermission": "Amora butuh kamera untuk foto profil dan verifikasi wajah."
         }
       ],
       [
@@ -53,7 +53,16 @@
         }
       ],
       "expo-font",
-      "expo-video"
+      "expo-video",
+      "@react-native-community/datetimepicker",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Amora butuh kamera untuk verifikasi wajah host.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": false
