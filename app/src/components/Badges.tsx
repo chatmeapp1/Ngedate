@@ -1,7 +1,7 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import type { ComponentProps } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View, type ViewStyle } from 'react-native';
 
 type Icon = ComponentProps<typeof MaterialCommunityIcons>['name'];
 
@@ -25,11 +25,11 @@ export function levelStyle(level: number) {
 }
 
 /** Lencana level: lambang bulat bercincin + angka pada pil gradasi. */
-export function LevelBadge({ level, size = 26 }: { level: number; size?: number }) {
+export function LevelBadge({ level, size = 26, style }: { level: number; size?: number; style?: ViewStyle }) {
   const st = levelStyle(level);
   const emblem = size * 1.18;
   return (
-    <View style={{ height: emblem, justifyContent: 'center', paddingLeft: emblem * 0.5, alignSelf: 'flex-start' }}>
+    <View style={{ height: emblem, justifyContent: 'center', paddingLeft: emblem * 0.5, alignSelf: 'flex-start', ...style }}>
       <LinearGradient
         colors={st.colors}
         start={{ x: 0, y: 0 }}
@@ -65,17 +65,17 @@ const HOST_LEVEL_COLORS: readonly (readonly [string, string])[] = [
 ];
 
 /** Lencana level host: pil kecil dengan bintang dan angka level. */
-export function HostLevelBadge({ level, size = 18 }: { level: number; size?: number }) {
+export function HostLevelBadge({ level, size = 18, style }: { level: number; size?: number; style?: ViewStyle }) {
   const c = HOST_LEVEL_COLORS[Math.max(0, Math.min(HOST_LEVEL_COLORS.length - 1, level))];
   return (
     <LinearGradient
       colors={c}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
-      style={{ height: size, borderRadius: size / 2, paddingLeft: size * 0.32, paddingRight: size * 0.42, flexDirection: 'row', alignItems: 'center', gap: size * 0.14, alignSelf: 'flex-start' }}
+      style={{ height: size, borderRadius: size / 2, paddingLeft: size * 0.32, paddingRight: size * 0.42, flexDirection: 'row', alignItems: 'center', gap: size * 0.12, alignSelf: 'flex-start', ...style }}
     >
-      <Ionicons name="star" size={size * 0.62} color="rgba(255,255,255,0.95)" />
-      <Text style={{ color: '#fff', fontWeight: '800', fontSize: size * 0.62, lineHeight: size * 0.8, minWidth: size * 0.4, textAlign: 'center' }}>{level}</Text>
+      <Ionicons name="star" size={size * 0.56} color="rgba(255,255,255,0.95)" />
+      <Text style={{ color: '#fff', fontWeight: '700', fontSize: size * 0.54, lineHeight: size * 0.95, minWidth: size * 0.36, textAlign: 'center', includeFontPadding: false, marginTop: size * 0.08 }}>{level}</Text>
     </LinearGradient>
   );
 }

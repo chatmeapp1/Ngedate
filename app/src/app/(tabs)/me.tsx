@@ -46,7 +46,7 @@ function HostHeader({ top }: { top: number }) {
               {user.displayName}
             </Text>
             {user.verified ? <Verified size={20} /> : null}
-            {m ? <HostLevelBadge level={m.level} size={18} /> : null}
+            {m ? <HostLevelBadge level={m.level} size={16} style={{ alignSelf: 'center' }} /> : null}
           </View>
           <Pressable onPress={copy} hitSlop={8} style={s.idRow}>
             <Text style={s.idPlain}>ID: {user.id}</Text>
@@ -141,7 +141,7 @@ export default function Me() {
                 {user.displayName}
               </Text>
               {user.verified ? <Verified size={20} /> : null}
-              {m ? (isHost ? <HostLevelBadge level={m.level} size={18} /> : <LevelBadge level={m.level} size={22} />) : null}
+              {m ? (isHost ? <HostLevelBadge level={m.level} size={16} style={{ alignSelf: 'center' }} /> : <LevelBadge level={m.level} size={22} style={{ alignSelf: 'center' }} />) : null}
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <View style={s.idChip}>
@@ -263,7 +263,7 @@ export default function Me() {
 
 const s = StyleSheet.create({
   profile: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  name: { fontSize: 22, fontWeight: '900', color: colors.text },
+  name: { fontSize: 19, fontWeight: '600', color: colors.text },
   meta: { color: colors.textSub, fontSize: 13 },
   hostBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', backgroundColor: colors.primary, paddingHorizontal: 8, height: 22, borderRadius: radius.pill },
   hostBadgeText: { color: '#fff', fontSize: 11, fontWeight: '800' },
@@ -275,9 +275,9 @@ const s = StyleSheet.create({
   unverifiedText: { color: '#B45309', fontSize: 11, fontWeight: '800' },
   earnWrap: { marginTop: 18, borderRadius: radius.lg, paddingTop: 4, overflow: 'hidden' },
   earnHead: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, height: 52 },
-  earnTitle: { flex: 1, color: colors.text, fontSize: 18, fontWeight: '900' },
-  earnPill: { backgroundColor: colors.primary, paddingHorizontal: 14, height: 30, borderRadius: radius.pill, justifyContent: 'center' },
-  earnPillText: { color: '#fff', fontWeight: '800', fontSize: 13 },
+  earnTitle: { flex: 1, color: colors.text, fontSize: 16, fontWeight: '700' },
+  earnPill: { backgroundColor: colors.primary, paddingHorizontal: 12, height: 26, borderRadius: radius.pill, justifyContent: 'center' },
+  earnPillText: { color: '#fff', fontWeight: '600', fontSize: 12 },
   earnBody: { backgroundColor: colors.primary, borderRadius: radius.lg, padding: 12, gap: 12 },
   earnCard: { backgroundColor: '#fff', borderRadius: radius.md, padding: 16 },
   earnCardHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },

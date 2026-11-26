@@ -113,7 +113,7 @@ export default function HostProfileScreen() {
                   {host.displayName}
                 </Text>
                 {host.verified ? <Verified size={22} /> : null}
-                {host.level != null ? <HostLevelBadge level={host.level} size={18} /> : null}
+                {host.level != null ? <HostLevelBadge level={host.level} size={16} style={{ alignSelf: 'center' }} /> : null}
               </View>
               <View style={s.badges}>
                 {host.age ? (
