@@ -19,10 +19,13 @@ export function RegionCard({ region, onPress }: { region: RegionCount; onPress: 
         <View style={s.photoWrap}>
           <Image source={{ uri: region.coverUrl }} style={StyleSheet.absoluteFill} contentFit="cover" contentPosition="top" />
           {/* Foto memudar ke warna kartu di sisi kiri */}
-          <LinearGradient colors={[from, `${from}00`]} start={{ x: 0, y: 0.5 }} end={{ x: 0.6, y: 0.5 }} style={StyleSheet.absoluteFill} />
+          <LinearGradient colors={[from, `${from}00`]} start={{ x: 0, y: 0.5 }} end={{ x: 0.55, y: 0.5 }} style={StyleSheet.absoluteFill} />
         </View>
       ) : (
-        <Text style={s.emoji}>{info.emoji}</Text>
+        // Belum ada host di wilayah ini: siluet ilustrasi
+        <View style={s.silhouette}>
+          <Ionicons name="woman" size={46} color="rgba(255,255,255,0.55)" />
+        </View>
       )}
 
       <View style={s.text}>
@@ -30,7 +33,7 @@ export function RegionCard({ region, onPress }: { region: RegionCount; onPress: 
           {info.label}
         </Text>
         <View style={s.count}>
-          <Ionicons name="people" size={13} color="rgba(255,255,255,0.92)" />
+          <Ionicons name="people" size={12} color="rgba(255,255,255,0.92)" />
           <Text style={s.countText}>{number(region.count)}</Text>
         </View>
       </View>
@@ -39,18 +42,18 @@ export function RegionCard({ region, onPress }: { region: RegionCount; onPress: 
 }
 
 const s = StyleSheet.create({
-  card: { height: 92, borderRadius: radius.md, overflow: 'hidden' },
-  photoWrap: { position: 'absolute', top: 0, right: 0, bottom: 0, width: '58%' },
-  emoji: { position: 'absolute', right: 6, bottom: 2, fontSize: 44, opacity: 0.9 },
-  text: { flex: 1, padding: 12, justifyContent: 'space-between' },
+  card: { height: 62, borderRadius: radius.md, overflow: 'hidden', flexDirection: 'row' },
+  photoWrap: { position: 'absolute', top: 0, right: 0, bottom: 0, width: '38%' },
+  silhouette: { position: 'absolute', right: 8, bottom: -2 },
+  text: { flex: 1, paddingHorizontal: 12, paddingVertical: 9, justifyContent: 'space-between' },
   title: {
     color: '#fff',
-    fontSize: 19,
-    fontWeight: '800',
-    textShadowColor: 'rgba(0,0,0,0.15)',
-    textShadowRadius: 4,
+    fontSize: 15,
+    fontWeight: '700',
+    textShadowColor: 'rgba(0,0,0,0.12)',
+    textShadowRadius: 3,
     textShadowOffset: { width: 0, height: 1 },
   },
   count: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  countText: { color: 'rgba(255,255,255,0.95)', fontWeight: '700', fontSize: 14 },
+  countText: { color: 'rgba(255,255,255,0.9)', fontWeight: '600', fontSize: 12.5 },
 });

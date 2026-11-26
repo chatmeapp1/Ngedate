@@ -100,8 +100,8 @@ export default function Home() {
 
 const s = StyleSheet.create({
   hero: { paddingHorizontal: 16, paddingBottom: 8 },
-  titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
-  title: { fontSize: 30, fontWeight: '900', color: colors.text, letterSpacing: -0.5 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
+  title: { fontSize: 22, fontWeight: '800', color: colors.text, letterSpacing: -0.3 },
   coins: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -112,7 +112,7 @@ const s = StyleSheet.create({
     borderRadius: radius.pill,
   },
   coinsText: { fontWeight: '800', color: colors.text },
-  iconBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
+  iconBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
   regionGrid: { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -5 },
   regionCell: { width: '33.333%', padding: 5 },
   tabs: { gap: 10, paddingHorizontal: 16, paddingVertical: 12 },
