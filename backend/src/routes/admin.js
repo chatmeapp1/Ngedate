@@ -11,6 +11,7 @@ const { describe } = require('../lib/gestures');
 const { publicUser } = require('./serializers');
 const { mapGift } = require('./gifts');
 const { REPORT_REASONS } = require('../services/safety');
+const withdraw = require('../services/withdraw');
 
 const router = express.Router();
 
@@ -192,6 +193,16 @@ router.patch('/settings', wrap(async (req, res) => {
     const share = Number(b.host_share);
     if (!(share >= 0 && share <= 1)) throw badRequest('host_share harus 0 sampai 1');
   }
+  const whole = (k, label, min, max) => {
+    if (b[k] === undefined) return;
+    const n = Number(b[k]);
+    if (!Number.isFinite(n) || n < min || n > max) throw badRequest(`${label} harus antara ${min} dan ${max}`);
+  };
+  whole('withdraw_rate_idr', 'Kurs rupiah per diamond', 1, 1000000);
+  whole('withdraw_min_diamonds', 'Minimal penarikan', 1, 1e9);
+  whole('withdraw_fee_percent', 'Biaya penarikan (%)', 0, 50);
+  if (b.withdraw_rate_idr !== undefined) b.withdraw_rate_idr = Math.round(Number(b.withdraw_rate_idr));
+  if (b.withdraw_min_diamonds !== undefined) b.withdraw_min_diamonds = Math.round(Number(b.withdraw_min_diamonds));
   res.json(await updateSettings(b));
 }));
 
@@ -210,6 +221,8 @@ router.get('/stats', wrap(async (req, res) => {
        (SELECT COUNT(*) FROM user_photos WHERE status = 'pending')::int AS pending_photos,
        (SELECT COUNT(*) FROM users WHERE pending_avatar_url IS NOT NULL)::int AS pending_avatars,
        (SELECT COUNT(*) FROM reports WHERE status = 'pending')::int AS pending_reports,
+       (SELECT COUNT(*) FROM withdrawals WHERE status = 'pending')::int AS pending_withdrawals,
+       (SELECT COALESCE(SUM(net_idr), 0) FROM withdrawals WHERE status = 'pending')::bigint AS pending_withdraw_idr,
        (SELECT COUNT(*) FROM users WHERE created_at > now() - interval '24 hours')::int AS new_users_24h,
        (SELECT COUNT(*) FROM messages WHERE type = 'text' AND created_at > now() - interval '24 hours')::int AS messages_24h,
        (SELECT COALESCE(SUM(price), 0) FROM messages WHERE type = 'gift' AND created_at > now() - interval '24 hours')::bigint AS gifts_24h,
@@ -226,7 +239,9 @@ router.get('/stats', wrap(async (req, res) => {
       photos: x.pending_photos,
       avatars: x.pending_avatars,
       reports: x.pending_reports,
+      withdrawals: x.pending_withdrawals,
     },
+    pendingWithdrawIdr: Number(x.pending_withdraw_idr),
     newUsers24h: x.new_users_24h,
     messages24h: x.messages_24h,
     gifts24h: Number(x.gifts_24h),
@@ -298,6 +313,28 @@ router.post('/reports/:id/review', wrap(async (req, res) => {
       );
     }
   });
+  res.json({ ok: true });
+}));
+
+// ---------------------------------------------------------------------------
+// Penarikan diamond host (dibayar manual oleh admin)
+// ---------------------------------------------------------------------------
+router.get('/withdrawals', wrap(async (req, res) => {
+  const status = v.str(req.query.status ?? 'pending', 'status', { pattern: /^(pending|paid|rejected|cancelled)$/ });
+  res.json(await withdraw.adminList(status));
+}));
+
+router.post('/withdrawals/:id/pay', wrap(async (req, res) => {
+  const w = await withdraw.adminPay(req.user.id, req.params.id, req.body || {});
+  realtime.emitTo(Number(w.user_id), 'withdrawal:update', { id: Number(w.id), status: 'paid' });
+  res.json({ ok: true });
+}));
+
+router.post('/withdrawals/:id/reject', wrap(async (req, res) => {
+  const w = await withdraw.adminReject(req.user.id, req.params.id, req.body || {});
+  realtime.emitTo(Number(w.user_id), 'withdrawal:update', { id: Number(w.id), status: 'rejected' });
+  const b = await wallet.balances(db, Number(w.user_id));
+  if (b) realtime.emitTo(Number(w.user_id), 'wallet:update', b);
   res.json({ ok: true });
 }));
 

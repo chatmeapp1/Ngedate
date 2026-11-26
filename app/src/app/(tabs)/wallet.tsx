@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useFocusEffect } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Alert, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -19,6 +19,9 @@ const REASONS: Record<string, string> = {
   gift_income: 'Penghasilan gift',
   admin_topup: 'Top up',
   admin_adjust: 'Penyesuaian admin',
+  withdraw_hold: 'Penarikan diamond',
+  withdraw_refund: 'Penarikan dikembalikan',
+  account_deleted: 'Akun dihapus',
 };
 
 export default function WalletScreen() {
@@ -92,6 +95,9 @@ export default function WalletScreen() {
                   <Text style={s.diamondLabel}>Penghasilan (diamond)</Text>
                   <Text style={s.diamondValue}>{number(wallet?.diamonds ?? 0)}</Text>
                 </View>
+                <Pressable onPress={() => router.push('/withdraw')} style={s.withdrawBtn}>
+                  <Text style={s.withdrawText}>Tarik</Text>
+                </Pressable>
               </View>
             ) : null}
             <Text style={s.section}>Riwayat</Text>
@@ -116,6 +122,8 @@ export default function WalletScreen() {
 }
 
 const s = StyleSheet.create({
+  withdrawBtn: { paddingHorizontal: 16, height: 36, borderRadius: radius.pill, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
+  withdrawText: { color: '#fff', fontWeight: '800' },
   title: { fontSize: 28, fontWeight: '900', color: colors.text },
   card: { borderRadius: radius.lg, padding: 20, gap: 8 },
   cardLabel: { color: 'rgba(255,255,255,0.85)', fontWeight: '700' },

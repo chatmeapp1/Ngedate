@@ -33,6 +33,7 @@ function createApp() {
   app.use('/api/onboarding', authenticate, require('./routes/onboarding'));
   app.use('/api/hosts', authenticate, require('./routes/hosts'));
   app.use('/api/members', authenticate, requireRole('host'), require('./routes/members'));
+  app.use('/api/withdrawals', authenticate, requireRole('host'), require('./routes/withdrawals'));
   app.use('/api/account', authenticate, require('./routes/account'));
   app.use('/api/blocks', authenticate, require('./routes/safety').blocks);
   app.use('/api/reports', authenticate, require('./routes/safety').reports);

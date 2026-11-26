@@ -7,6 +7,10 @@ const DEFAULTS = {
   wa_threshold_min: 10000,
   wa_threshold_max: 100000000,
   reply_window_hours: 24,
+  // Penarikan diamond host (nilai awal, ubah di panel admin > Pengaturan)
+  withdraw_rate_idr: 10, // rupiah per 1 diamond
+  withdraw_min_diamonds: 10000, // minimal diamond per penarikan
+  withdraw_fee_percent: 0, // biaya penarikan (% dari jumlah rupiah)
 };
 
 async function getSettings(client = db) {

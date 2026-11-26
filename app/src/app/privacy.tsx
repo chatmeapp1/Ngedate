@@ -26,6 +26,10 @@ export default function Privacy() {
           body: 'Saat Anda melaporkan pengguna dari dalam chat, beberapa pesan terakhir di percakapan itu disalin dan hanya dapat dilihat tim moderasi kami untuk menilai laporan. Laporan bersifat rahasia dan tidak diberitahukan kepada pengguna yang dilaporkan. Pengguna yang Anda blokir tidak dapat melihat atau mengirim pesan kepada Anda.',
         },
         {
+          title: 'Penarikan penghasilan host',
+          body: 'Untuk menarik diamond, host mengisi data rekening bank atau e-wallet (nama bank, nomor, dan nama pemilik). Data ini hanya dilihat tim kami untuk memproses transfer, disimpan terenkripsi di perangkat Anda selama login, dan dihapus saat akun dihapus. Catatan penarikan yang sudah selesai disimpan untuk pembukuan, hanya dengan 4 digit terakhir nomor rekening.',
+        },
+        {
           title: 'Berbagi data',
           body: 'Kami tidak menjual data pribadi. Data hanya dibagikan kepada penyedia layanan yang membantu menjalankan Amora (misalnya penyimpanan server dan pembayaran) atau bila diwajibkan hukum.',
         },

@@ -179,3 +179,33 @@ export interface SendGiftResult {
   giftTotal: number;
   waUnlocked: boolean;
 }
+
+export interface Withdrawal {
+  id: number;
+  diamonds: number;
+  rateIdr: number;
+  grossIdr: number;
+  feeIdr: number;
+  netIdr: number;
+  kind: 'bank' | 'ewallet';
+  provider: string;
+  accountNumber: string;
+  accountName: string;
+  status: 'pending' | 'paid' | 'rejected' | 'cancelled';
+  adminNote: string | null;
+  transferRef: string | null;
+  createdAt: string;
+  reviewedAt: string | null;
+}
+
+export interface WithdrawOptions {
+  diamonds: number;
+  rateIdr: number;
+  minDiamonds: number;
+  feePercent: number;
+  passwordSet: boolean;
+  cooldownHours: number;
+  providers: { kind: 'bank' | 'ewallet'; name: string }[];
+  account: { kind: 'bank' | 'ewallet'; provider: string; accountNumber: string; accountName: string; cooldownUntil: string | null } | null;
+  pending: Withdrawal | null;
+}

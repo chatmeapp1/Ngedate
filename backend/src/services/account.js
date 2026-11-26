@@ -5,7 +5,7 @@ const v = require('../lib/validate');
 const wallet = require('./wallet');
 const storage = require('../lib/storage');
 const tokens = require('../lib/tokens');
-const { badRequest, forbidden, notFound, unauthorized } = require('../lib/errors');
+const { ApiError, badRequest, forbidden, notFound, unauthorized } = require('../lib/errors');
 
 async function loadUser(client, userId) {
   const { rows } = await client.query(`SELECT * FROM users WHERE id = $1`, [userId]);
@@ -67,6 +67,12 @@ async function deleteAccount(userId, { confirm, password }) {
     if (user.role === 'admin') throw forbidden('Akun admin tidak bisa dihapus dari aplikasi', 'ADMIN_PROTECTED');
     await checkCurrentPassword(user, password);
 
+    // Diamond yang sedang diproses untuk penarikan tidak boleh hilang begitu saja
+    const { rows: pendingW } = await client.query(`SELECT 1 FROM withdrawals WHERE user_id = $1 AND status = 'pending'`, [userId]);
+    if (pendingW.length) {
+      throw new ApiError(409, 'WITHDRAWAL_PENDING', 'Masih ada penarikan diamond yang diproses. Tunggu selesai atau batalkan dulu sebelum menghapus akun.');
+    }
+
     // 1) Koin yang masih ditahan: kembalikan ke pengirimnya
     const refunds = [];
     const { rows: convs } = await client.query(
@@ -119,6 +125,9 @@ async function deleteAccount(userId, { confirm, password }) {
     await client.query(`DELETE FROM blocks WHERE blocker_id = $1 OR blocked_id = $1`, [userId]);
     await client.query(`UPDATE verifications SET photo_urls = '{}' WHERE user_id = $1`, [userId]);
     await client.query(`UPDATE host_profiles SET wa_number = NULL, wa_enabled = false WHERE user_id = $1`, [userId]);
+    // Rekening penarikan dihapus; catatan penarikan lama (pembukuan) hanya menyisakan 4 digit terakhir
+    await client.query(`DELETE FROM payout_accounts WHERE user_id = $1`, [userId]);
+    await client.query(`UPDATE withdrawals SET account_name = '(dihapus)', account_number = RIGHT(account_number, 4) WHERE user_id = $1`, [userId]);
 
     // 5) Anonimkan akun
     await client.query(

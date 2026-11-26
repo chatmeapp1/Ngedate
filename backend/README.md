@@ -112,6 +112,18 @@ CONFIRM_RESET=HAPUS-SEMUA-DATA ADMIN_USERNAME=amora ADMIN_PASSWORD=ganti-ini npm
 Tanpa `CONFIRM_RESET=HAPUS-SEMUA-DATA` perintah ini dibatalkan. Hanya file unggahan buatan aplikasi yang dihapus,
 file lain di folder yang sama tidak disentuh. Admin mendapat ID 100001, akun pertama pengguna 100002.
 
+## Penarikan diamond host
+
+Host menarik diamond di aplikasi (Dompet > Tarik, atau Saya > Tarik diamond). Alurnya manual:
+
+1. Host mengisi rekening bank/e-wallet (wajib punya password; wajib mengisi password saat menyimpan rekening).
+2. Host mengajukan penarikan: diamond **langsung dipotong (ditahan)**. Satu pengajuan menunggu per host.
+3. Admin membuka **Penarikan** di panel, transfer manual ke rekening itu, lalu **Tandai sudah dibayar**
+   (opsional nomor referensi). Jika ditolak (wajib alasan), diamond otomatis dikembalikan. Host juga bisa membatalkan sendiri.
+
+Pengaturan di panel admin > Pengaturan: **rupiah per diamond** (awal 10), **minimal diamond** (awal 10.000), **biaya %** (awal 0).
+Pengaman: mengubah rekening menahan penarikan 24 jam; akun tidak bisa dihapus saat ada penarikan berjalan.
+
 ## Panel admin web
 
 Buka `http://<alamat-server>:<port>/admin` di browser (HP juga bisa) lalu masuk dengan akun admin

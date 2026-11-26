@@ -414,7 +414,7 @@ async function pageDashboard() {
   const earn = Object.entries(s.platformEarnings);
   const totalEarn = earn.reduce((a, [, v]) => a + v, 0);
   const stat = (n, l, warn) => h('div', { class: 'card stat' + (warn ? ' warn' : '') }, h('div', { class: 'n' }, n), h('div', { class: 'l' }, l));
-  const pend = s.pending.verifications + s.pending.photos + s.pending.avatars + s.pending.reports;
+  const pend = s.pending.verifications + s.pending.photos + s.pending.avatars + s.pending.reports + s.pending.withdrawals;
   return [
     pageHead('Dashboard', 'Ringkasan Amora saat ini'),
     pend > 0
@@ -424,7 +424,8 @@ async function pageDashboard() {
             h('span', { class: 'sp' }),
             s.pending.verifications ? h('a', { class: 'btn pri sm', href: '#verifikasi' }, 'Verifikasi wajah (' + s.pending.verifications + ')') : null,
             s.pending.photos + s.pending.avatars ? h('a', { class: 'btn pri sm', href: '#foto' }, 'Foto host (' + (s.pending.photos + s.pending.avatars) + ')') : null,
-            s.pending.reports ? h('a', { class: 'btn pri sm', href: '#laporan' }, 'Laporan (' + s.pending.reports + ')') : null))
+            s.pending.reports ? h('a', { class: 'btn pri sm', href: '#laporan' }, 'Laporan (' + s.pending.reports + ')') : null,
+            s.pending.withdrawals ? h('a', { class: 'btn pri sm', href: '#penarikan' }, 'Penarikan (' + s.pending.withdrawals + ' · Rp ' + fmt(s.pendingWithdrawIdr) + ')') : null))
       : null,
     h('div', { class: 'grid g3' },
       stat(fmt(s.users.user || 0), 'Pengguna'),
@@ -782,6 +783,86 @@ async function pageReports() {
   return root;
 }
 
+// ----- Penarikan diamond host -----
+let wdTab = 'pending';
+const rupiah = (n) => 'Rp ' + fmt(n);
+
+function copyText(text, label) {
+  const done = () => toast((label || 'Teks') + ' disalin');
+  const fail = () => toast('Salin manual: ' + text, true);
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, fail);
+  else fail();
+}
+
+async function pageWithdrawals() {
+  const list = await get('/api/admin/withdrawals?status=' + wdTab);
+  const root = h('div');
+  const totalNet = list.reduce((a, w) => a + w.netIdr, 0);
+  root.append(
+    ...pageHead('Penarikan diamond', 'Transfer manual ke rekening host, lalu tandai sudah dibayar. Jika ditolak, diamond otomatis dikembalikan ke host.'),
+    h('div', { class: 'tabs' }, [['pending', 'Menunggu'], ['paid', 'Dibayar'], ['rejected', 'Ditolak'], ['cancelled', 'Dibatalkan']].map(([k, l]) =>
+      h('button', { class: 'tab' + (wdTab === k ? ' on' : ''), onclick: () => { wdTab = k; render(); } }, l)))
+  );
+  if (wdTab === 'pending' && list.length) {
+    root.append(h('div', { class: 'card stat warn', style: 'margin-bottom:14px' },
+      h('div', { class: 'n' }, rupiah(totalNet)),
+      h('div', { class: 'l' }, list.length + ' pengajuan menunggu — total yang perlu ditransfer')));
+  }
+  if (!list.length) root.append(empty('Tidak ada penarikan'));
+
+  const row = (k, v, copy) => h('div', { class: 'row', style: 'justify-content:space-between;gap:8px;padding:4px 0' },
+    h('span', { class: 'muted' }, k),
+    h('span', { class: 'row', style: 'gap:6px' }, h('b', {}, v), copy ? h('button', { class: 'btn sm', onclick: () => copyText(copy, k) }, 'Salin') : null));
+
+  const grid = h('div', { class: 'grid', style: 'grid-template-columns:repeat(auto-fill,minmax(340px,1fr))' });
+  for (const w of list) {
+    grid.append(h('div', { class: 'card' },
+      h('div', { class: 'row', style: 'margin-bottom:10px' },
+        avatar(w.user.avatarUrl, w.user.displayName),
+        h('div', { class: 'sp', style: 'min-width:0' }, h('b', {}, w.user.displayName), h('div', { class: 'dim' }, 'ID ' + w.user.id + ' · ' + ago(w.createdAt))),
+        w.status !== 'pending' ? h('span', { class: 'pill ' + (w.status === 'paid' ? 'green' : 'red') }, { paid: 'Dibayar', rejected: 'Ditolak', cancelled: 'Dibatalkan' }[w.status]) : null),
+      h('div', { class: 'quote', style: 'font-style:normal;background:#f5f3ff;border-color:var(--primary)' },
+        h('div', { class: 'dim' }, 'Transfer ke host'),
+        h('div', { style: 'font-size:26px;font-weight:900;letter-spacing:-.5px' }, rupiah(w.netIdr)),
+        h('div', { class: 'dim' }, fmt(w.diamonds) + ' diamond × Rp ' + fmt(w.rateIdr) + ' = ' + rupiah(w.grossIdr) + (w.feeIdr ? ' − biaya ' + rupiah(w.feeIdr) : ''))),
+      h('div', { style: 'margin:8px 0' },
+        row(w.kind === 'bank' ? 'Bank' : 'E-wallet', w.provider),
+        row('Nomor', w.accountNumber, w.accountNumber),
+        row('Atas nama', w.accountName, w.accountName),
+        w.paidBeforeIdr ? row('Sudah dibayar sebelumnya', rupiah(w.paidBeforeIdr)) : null),
+      w.status === 'pending'
+        ? h('div', { class: 'row wrap', style: 'gap:6px;margin-top:10px' },
+            h('button', { class: 'btn ok sp', onclick: () => pay(w) }, 'Tandai sudah dibayar'),
+            h('button', { class: 'btn bad', onclick: () => reject(w) }, 'Tolak'))
+        : h('div', { class: 'dim', style: 'margin-top:6px' },
+            (w.transferRef ? 'Ref: ' + w.transferRef + ' · ' : '') + (w.adminNote || '') + (w.reviewedAt ? ' · ' + ago(w.reviewedAt) : ''))));
+  }
+  root.append(grid);
+
+  async function pay(w) {
+    const f = await formModal({
+      title: 'Tandai sudah dibayar',
+      submit: 'Sudah ditransfer',
+      fields: [
+        { name: 'ref', label: 'Nomor referensi transfer (opsional)', type: 'text', hint: 'Dari bukti transfer, untuk pembukuan' },
+        { name: 'note', label: 'Catatan (opsional)', type: 'textarea' },
+      ],
+    });
+    if (f && await act(() => post('/api/admin/withdrawals/' + w.id + '/pay', { ref: f.ref || undefined, note: f.note || undefined }), 'Ditandai sudah dibayar')) render();
+  }
+
+  async function reject(w) {
+    const f = await formModal({
+      title: 'Tolak penarikan',
+      submit: 'Tolak & kembalikan diamond',
+      danger: true,
+      fields: [{ name: 'reason', label: 'Alasan (dilihat host)', type: 'textarea', hint: 'Mis. nama rekening tidak cocok dengan nama akun' }],
+    });
+    if (f && await act(() => post('/api/admin/withdrawals/' + w.id + '/reject', { reason: f.reason }), 'Ditolak, diamond dikembalikan')) render();
+  }
+  return root;
+}
+
 // ----- Gift -----
 function giftIcon(g) {
   return h('div', { class: 'gift-ic' }, g.imageUrl ? h('img', { src: g.imageUrl, alt: '' }) : (g.icon || '🎁'));
@@ -889,6 +970,9 @@ async function pageSettings() {
     { k: 'wa_threshold_min', label: 'Syarat total gift untuk buka WA — minimum (koin)', min: 0 },
     { k: 'wa_threshold_max', label: 'Syarat total gift untuk buka WA — maksimum (koin)', min: 0 },
     { k: 'reply_window_hours', label: 'Batas balas sebelum koin dikembalikan (jam)', min: 1 },
+    { k: 'withdraw_rate_idr', label: 'Penarikan: rupiah per 1 diamond', hint: 'Kurs pencairan host. Berlaku untuk pengajuan berikutnya.', min: 1 },
+    { k: 'withdraw_min_diamonds', label: 'Penarikan: minimal diamond per pengajuan', min: 1 },
+    { k: 'withdraw_fee_percent', label: 'Penarikan: biaya (%)', hint: 'Dipotong dari jumlah rupiah. 0 = tanpa biaya.', min: 0, max: 50 },
   ];
   const inputs = {};
   const form = h('form', { class: 'card', style: 'max-width:520px', onsubmit: async (e) => {
@@ -920,6 +1004,7 @@ const pages = {
   foto: { title: 'Foto host', icon: '🖼️', fn: pagePhotos, badge: () => stats && stats.pending.photos + stats.pending.avatars },
   pengguna: { title: 'Pengguna', icon: '👥', fn: pageUsers },
   topup: { title: 'Top up koin', icon: '💰', fn: pageTopup },
+  penarikan: { title: 'Penarikan', icon: '💸', fn: pageWithdrawals, badge: () => stats && stats.pending.withdrawals },
   laporan: { title: 'Laporan', icon: '🚩', fn: pageReports, badge: () => stats && stats.pending.reports },
   agency: { title: 'Agency', icon: '🏢', fn: pageAgency },
   gift: { title: 'Gift', icon: '🎁', fn: pageGifts },

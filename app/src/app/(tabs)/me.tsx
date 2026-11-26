@@ -74,6 +74,7 @@ export default function Me() {
           <>
             <Item icon="eye-outline" label="Lihat profil saya" onPress={() => router.push({ pathname: '/host/[id]', params: { id: String(user.id) } })} />
             <Item icon="options-outline" label="Pengaturan host (tarif & WhatsApp)" onPress={() => router.push('/host-settings')} />
+            <Item icon="cash-outline" label="Tarik diamond" onPress={() => router.push('/withdraw')} />
             {!user.verified ? (
               <Item
                 icon="scan-outline"
