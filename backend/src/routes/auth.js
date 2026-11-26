@@ -80,8 +80,8 @@ router.post('/quick', limiter, wrap(async (req, res) => {
       await client.query('SAVEPOINT pick_username');
       try {
         const { rows } = await client.query(
-          `INSERT INTO users (username, password_hash, display_name, country_code)
-           VALUES ($1, $2, $3, $4) RETURNING *`,
+          `INSERT INTO users (username, password_hash, display_name, country_code, password_set)
+           VALUES ($1, $2, $3, $4, false) RETURNING *`,
           [`amora${digits}`, hash, `Amora ${digits.slice(-4)}`, country ? country.toUpperCase() : null]
         );
         await client.query(`INSERT INTO device_accounts (device_hash, user_id) VALUES ($1, $2)`, [deviceHash, rows[0].id]);

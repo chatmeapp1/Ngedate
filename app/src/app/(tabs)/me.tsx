@@ -87,6 +87,7 @@ export default function Me() {
       </View>
 
       <View style={s.group}>
+        <Item icon="settings-outline" label="Pengaturan akun" onPress={() => router.push('/account-settings')} />
         <Item icon="shield-checkmark-outline" label="Pengguna diblokir" onPress={() => router.push('/blocked')} />
         <Item icon="server-outline" label="Alamat server" onPress={() => router.push('/server')} />
         <Item

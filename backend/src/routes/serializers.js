@@ -37,6 +37,7 @@ function publicUser(u, { self = false } = {}) {
     out.pendingAvatarUrl = u.pending_avatar_url || null;
     out.agencyName = u.agency_name || null;
     out.verificationStatus = u.verification_status || 'none';
+    out.passwordSet = u.password_set !== false;
   }
   return out;
 }

@@ -104,6 +104,11 @@ async function request<T>(method: string, path: string, body?: Body, retry = tru
   if (res.ok) return data as T;
 
   const code: string = data?.error?.code ?? 'ERROR';
+  if (code === 'ACCOUNT_DELETED' && session) {
+    // Akun sudah dihapus (mis. dari HP lain): sesi di sini dibersihkan
+    await setSession(null);
+    logoutListeners.forEach((fn) => fn());
+  }
   if (res.status === 401 && code === 'TOKEN_EXPIRED' && retry && (await refreshSession())) {
     return request<T>(method, path, body, false);
   }

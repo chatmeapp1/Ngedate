@@ -13,6 +13,13 @@ function createApp() {
 
   app.get('/health', (req, res) => res.json({ ok: true }));
   app.use('/uploads', express.static(storage.UPLOAD_DIR, { maxAge: '30d', immutable: true }));
+
+  // Halaman publik cara menghapus akun (dibutuhkan formulir Data Safety Google Play)
+  const deletePage = require('fs').readFileSync(require('path').join(__dirname, '..', 'public', 'hapus-akun.html'), 'utf8');
+  app.get(['/hapus-akun', '/delete-account'], (req, res) => {
+    const support = (process.env.SUPPORT_CONTACT || 'tim dukungan Amora').replace(/[<>&"]/g, '');
+    res.type('html').send(deletePage.replace(/\{\{SUPPORT\}\}/g, support));
+  });
   // Panel admin web (halaman statis; semua data lewat /api/admin dengan login admin)
   app.use(
     '/admin',
@@ -26,6 +33,7 @@ function createApp() {
   app.use('/api/onboarding', authenticate, require('./routes/onboarding'));
   app.use('/api/hosts', authenticate, require('./routes/hosts'));
   app.use('/api/members', authenticate, requireRole('host'), require('./routes/members'));
+  app.use('/api/account', authenticate, require('./routes/account'));
   app.use('/api/blocks', authenticate, require('./routes/safety').blocks);
   app.use('/api/reports', authenticate, require('./routes/safety').reports);
   app.use('/api/users', authenticate, require('./routes/social'));

@@ -19,6 +19,7 @@ async function authenticate(req, res, next) {
     }
     const { rows } = await db.query(`SELECT id, role, status FROM users WHERE id = $1`, [payload.id]);
     if (!rows.length) throw unauthorized('Akun tidak ditemukan');
+    if (rows[0].status === 'deleted') throw forbidden('Akun sudah dihapus', 'ACCOUNT_DELETED');
     if (rows[0].status !== 'active') throw forbidden('Akun ditangguhkan', 'SUSPENDED');
     req.user = { id: Number(rows[0].id), role: rows[0].role };
     next();

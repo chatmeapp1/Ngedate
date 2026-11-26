@@ -528,7 +528,7 @@ async function pageUsers(param) {
   const root = h('div', {}, pageHead('Pengguna', 'Maksimal 100 hasil terbaru. Gunakan pencarian nama, username, email, atau ID.'));
   const input = h('input', { type: 'search', placeholder: 'Cari…', value: filt.q, onkeydown: (e) => { if (e.key === 'Enter') go(); } });
   const role = h('select', {}, [['', 'Semua peran'], ['user', 'User'], ['host', 'Host'], ['admin', 'Admin']].map(([v, l]) => h('option', { value: v, selected: filt.role === v }, l)));
-  const status = h('select', {}, [['', 'Semua status'], ['active', 'Aktif'], ['suspended', 'Ditangguhkan']].map(([v, l]) => h('option', { value: v, selected: filt.status === v }, l)));
+  const status = h('select', {}, [['', 'Semua status'], ['active', 'Aktif'], ['suspended', 'Ditangguhkan'], ['deleted', 'Dihapus']].map(([v, l]) => h('option', { value: v, selected: filt.status === v }, l)));
   const go = () => { filt.q = input.value.trim(); filt.role = role.value; filt.status = status.value; render(); };
   role.onchange = go; status.onchange = go;
   root.append(h('div', { class: 'search' }, input, role, status, h('button', { class: 'btn pri', onclick: go }, 'Cari')));
@@ -536,7 +536,7 @@ async function pageUsers(param) {
 
   const grid = h('div', { class: 'grid g2' });
   for (const u of list) {
-    const isAdmin = u.role === 'admin';
+    const isAdmin = u.role === 'admin' || u.status === 'deleted';
     grid.append(h('div', { class: 'card' },
       h('div', { class: 'row' },
         avatar(u.avatarUrl, u.displayName),
@@ -548,6 +548,7 @@ async function pageUsers(param) {
         h('span', { class: 'pill' }, u.gender === 'male' ? 'Pria' : u.gender === 'female' ? 'Wanita' : 'Gender -'),
         u.countryCode ? h('span', { class: 'pill' }, u.countryCode) : null,
         u.status === 'suspended' ? h('span', { class: 'pill red' }, 'Ditangguhkan') : null,
+        u.status === 'deleted' ? h('span', { class: 'pill red' }, 'Akun dihapus') : null,
         u.role === 'host' && u.hostStatus !== 'approved' ? h('span', { class: 'pill amber' }, 'Host: ' + (u.hostStatus || '-')) : null,
         u.agencyName ? h('span', { class: 'pill' }, u.agencyName) : null,
         !u.profileCompleted && !isAdmin ? h('span', { class: 'pill amber' }, 'Profil belum lengkap') : null),

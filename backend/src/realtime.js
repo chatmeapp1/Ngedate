@@ -68,6 +68,12 @@ function emitTo(userIds, event, payload) {
   for (const id of [].concat(userIds)) io.to(`user:${id}`).emit(event, payload);
 }
 
+// Putuskan semua koneksi socket seorang user (mis. akun dihapus)
+function disconnectUser(userId) {
+  if (!io) return;
+  io.in(`user:${userId}`).disconnectSockets(true);
+}
+
 function isOnline(userId) {
   if (!io) return false;
   const room = io.sockets.adapter.rooms.get(`user:${userId}`);
@@ -84,4 +90,4 @@ function onlineUserIds() {
   return ids;
 }
 
-module.exports = { attach, emitTo, isOnline, onlineUserIds };
+module.exports = { attach, emitTo, isOnline, onlineUserIds, disconnectUser };

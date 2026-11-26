@@ -26,6 +26,8 @@ export interface User {
   pendingAvatarUrl?: string | null;
   agencyName?: string | null;
   verificationStatus?: 'none' | 'pending' | 'approved' | 'rejected';
+  /** false = akun Login cepat yang belum pernah mengatur password */
+  passwordSet?: boolean;
 }
 
 export interface Host extends User {

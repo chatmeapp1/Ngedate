@@ -37,6 +37,8 @@ async function blockerBetween(client, a, b) {
 
 /** Lempar 403 BLOCKED bila ada blokir. Pesan sengaja tidak membuka siapa yang memblokir ke pihak yang diblokir. */
 async function assertNotBlocked(client, senderId, otherId) {
+  const { rows: st } = await client.query(`SELECT status FROM users WHERE id = $1`, [otherId]);
+  if (st.length && st[0].status === 'deleted') throw new ApiError(403, 'ACCOUNT_DELETED', 'Akun ini sudah dihapus.');
   const blocker = await blockerBetween(client, senderId, otherId);
   if (blocker === null) return;
   if (blocker === senderId) {

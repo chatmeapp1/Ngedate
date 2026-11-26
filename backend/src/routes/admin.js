@@ -17,7 +17,7 @@ const router = express.Router();
 router.get('/users', wrap(async (req, res) => {
   const q = v.str(req.query.q, 'q', { max: 50, optional: true });
   const role = v.str(req.query.role, 'role', { optional: true, pattern: /^(user|host|admin)$/ });
-  const status = v.str(req.query.status, 'status', { optional: true, pattern: /^(active|suspended)$/ });
+  const status = v.str(req.query.status, 'status', { optional: true, pattern: /^(active|suspended|deleted)$/ });
   const params = [];
   const where = [];
   if (q) {
@@ -55,7 +55,7 @@ router.patch('/users/:id/role', wrap(async (req, res) => {
   const userId = v.id(req.params.id);
   const role = v.str(req.body.role, 'role', { pattern: /^(user|host)$/ });
   const { rows } = await db.query(
-    `UPDATE users SET role = $2, updated_at = now() WHERE id = $1 AND role <> 'admin' RETURNING *`,
+    `UPDATE users SET role = $2, updated_at = now() WHERE id = $1 AND role <> 'admin' AND status <> 'deleted' RETURNING *`,
     [userId, role]
   );
   if (!rows.length) throw notFound('User tidak ditemukan');
@@ -73,7 +73,7 @@ router.patch('/users/:id/status', wrap(async (req, res) => {
   const userId = v.id(req.params.id);
   const status = v.str(req.body.status, 'status', { pattern: /^(active|suspended)$/ });
   const { rows } = await db.query(
-    `UPDATE users SET status = $2, updated_at = now() WHERE id = $1 AND role <> 'admin' RETURNING *`,
+    `UPDATE users SET status = $2, updated_at = now() WHERE id = $1 AND role <> 'admin' AND status <> 'deleted' RETURNING *`,
     [userId, status]
   );
   if (!rows.length) throw notFound('User tidak ditemukan');

@@ -35,7 +35,7 @@ export default function Privacy() {
         },
         {
           title: 'Hak Anda',
-          body: 'Anda dapat mengubah profil kapan saja dan meminta penghapusan akun beserta datanya dengan menghubungi kami.',
+          body: 'Anda dapat mengubah profil kapan saja. Anda juga dapat menghapus akun beserta data pribadinya langsung dari aplikasi lewat Saya > Pengaturan akun > Hapus akun. Penghapusan berlaku permanen: saldo koin dan diamond hangus, sedangkan catatan transaksi tanpa identitas dan laporan pelanggaran dipertahankan untuk pembukuan dan moderasi. Jika tidak bisa membuka aplikasi, ikuti petunjuk di halaman hapus-akun pada alamat server Anda atau hubungi kami.',
         },
         {
           title: 'Usia minimum',
