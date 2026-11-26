@@ -65,6 +65,36 @@ async function saveFile(req, file) {
   return { name, url: `${publicBase(req)}/uploads/${name}` };
 }
 
+// ---- Video efek gift (MP4, maks 15 MB) ----
+const videoUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 15 * 1024 * 1024, files: 1 },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === 'video/mp4') cb(null, true);
+    else cb(badRequest('Hanya video MP4', 'INVALID_FILE'));
+  },
+}).single('file');
+
+function singleVideo(req, res, next) {
+  videoUpload(req, res, (err) => {
+    if (!err) return next();
+    if (err.code === 'LIMIT_FILE_SIZE') return next(badRequest('Ukuran video maksimal 15 MB', 'FILE_TOO_LARGE'));
+    next(err);
+  });
+}
+
+async function saveVideo(req) {
+  const file = req.file;
+  if (!file) throw badRequest('File video wajib diisi', 'FILE_REQUIRED');
+  // Tanda tangan MP4: kotak "ftyp" di byte 4-8 (jangan percaya tipe dari klien saja)
+  if (file.buffer.length < 12 || file.buffer.subarray(4, 8).toString('latin1') !== 'ftyp') {
+    throw badRequest('File bukan video MP4 yang valid', 'INVALID_FILE');
+  }
+  const name = `${Date.now()}-${crypto.randomBytes(8).toString('hex')}.mp4`;
+  await fs.promises.writeFile(path.join(UPLOAD_DIR, name), file.buffer);
+  return { name, url: `${publicBase(req)}/uploads/${name}` };
+}
+
 async function save(req) {
   if (!req.file) throw badRequest('File gambar wajib diisi', 'FILE_REQUIRED');
   return saveFile(req, req.file);
@@ -76,4 +106,4 @@ async function remove(url) {
   await fs.promises.unlink(path.join(UPLOAD_DIR, name)).catch(() => {});
 }
 
-module.exports = { UPLOAD_DIR, single, many, save, saveFile, remove };
+module.exports = { UPLOAD_DIR, single, many, save, saveFile, remove, singleVideo, saveVideo };

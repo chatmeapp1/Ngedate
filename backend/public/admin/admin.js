@@ -125,7 +125,7 @@ function formModal({ title, fields, submit = 'Simpan', danger = false }) {
       else if (f.type === 'select') {
         input = h('select', {}, f.options.map((o) => h('option', { value: o.value, selected: String(o.value) === String(f.value) }, o.label)));
       } else if (f.type === 'checkbox') input = h('input', { type: 'checkbox', checked: f.value });
-      else if (f.type === 'file') input = h('input', { type: 'file', accept: 'image/png,image/jpeg,image/webp' });
+      else if (f.type === 'file') input = h('input', { type: 'file', accept: f.accept || 'image/png,image/jpeg,image/webp' });
       else input = h('input', { type: f.type || 'text', value: f.value ?? '', autocomplete: 'off', step: f.type === 'number' ? 'any' : null });
       inputs[f.name] = input;
       if (f.type === 'checkbox') return h('label', { class: 'chk' }, input, f.label);
@@ -505,6 +505,9 @@ async function pageGifts() {
     { name: 'sortOrder', label: 'Urutan', type: 'number', value: g ? g.sortOrder : 0, hint: 'Angka kecil tampil lebih dulu' },
     { name: 'image', label: 'Gambar gift (opsional)', type: 'file', hint: 'PNG/WEBP transparan, maks 5 MB. Menggantikan emoji.' },
     ...(g && g.imageUrl ? [{ name: 'removeImage', label: 'Hapus gambar yang ada', type: 'checkbox', value: false }] : []),
+    { name: 'video', label: 'Efek MP4 layar penuh (opsional)', type: 'file', accept: 'video/mp4', hint: 'MP4 maks 15 MB, disarankan portrait (mis. 720x1280). Diputar maksimal 6 detik lalu memudar halus. Suara tidak diputar.' },
+    ...(g && g.animationUrl ? [{ name: 'removeVideo', label: 'Hapus efek MP4 yang ada', type: 'checkbox', value: false }] : []),
+    { name: 'blend', label: 'Latar video hitam → jadikan transparan', type: 'checkbox', value: g ? g.animationBlend : false },
     { name: 'active', label: 'Aktif (tampil di panel gift)', type: 'checkbox', value: g ? g.active : true },
   ];
 
@@ -515,8 +518,15 @@ async function pageGifts() {
       f.append('file', r.image);
       imageUrl = (await api('POST', '/api/admin/upload', undefined, f)).url;
     } else if (r.removeImage) imageUrl = '';
-    const body = { name: r.name, price: r.price, icon: r.icon || undefined, category: r.category, sortOrder: r.sortOrder ?? 0, active: r.active };
+    let animationUrl;
+    if (r.video) {
+      const f = new FormData();
+      f.append('file', r.video);
+      animationUrl = (await api('POST', '/api/admin/upload-video', undefined, f)).url;
+    } else if (r.removeVideo) animationUrl = '';
+    const body = { name: r.name, price: r.price, icon: r.icon || undefined, category: r.category, sortOrder: r.sortOrder ?? 0, active: r.active, animationBlend: r.blend };
     if (imageUrl !== undefined) body.imageUrl = imageUrl;
+    if (animationUrl !== undefined) body.animationUrl = animationUrl;
     return g ? patch('/api/admin/gifts/' + g.id, body) : post('/api/admin/gifts', body);
   };
 
@@ -533,7 +543,7 @@ async function pageGifts() {
         h('div', { class: 'sp' }, h('b', {}, g.name), h('div', { class: 'dim' }, fmt(g.price) + ' koin · urutan ' + g.sortOrder)),
         h('div', { style: 'text-align:right' },
           h('span', { class: 'pill ' + (g.category === 'luxury' ? 'amber' : '') }, g.category === 'luxury' ? 'Mewah' : 'Populer'),
-          h('div', { style: 'margin-top:4px' }, g.active ? null : h('span', { class: 'pill red' }, 'Nonaktif')))),
+          h('div', { style: 'margin-top:4px' }, g.active ? null : h('span', { class: 'pill red' }, 'Nonaktif'), g.animationUrl ? h('span', { class: 'pill purple', style: 'margin-left:4px' }, '🎬 MP4') : null))),
       h('div', { class: 'row', style: 'margin-top:12px' }, h('button', { class: 'btn sm', onclick: async () => {
         const r = await formModal({ title: 'Ubah gift', fields: fields(g) });
         if (r && await act(() => save(g, r), 'Gift diperbarui')) render();

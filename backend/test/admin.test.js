@@ -154,3 +154,48 @@ test('top up koin oleh admin tercatat di riwayat, bisa dikurangi, tidak boleh mi
   assert.equal(other.body.length, 0);
   assert.equal((await api('GET', '/api/admin/coin-log', { token: budi.token })).status, 403);
 });
+
+test('video efek gift: hanya MP4 asli, admin saja, ikut terkirim di pesan gift', async () => {
+  // MP4 minimal: kotak ftyp valid
+  const mp4 = Buffer.concat([Buffer.from([0, 0, 0, 20]), Buffer.from('ftypisom'), Buffer.alloc(8)]);
+  const up = async (token, buf, type) => {
+    const f = new FormData();
+    f.append('file', new Blob([buf], { type }), 'efek.mp4');
+    return api('POST', '/api/admin/upload-video', { token, form: f });
+  };
+  const ok = await up(admin.token, mp4, 'video/mp4');
+  assert.equal(ok.status, 201, JSON.stringify(ok.body));
+  assert.match(ok.body.url, /\/uploads\/.+\.mp4$/);
+  const served = await fetch(ok.body.url.replace(/^https?:\/\/[^/]+/, base));
+  assert.equal(served.status, 200);
+
+  // tipe benar tapi isi bukan MP4, tipe salah, dan bukan admin
+  assert.equal((await up(admin.token, Buffer.from('ini bukan video sama sekali'), 'video/mp4')).status, 400);
+  assert.equal((await up(admin.token, mp4, 'video/webm')).status, 400);
+  assert.equal((await up(budi.token, mp4, 'video/mp4')).status, 403);
+
+  // gift dengan efek video & mode transparan, lalu dikirim: pesan membawa datanya
+  const g = await api('POST', '/api/admin/gifts', { token: admin.token, body: { name: 'Naga', price: 100, icon: '🐉', category: 'luxury', animationUrl: ok.body.url, animationBlend: true } });
+  assert.equal(g.status, 201, JSON.stringify(g.body));
+  assert.equal(g.body.animationUrl, ok.body.url);
+  assert.equal(g.body.animationBlend, true);
+  await api('PATCH', `/api/admin/users/${budi.id}/status`, { token: admin.token, body: { status: 'active' } });
+  const list = await api('GET', '/api/gifts', { token: budi.token });
+  const naga = list.body.find((x) => x.name === 'Naga');
+  assert.equal(naga.animationBlend, true);
+
+  await db.query(`UPDATE users SET gender = 'male', profile_completed = true, coins = 5000 WHERE id = $1`, [budi.id]);
+  await db.query(`UPDATE users SET gender = 'female', profile_completed = true WHERE id = $1`, [sari.id]);
+  await db.query(`INSERT INTO host_profiles (user_id, chat_price) VALUES ($1, 10) ON CONFLICT DO NOTHING`, [sari.id]);
+  const conv = await api('POST', '/api/conversations', { token: budi.token, body: { hostId: sari.id } });
+  assert.equal(conv.status, 200, JSON.stringify(conv.body));
+  const sent = await api('POST', `/api/conversations/${conv.body.id}/gifts`, { token: budi.token, body: { giftId: naga.id, count: 1 } });
+  assert.equal(sent.status, 201, JSON.stringify(sent.body));
+  assert.equal(sent.body.message.gift.animationUrl, ok.body.url);
+  assert.equal(sent.body.message.gift.animationBlend, true);
+
+  // hapus efek video: string kosong mengosongkan kolom
+  const cleared = await api('PATCH', `/api/admin/gifts/${naga.id}`, { token: admin.token, body: { animationUrl: '', animationBlend: false } });
+  assert.equal(cleared.body.animationUrl, null);
+  assert.equal(cleared.body.animationBlend, false);
+});

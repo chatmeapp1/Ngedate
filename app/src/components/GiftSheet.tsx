@@ -76,9 +76,12 @@ export function GiftSheet({
       onClose();
       playGift({
         messageId: r.message.id,
+        giftId: selected.id,
         name: selected.name,
         icon: selected.icon,
         imageUrl: selected.imageUrl,
+        videoUrl: selected.animationUrl,
+        blend: selected.animationBlend,
         count,
         price: selected.price,
         category: selected.category,

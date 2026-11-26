@@ -103,6 +103,7 @@ export interface Message {
     price: number | null;
     imageUrl: string | null;
     animationUrl: string | null;
+    animationBlend: boolean;
     soundUrl: string | null;
     count: number;
   } | null;
@@ -163,6 +164,7 @@ export interface Gift {
   icon: string | null;
   imageUrl: string | null;
   animationUrl: string | null;
+  animationBlend: boolean;
   soundUrl: string | null;
   category: string;
   sortOrder: number;

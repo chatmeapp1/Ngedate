@@ -99,6 +99,12 @@ router.post('/users/:id/coins', wrap(async (req, res) => {
 }));
 
 // Riwayat top up / penyesuaian koin oleh admin (terbaru dulu)
+// Unggah video efek gift (MP4, maks 15 MB) -> URL
+router.post('/upload-video', storage.singleVideo, wrap(async (req, res) => {
+  const { url } = await storage.saveVideo(req);
+  res.status(201).json({ url });
+}));
+
 router.get('/coin-log', wrap(async (req, res) => {
   const userId = v.int(req.query.userId, 'userId', { min: 1, optional: true });
   const params = [];
@@ -146,15 +152,16 @@ function giftFields(b, optional) {
     category: v.str(b.category, 'Kategori', { max: 20, optional: true }),
     sort_order: v.int(b.sortOrder, 'Urutan', { optional: true }),
     active: v.bool(b.active, 'Aktif', { optional: true }),
+    animation_blend: v.bool(b.animationBlend, 'Mode transparan', { optional: true }),
   };
 }
 
 router.post('/gifts', wrap(async (req, res) => {
   const f = giftFields(req.body || {}, false);
   const { rows } = await db.query(
-    `INSERT INTO gifts (name, price, image_url, animation_url, sound_url, category, sort_order, active, icon)
-     VALUES ($1, $2, $3, $4, $5, COALESCE($6, 'normal'), COALESCE($7, 0), COALESCE($8, true), $9) RETURNING *`,
-    [f.name, f.price, f.image_url, f.animation_url, f.sound_url, f.category, f.sort_order, f.active, f.icon]
+    `INSERT INTO gifts (name, price, image_url, animation_url, sound_url, category, sort_order, active, icon, animation_blend)
+     VALUES ($1, $2, $3, $4, $5, COALESCE($6, 'normal'), COALESCE($7, 0), COALESCE($8, true), $9, COALESCE($10, false)) RETURNING *`,
+    [f.name, f.price, f.image_url, f.animation_url, f.sound_url, f.category, f.sort_order, f.active, f.icon, f.animation_blend]
   );
   res.status(201).json(mapGift(rows[0]));
 }));

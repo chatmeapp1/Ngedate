@@ -2,72 +2,105 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, Linking, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  DriveEffect,
+  effectKind,
+  GiftBanner,
+  RainEffect,
+  RiseEffect,
+  SailEffect,
+  VideoEffect,
+  type BannerData,
+  type GiftItem,
+} from '@/components/GiftEffects';
 import { GiftIcon } from '@/components/GiftIcon';
 import { number } from '@/lib/format';
 import { setGiftFxListener, type GiftFx } from '@/lib/giftFx';
 import { colors } from '@/lib/theme';
 
 const ND = true; // useNativeDriver
+const COMBO_WINDOW_MS = 4500; // jeda maksimal antar gift agar dihitung combo
 
-/** Lapisan animasi gift di atas semua layar. Dipasang sekali di root layout. */
+/**
+ * Lapisan animasi gift di atas semua layar. Dipasang sekali di root layout.
+ *  - Banner gift (kiri atas) dengan combo: langsung, bisa bertumpuk
+ *  - Efek layar penuh: diputar satu per satu (antrean)
+ */
 export function GiftOverlay() {
+  const insets = useSafeAreaInsets();
   const [queue, setQueue] = useState<GiftFx[]>([]);
+  const [banners, setBanners] = useState<BannerData[]>([]);
+  const [videoFailed, setVideoFailed] = useState<string[]>([]);
 
   useEffect(() => {
-    setGiftFxListener((fx) => setQueue((q) => (q.length > 20 ? q : [...q, fx])));
+    setGiftFxListener((fx) => {
+      if (fx.kind === 'gift') {
+        const id = `${fx.from ?? 'me'}|${fx.giftId}`;
+        const now = Date.now();
+        setBanners((cur) => {
+          const found = cur.find((b) => b.id === id && b.until > now);
+          if (found) {
+            return cur.map((b) => (b === found ? { ...b, count: b.count + fx.count, bump: b.bump + 1, until: now + COMBO_WINDOW_MS } : b));
+          }
+          const next: BannerData = {
+            id,
+            from: fx.from ?? 'Kamu',
+            name: fx.name,
+            icon: fx.icon,
+            imageUrl: fx.imageUrl,
+            count: fx.count,
+            bump: 0,
+            until: now + COMBO_WINDOW_MS,
+          };
+          return [...cur.filter((b) => b.id !== id), next].slice(-3);
+        });
+      }
+      setQueue((q) => {
+        if (q.length > 20) return q;
+        // Combo gift biasa: cukup banner, jangan menumpuk hujan terus-menerus
+        if (fx.kind === 'gift' && !fx.luxury && !fx.videoUrl && q.length >= 2) return q;
+        return [...q, fx];
+      });
+    });
     return () => setGiftFxListener(null);
   }, []);
 
   // Stabil, supaya animasi tidak diulang saat antrean bertambah
   const done = useCallback((key: string) => setQueue((q) => (q[0]?.key === key ? q.slice(1) : q)), []);
+  const failVideo = useCallback((key: string) => setVideoFailed((v) => (v.includes(key) ? v : [...v, key])), []);
+  const bannerGone = useCallback(
+    (id: string, until: number) => setBanners((cur) => cur.filter((b) => !(b.id === id && b.until === until))),
+    []
+  );
 
   const current = queue[0];
-  if (!current) return null;
-
-  if (current.kind === 'wa') return <WaCelebration key={current.key} fx={current} onDone={done} />;
-  if (current.luxury) return <LuxuryGift key={current.key} fx={current} onDone={done} />;
-  return <NormalGift key={current.key} fx={current} onDone={done} />;
-}
-
-type GiftItem = Extract<GiftFx, { kind: 'gift' }>;
-
-// ---------- Gift biasa: muncul memantul lalu melayang ke atas ----------
-function NormalGift({ fx, onDone }: { fx: GiftItem; onDone: (key: string) => void }) {
-  const scale = useRef(new Animated.Value(0)).current;
-  const rise = useRef(new Animated.Value(0)).current;
-  const countPop = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.sequence([
-      Animated.spring(scale, { toValue: 1, friction: 4, tension: 120, useNativeDriver: ND }),
-      Animated.spring(countPop, { toValue: 1, friction: 3, tension: 160, useNativeDriver: ND }),
-      Animated.delay(800),
-      Animated.timing(rise, { toValue: 1, duration: 800, easing: Easing.in(Easing.quad), useNativeDriver: ND }),
-    ]).start(() => onDone(fx.key));
-    const safety = setTimeout(() => onDone(fx.key), 5000); // pengaman jika animasi tersendat
-    return () => clearTimeout(safety);
-  }, [scale, rise, countPop, onDone, fx.key]);
-
-  const translateY = rise.interpolate({ inputRange: [0, 1], outputRange: [0, -220] });
-  const opacity = rise.interpolate({ inputRange: [0, 0.7, 1], outputRange: [1, 0.6, 0] });
+  let effect = null;
+  if (current) {
+    if (current.kind === 'wa') effect = <WaCelebration key={current.key} fx={current} onDone={done} />;
+    else if (current.videoUrl && !videoFailed.includes(current.key)) {
+      effect = <VideoEffect key={current.key} fx={current} onDone={done} onFail={failVideo} />;
+    } else {
+      const kind = effectKind(current);
+      if (kind === 'drive') effect = <DriveEffect key={current.key} fx={current} onDone={done} />;
+      else if (kind === 'sail') effect = <SailEffect key={current.key} fx={current} onDone={done} />;
+      else if (kind === 'rise') effect = <RiseEffect key={current.key} fx={current} onDone={done} />;
+      else if (kind === 'luxury') effect = <LuxuryGift key={current.key} fx={current} onDone={done} />;
+      else effect = <RainEffect key={current.key} fx={current} onDone={done} />;
+    }
+  }
 
   return (
-    <View pointerEvents="none" style={[StyleSheet.absoluteFill, s.center, { paddingTop: 120 }]}>
-      <Animated.View style={{ alignItems: 'center', opacity, transform: [{ translateY }, { scale }] }}>
-        <View style={s.normalGlow}>
-          <GiftIcon icon={fx.icon} imageUrl={fx.imageUrl} size={96} />
+    <>
+      {effect}
+      {banners.length ? (
+        <View pointerEvents="none" style={{ position: 'absolute', left: 10, top: insets.top + 74, gap: 8 }}>
+          {banners.map((b) => (
+            <GiftBanner key={b.id} b={b} onGone={bannerGone} />
+          ))}
         </View>
-        <View style={s.pill}>
-          <Text style={s.pillText} numberOfLines={1}>
-            {fx.from ? `${fx.from} · ` : ''}
-            {fx.name}
-          </Text>
-          <Animated.Text style={[s.pillCount, { transform: [{ scale: countPop.interpolate({ inputRange: [0, 1], outputRange: [0.3, 1] }) }] }]}>
-            x{fx.count}
-          </Animated.Text>
-        </View>
-      </Animated.View>
-    </View>
+      ) : null}
+    </>
   );
 }
 

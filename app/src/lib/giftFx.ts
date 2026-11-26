@@ -8,9 +8,14 @@ export type GiftFx =
   | {
       kind: 'gift';
       key: string;
+      giftId: number;
       name: string;
       icon: string | null;
       imageUrl: string | null;
+      /** efek MP4 layar penuh (dari admin), diputar maksimal 6 detik */
+      videoUrl: string | null;
+      /** video berlatar hitam: diputar dengan mode screen supaya tampak transparan */
+      blend: boolean;
       count: number;
       price: number; // harga satuan
       luxury: boolean;
@@ -36,9 +41,12 @@ function push(fx: GiftFx) {
 
 export function playGift(args: {
   messageId: number;
+  giftId: number;
   name: string;
   icon?: string | null;
   imageUrl?: string | null;
+  videoUrl?: string | null;
+  blend?: boolean;
   count: number;
   price?: number | null;
   category?: string | null;
@@ -49,9 +57,12 @@ export function playGift(args: {
   push({
     kind: 'gift',
     key: `m${args.messageId}`,
+    giftId: args.giftId,
     name: args.name,
     icon: args.icon ?? null,
     imageUrl: args.imageUrl ?? null,
+    videoUrl: args.videoUrl ?? null,
+    blend: !!args.blend,
     count: args.count,
     price: unit,
     luxury: args.category === 'luxury' || unit >= LUXURY_PRICE || unit * args.count >= LUXURY_PRICE * 5,

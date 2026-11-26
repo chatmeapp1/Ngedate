@@ -12,6 +12,7 @@ function mapGift(g) {
     icon: g.icon,
     imageUrl: g.image_url,
     animationUrl: g.animation_url,
+    animationBlend: !!g.animation_blend,
     soundUrl: g.sound_url,
     category: g.category,
     sortOrder: g.sort_order,

@@ -149,9 +149,12 @@ export default function ChatRoom() {
           const g = e.message.gift;
           playGift({
             messageId: e.message.id,
+            giftId: g.id,
             name: g.name,
             icon: g.icon,
             imageUrl: g.imageUrl,
+            videoUrl: g.animationUrl,
+            blend: g.animationBlend,
             count: g.count,
             price: g.price,
             category: g.category,
