@@ -1,10 +1,10 @@
-// 1500 -> "1,5rb", 1000000 -> "1jt"
+// 1500 -> "1.5k", 481600 -> "481.6k", 1000000 -> "1M", 2500000000 -> "2.5B"
 export function compact(n: number): string {
   const abs = Math.abs(n);
-  const fmt = (v: number, unit: string) => `${Number.isInteger(v) ? v : v.toFixed(1).replace('.', ',')}${unit}`;
-  if (abs >= 1e9) return fmt(Math.round((n / 1e9) * 10) / 10, 'M');
-  if (abs >= 1e6) return fmt(Math.round((n / 1e6) * 10) / 10, 'jt');
-  if (abs >= 1e3) return fmt(Math.round((n / 1e3) * 10) / 10, 'rb');
+  const fmt = (v: number, unit: string) => `${Number.isInteger(v) ? v : v.toFixed(1)}${unit}`;
+  if (abs >= 1e9) return fmt(Math.round((n / 1e9) * 10) / 10, 'B');
+  if (abs >= 1e6) return fmt(Math.round((n / 1e6) * 10) / 10, 'M');
+  if (abs >= 1e3) return fmt(Math.round((n / 1e3) * 10) / 10, 'k');
   return String(n);
 }
 
