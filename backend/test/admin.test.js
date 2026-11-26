@@ -99,6 +99,10 @@ test('daftar pengguna bisa disaring peran & status', async () => {
   const both = await api('GET', '/api/admin/users?role=host&status=suspended', { token: admin.token });
   assert.equal(both.body.length, 0);
   assert.equal((await api('GET', '/api/admin/users?role=bukan', { token: admin.token })).status, 400);
+
+  // Cari berdasarkan ID persis, bukan hanya nama
+  const byId = await api('GET', `/api/admin/users?q=${sari.id}`, { token: admin.token });
+  assert.ok(byId.body.some((u) => u.id === sari.id), 'ID ditemukan');
 });
 
 test('unggah gambar gift lalu hapus gambarnya', async () => {
@@ -125,4 +129,28 @@ test('unggah gambar gift lalu hapus gambarnya', async () => {
   assert.equal(cleared.status, 200);
   assert.equal(cleared.body.imageUrl, null);
   assert.equal(cleared.body.icon, '🌸', 'emoji tetap ada');
+});
+
+test('top up koin oleh admin tercatat di riwayat, bisa dikurangi, tidak boleh minus', async () => {
+  const up = await api('POST', `/api/admin/users/${budi.id}/coins`, { token: admin.token, body: { amount: 5000, note: 'Top up uji' } });
+  assert.equal(up.status, 200, JSON.stringify(up.body));
+  assert.equal(up.body.coins, 5000);
+  const down = await api('POST', `/api/admin/users/${budi.id}/coins`, { token: admin.token, body: { amount: -1200, note: 'Koreksi' } });
+  assert.equal(down.body.coins, 3800);
+  const tooMuch = await api('POST', `/api/admin/users/${budi.id}/coins`, { token: admin.token, body: { amount: -999999 } });
+  assert.equal(tooMuch.status, 402);
+  assert.equal((await api('POST', `/api/admin/users/${budi.id}/coins`, { token: admin.token, body: { amount: 0 } })).status, 400);
+
+  const log = await api('GET', '/api/admin/coin-log', { token: admin.token });
+  assert.equal(log.status, 200);
+  assert.equal(log.body.length, 2);
+  assert.deepEqual(log.body.map((r) => r.amount), [-1200, 5000], 'terbaru dulu');
+  assert.equal(log.body[0].balanceAfter, 3800);
+  assert.equal(log.body[1].note, 'Top up uji');
+  assert.equal(log.body[1].admin, 'admin');
+  assert.equal(log.body[1].username, 'budi');
+
+  const other = await api('GET', `/api/admin/coin-log?userId=${sari.id}`, { token: admin.token });
+  assert.equal(other.body.length, 0);
+  assert.equal((await api('GET', '/api/admin/coin-log', { token: budi.token })).status, 403);
 });

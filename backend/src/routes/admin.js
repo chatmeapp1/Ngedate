@@ -22,7 +22,10 @@ router.get('/users', wrap(async (req, res) => {
   if (q) {
     params.push(`%${q.toLowerCase()}%`);
     const i = params.length;
-    where.push(`(u.username LIKE $${i} OR lower(u.display_name) LIKE $${i} OR u.email LIKE $${i} OR u.id::text = $${i})`);
+    // ID dicocokkan persis (parameter terpisah dari pola LIKE)
+    params.push(q);
+    const j = params.length;
+    where.push(`(u.username LIKE $${i} OR lower(u.display_name) LIKE $${i} OR u.email LIKE $${i} OR u.id::text = $${j})`);
   }
   if (role) {
     params.push(role);
@@ -93,6 +96,37 @@ router.post('/users/:id/coins', wrap(async (req, res) => {
   const b = await wallet.balances(db, userId);
   realtime.emitTo(userId, 'wallet:update', b);
   res.json({ coins: balance });
+}));
+
+// Riwayat top up / penyesuaian koin oleh admin (terbaru dulu)
+router.get('/coin-log', wrap(async (req, res) => {
+  const userId = v.int(req.query.userId, 'userId', { min: 1, optional: true });
+  const params = [];
+  let where = `l.currency = 'coin' AND l.reason IN ('admin_topup', 'admin_adjust')`;
+  if (userId) {
+    params.push(userId);
+    where += ` AND l.user_id = $1`;
+  }
+  const { rows } = await db.query(
+    `SELECT l.id, l.user_id, l.amount, l.balance_after, l.reason, l.note, l.created_at,
+            u.display_name, u.username, adm.username AS admin_username
+     FROM ledger l
+     JOIN users u ON u.id = l.user_id
+     LEFT JOIN users adm ON adm.id = l.ref_id AND l.ref_type = 'admin'
+     WHERE ${where} ORDER BY l.id DESC LIMIT 50`,
+    params
+  );
+  res.json(rows.map((r) => ({
+    id: Number(r.id),
+    userId: Number(r.user_id),
+    displayName: r.display_name,
+    username: r.username,
+    amount: Number(r.amount),
+    balanceAfter: Number(r.balance_after),
+    note: r.note,
+    admin: r.admin_username,
+    createdAt: r.created_at,
+  })));
 }));
 
 router.get('/gifts', wrap(async (req, res) => {

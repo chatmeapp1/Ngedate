@@ -327,13 +327,7 @@ async function pageUsers() {
         h('dt', {}, 'Koin'), h('dd', {}, fmt(u.coins)),
         h('dt', {}, 'Diamond'), h('dd', {}, fmt(u.diamonds))),
       isAdmin ? null : h('div', { class: 'row wrap', style: 'margin-top:12px;gap:6px' },
-        h('button', { class: 'btn sm', onclick: async () => {
-          const r = await formModal({ title: 'Koin untuk ' + u.displayName, submit: 'Terapkan',
-            fields: [
-              { name: 'amount', label: 'Jumlah koin', type: 'number', hint: 'Positif = tambah, negatif = kurangi' },
-              { name: 'note', label: 'Catatan', type: 'text' }] });
-          if (r && r.amount && await act(() => post('/api/admin/users/' + u.id + '/coins', { amount: Math.trunc(r.amount), note: r.note || undefined }), 'Koin diperbarui')) render();
-        } }, 'Koin'),
+        h('a', { class: 'btn sm', href: '#topup/' + u.id, style: 'text-decoration:none' }, '💰 Top up koin'),
         h('button', { class: 'btn sm', onclick: async () => {
           const to = u.role === 'host' ? 'user' : 'host';
           if (await confirmModal(to === 'host' ? 'Jadikan host' : 'Kembalikan ke user', u.displayName + (to === 'host' ? ' langsung disetujui sebagai host.' : ' tidak lagi tampil sebagai host.'), 'Ya')
@@ -386,6 +380,111 @@ async function pageAgency() {
       } }, 'Ubah'))));
   }
   root.append(grid);
+  return root;
+}
+
+
+// ----- Top up koin -----
+async function pageTopup(param) {
+  const root = h('div', {}, pageHead('Top up koin', 'Kirim koin ke pengguna, atau kurangi jika salah kirim. Semuanya tercatat di riwayat.'));
+  let selected = null;
+
+  const results = h('div', { class: 'grid g2', style: 'margin-bottom:14px' });
+  const formBox = h('div');
+  const historyBox = h('div');
+
+  const input = h('input', { type: 'search', placeholder: 'Cari nama, username, atau ID pengguna…', onkeydown: (e) => { if (e.key === 'Enter') doSearch(); } });
+  const searchBtn = h('button', { class: 'btn pri', onclick: () => doSearch() }, 'Cari');
+  root.append(h('div', { class: 'search' }, input, searchBtn), results, formBox, historyBox);
+
+  async function doSearch(q) {
+    const text = (q ?? input.value).trim();
+    if (!text) return;
+    const list = await act(() => get('/api/admin/users?q=' + encodeURIComponent(text)));
+    if (!list) return;
+    const found = list.filter((u) => u.role !== 'admin').slice(0, 8);
+    results.replaceChildren(...(found.length ? found.map(userRow) : [empty('Pengguna tidak ditemukan')]));
+    // Dibuka dari kartu pengguna (#topup/ID): pilih yang ID-nya persis sama
+    const exact = found.find((u) => String(u.id) === text);
+    if (q && exact) pick(exact);
+    else if (found.length === 1) pick(found[0]);
+  }
+
+  function userRow(u) {
+    return h('div', { class: 'card row' },
+      avatar(u.avatarUrl, u.displayName),
+      h('div', { class: 'sp', style: 'min-width:0' }, h('b', {}, u.displayName), h('div', { class: 'dim' }, '@' + u.username + ' · ID ' + u.id + ' · ' + fmt(u.coins) + ' koin')),
+      h('button', { class: 'btn sm pri', onclick: () => pick(u) }, 'Pilih'));
+  }
+
+  function pick(u) {
+    selected = u;
+    results.replaceChildren();
+    drawForm();
+    drawHistory();
+    formBox.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function drawForm() {
+    const u = selected;
+    const amount = h('input', { type: 'number', min: 1, step: 1, placeholder: 'Jumlah koin' });
+    const note = h('input', { type: 'text', placeholder: 'Catatan (opsional), mis. Top up transfer bank', maxlength: 200 });
+    const mode = h('select', {}, h('option', { value: 'add' }, 'Tambah koin'), h('option', { value: 'sub' }, 'Kurangi koin'));
+    const chips = h('div', { class: 'row wrap', style: 'gap:6px;margin-bottom:12px' }, [1000, 5000, 10000, 50000, 100000, 500000].map((n) =>
+      h('button', { type: 'button', class: 'tab', onclick: () => { amount.value = n; } }, fmt(n))));
+    const balance = h('b', {}, fmt(u.coins) + ' koin');
+    const submit = h('button', { class: 'btn pri', type: 'submit' }, 'Kirim koin');
+
+    formBox.replaceChildren(h('form', { class: 'card', style: 'max-width:520px;margin-bottom:6px', onsubmit: async (e) => {
+      e.preventDefault();
+      const n = Math.trunc(Number(amount.value));
+      if (!(n > 0)) return toast('Isi jumlah koin lebih dari 0', true);
+      const sign = mode.value === 'sub' ? -1 : 1;
+      const ok = await confirmModal(sign > 0 ? 'Kirim koin' : 'Kurangi koin',
+        (sign > 0 ? 'Kirim ' : 'Kurangi ') + fmt(n) + ' koin ' + (sign > 0 ? 'ke ' : 'dari ') + u.displayName + ' (@' + u.username + ')?', sign > 0 ? 'Kirim' : 'Kurangi');
+      if (!ok) return;
+      submit.disabled = true;
+      const r = await act(() => post('/api/admin/users/' + u.id + '/coins', { amount: sign * n, note: note.value.trim() || undefined }));
+      submit.disabled = false;
+      if (!r) return;
+      u.coins = r.coins;
+      balance.textContent = fmt(r.coins) + ' koin';
+      amount.value = '';
+      note.value = '';
+      toast((sign > 0 ? 'Koin terkirim. ' : 'Koin dikurangi. ') + 'Saldo sekarang ' + fmt(r.coins));
+      drawHistory();
+    } },
+      h('div', { class: 'row', style: 'margin-bottom:14px' },
+        avatar(u.avatarUrl, u.displayName),
+        h('div', { class: 'sp', style: 'min-width:0' }, h('b', {}, u.displayName), h('div', { class: 'dim' }, '@' + u.username + ' · ID ' + u.id)),
+        h('div', { style: 'text-align:right' }, h('div', { class: 'dim' }, 'Saldo'), balance)),
+      h('label', { class: 'f' }, h('span', {}, 'Jenis'), mode),
+      h('label', { class: 'f' }, h('span', {}, 'Jumlah'), amount),
+      chips,
+      h('label', { class: 'f' }, h('span', {}, 'Catatan'), note),
+      submit));
+    amount.focus();
+  }
+
+  async function drawHistory() {
+    const list = await act(() => get('/api/admin/coin-log' + (selected ? '?userId=' + selected.id : '')));
+    if (!list) return;
+    historyBox.replaceChildren(
+      h('div', { class: 'sec' }, selected ? 'Riwayat ' + selected.displayName : 'Riwayat top up terbaru'),
+      list.length
+        ? h('div', { class: 'card', style: 'padding:6px 16px' }, list.map((r) =>
+            h('div', { class: 'row', style: 'padding:10px 0;border-bottom:1px solid var(--border)' },
+              h('div', { class: 'sp', style: 'min-width:0' },
+                h('b', {}, r.displayName), h('span', { class: 'dim' }, ' @' + r.username),
+                h('div', { class: 'dim' }, ago(r.createdAt) + (r.admin ? ' · oleh ' + r.admin : '') + (r.note ? ' · ' + r.note : ''))),
+              h('div', { style: 'text-align:right' },
+                h('b', { style: 'color:' + (r.amount > 0 ? '#15803d' : '#b91c1c') }, (r.amount > 0 ? '+' : '') + fmt(r.amount)),
+                h('div', { class: 'dim' }, 'saldo ' + fmt(r.balanceAfter))))))
+        : empty('Belum ada riwayat'));
+  }
+
+  if (param && /^\d+$/.test(param)) await doSearch(param);
+  else await drawHistory();
   return root;
 }
 
@@ -485,6 +584,7 @@ const pages = {
   verifikasi: { title: 'Verifikasi wajah', icon: '🪪', fn: pageVerifikasi, badge: () => stats && stats.pending.verifications },
   foto: { title: 'Foto host', icon: '🖼️', fn: pagePhotos, badge: () => stats && stats.pending.photos + stats.pending.avatars },
   pengguna: { title: 'Pengguna', icon: '👥', fn: pageUsers },
+  topup: { title: 'Top up koin', icon: '💰', fn: pageTopup },
   agency: { title: 'Agency', icon: '🏢', fn: pageAgency },
   gift: { title: 'Gift', icon: '🎁', fn: pageGifts },
   pengaturan: { title: 'Pengaturan', icon: '⚙️', fn: pageSettings },
@@ -497,9 +597,10 @@ async function refreshStats() {
 }
 
 function current() {
-  const k = location.hash.replace('#', '');
+  const k = location.hash.replace('#', '').split('/')[0];
   return pages[k] ? k : 'dashboard';
 }
+const hashParam = () => location.hash.replace('#', '').split('/')[1] || '';
 
 function drawNav() {
   const nav = document.getElementById('nav');
@@ -523,7 +624,7 @@ async function render() {
   if (scrim) scrim.remove();
   document.getElementById('toptitle').textContent = pages[k].title;
   try {
-    const out = await pages[k].fn();
+    const out = await pages[k].fn(hashParam());
     if (seq !== renderSeq) return;
     el.replaceChildren(...[out].flat(Infinity).filter(Boolean));
     if (k !== 'dashboard') refreshStats().catch(() => {});
