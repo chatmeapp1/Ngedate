@@ -54,7 +54,7 @@ export default function Me() {
         </View>
         <View style={s.balances}>
           {!isHost ? (
-            <Pressable style={s.balance} onPress={() => router.push('/wallet')}>
+            <Pressable style={s.balance} onPress={() => router.push('/topup')}>
               <Coin size={20} />
               <Text style={s.balanceValue}>{number(user.coins ?? 0)}</Text>
               <Text style={s.balanceLabel}>Koin</Text>
