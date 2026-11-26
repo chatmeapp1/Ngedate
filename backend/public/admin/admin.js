@@ -112,34 +112,148 @@ async function act(fn, okMsg) {
   }
 }
 
+// Unggah file dengan kemajuan (XHR). Satu kali coba ulang jika token kedaluwarsa.
+function xhrUpload(path, file, onProgress, retry = true) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', path);
+    if (session && session.accessToken) xhr.setRequestHeader('authorization', 'Bearer ' + session.accessToken);
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) onProgress(e.loaded / e.total);
+    };
+    xhr.onerror = () => reject(new Error('Koneksi terputus saat mengunggah'));
+    xhr.onload = async () => {
+      let json = null;
+      try {
+        json = JSON.parse(xhr.responseText);
+      } catch (e) { /* bukan JSON */ }
+      if (xhr.status === 401 && retry) {
+        try {
+          await get('/api/me'); // memicu pembaruan token
+          return resolve(await xhrUpload(path, file, onProgress, false));
+        } catch (e) {
+          return reject(e);
+        }
+      }
+      if (xhr.status >= 200 && xhr.status < 300) return resolve(json);
+      reject(new Error((json && json.error && json.error.message) || 'Gagal mengunggah (' + xhr.status + ')'));
+    };
+    const fd = new FormData();
+    fd.append('file', file);
+    xhr.send(fd);
+  });
+}
+
+function lightboxVideo(src) {
+  const v = h('video', { src, autoplay: true, loop: true, muted: true, playsinline: true, controls: true, style: 'max-width:100%;max-height:100%;border-radius:12px' });
+  v.muted = true;
+  const box = h('div', { class: 'lightbox', onclick: (e) => e.target === box && box.remove() }, v);
+  document.body.append(box);
+}
+
 // ---------------------------------------------------------------------------
 // Modal formulir
 // ---------------------------------------------------------------------------
-// fields: [{ name, label, type: text|number|textarea|select|checkbox|file, value, options, hint }]
-function formModal({ title, fields, submit = 'Simpan', danger = false }) {
+// fields: [{ name, label, type: text|number|textarea|select|checkbox|file, value, options, hint,
+//            accept, maxMB, preview: 'video'|'image', current }]
+// onSubmit(values, ui): opsional. Jika ada, modal tetap terbuka selama proses (mis. unggah file),
+// menampilkan kemajuan lewat ui.progress(teks, 0..1) dan pesan error jika gagal.
+function fmtSize(bytes) {
+  return bytes >= 1048576 ? (bytes / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(bytes / 1024)) + ' KB';
+}
+
+// Pratinjau & validasi untuk input file
+function wireFile(f, input, box) {
+  const types = (f.accept || 'image/png,image/jpeg,image/webp').split(',');
+  const note = (text, cls) => h('div', { class: cls || 'dim', style: 'margin-top:6px' }, text);
+  if (f.current && f.preview === 'video') {
+    box.append(h('div', { class: 'dim', style: 'margin-top:6px' }, 'Efek saat ini:'),
+      h('video', { class: 'pv', src: f.current, controls: true, muted: true, loop: true, playsinline: true }));
+  } else if (f.current && f.preview === 'image') {
+    box.append(h('img', { class: 'pv', src: f.current, alt: '' }));
+  }
+  input.addEventListener('change', () => {
+    box.replaceChildren();
+    const file = input.files[0];
+    if (!file) return;
+    if (!types.includes(file.type)) {
+      input.value = '';
+      box.append(note('Jenis file tidak didukung (' + (file.type || 'tidak dikenal') + '). Pakai: ' + types.map((t) => t.split('/')[1].toUpperCase()).join(', '), 'err-text'));
+      return;
+    }
+    if (f.maxMB && file.size > f.maxMB * 1048576) {
+      input.value = '';
+      box.append(note('Ukuran ' + fmtSize(file.size) + ' melebihi batas ' + f.maxMB + ' MB. Kecilkan dulu videonya.', 'err-text'));
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    const info = note(file.name + ' · ' + fmtSize(file.size));
+    const warn = h('div', { class: 'warn-text' });
+    let media;
+    if (f.preview === 'video') {
+      media = h('video', { class: 'pv', src: url, controls: true, muted: true, loop: true, playsinline: true });
+      media.muted = true;
+      media.addEventListener('loadedmetadata', () => {
+        const d = media.duration;
+        info.textContent += ' · ' + d.toFixed(1) + ' dtk';
+        if (d > 6.05) warn.textContent = 'Video ' + d.toFixed(1) + ' detik: hanya 6 detik pertama yang diputar, lalu memudar.';
+      });
+      media.addEventListener('error', () => {
+        warn.textContent = 'Browser tidak bisa memutar pratinjau ini. Pakai MP4 H.264 supaya aman di semua HP.';
+      });
+    } else {
+      media = h('img', { class: 'pv', src: url, alt: '' });
+    }
+    box.append(media, info, warn);
+  });
+}
+
+function formModal({ title, fields, submit = 'Simpan', danger = false, onSubmit = null }) {
   return new Promise((resolve) => {
     const inputs = {};
     const body = fields.map((f) => {
       let input;
+      let extra = null;
       if (f.type === 'textarea') input = h('textarea', { rows: 3, value: f.value ?? '' });
       else if (f.type === 'select') {
         input = h('select', {}, f.options.map((o) => h('option', { value: o.value, selected: String(o.value) === String(f.value) }, o.label)));
       } else if (f.type === 'checkbox') input = h('input', { type: 'checkbox', checked: f.value });
-      else if (f.type === 'file') input = h('input', { type: 'file', accept: f.accept || 'image/png,image/jpeg,image/webp' });
-      else input = h('input', { type: f.type || 'text', value: f.value ?? '', autocomplete: 'off', step: f.type === 'number' ? 'any' : null });
+      else if (f.type === 'file') {
+        input = h('input', { type: 'file', accept: f.accept || 'image/png,image/jpeg,image/webp' });
+        extra = h('div');
+        wireFile(f, input, extra);
+      } else input = h('input', { type: f.type || 'text', value: f.value ?? '', autocomplete: 'off', step: f.type === 'number' ? 'any' : null });
       inputs[f.name] = input;
       if (f.type === 'checkbox') return h('label', { class: 'chk' }, input, f.label);
-      return h('label', { class: 'f' }, h('span', {}, f.label), input, f.hint ? h('small', { class: 'hint' }, f.hint) : null);
+      return h('div', { class: 'f' }, h('label', { class: 'f', style: 'margin:0' }, h('span', {}, f.label), input, f.hint ? h('small', { class: 'hint' }, f.hint) : null), extra);
     });
+    let busy = false;
     const close = (v) => {
+      if (busy) return;
       wrap.remove();
       resolve(v);
+    };
+    const bar = h('i');
+    const status = h('div', { style: 'display:none;margin:4px 0 12px' },
+      h('div', { class: 'progress' }, bar),
+      h('div', { class: 'dim', id: 'st', style: 'margin-top:6px' }));
+    const stText = status.querySelector('#st');
+    const errBox = h('p', { class: 'err-text', style: 'display:none' });
+    const cancel = h('button', { type: 'button', class: 'btn', onclick: () => close(null) }, 'Batal');
+    const ok = h('button', { type: 'submit', class: 'btn ' + (danger ? 'bad' : 'pri') }, submit);
+    const ui = {
+      progress(text, frac) {
+        status.style.display = 'block';
+        stText.textContent = text;
+        bar.style.width = Math.round(Math.max(0, Math.min(1, frac ?? 0)) * 100) + '%';
+      },
     };
     const form = h(
       'form',
       {
-        onsubmit: (e) => {
+        onsubmit: async (e) => {
           e.preventDefault();
+          if (busy) return;
           const out = {};
           for (const f of fields) {
             const el = inputs[f.name];
@@ -148,14 +262,30 @@ function formModal({ title, fields, submit = 'Simpan', danger = false }) {
             else if (f.type === 'number') out[f.name] = el.value === '' ? null : Number(el.value);
             else out[f.name] = el.value.trim();
           }
-          close(out);
+          if (!onSubmit) return close(out);
+          busy = true;
+          cancel.disabled = true;
+          ok.disabled = true;
+          errBox.style.display = 'none';
+          try {
+            const result = await onSubmit(out, ui);
+            busy = false;
+            close(result === undefined ? out : result);
+          } catch (ex) {
+            busy = false;
+            cancel.disabled = false;
+            ok.disabled = false;
+            status.style.display = 'none';
+            errBox.textContent = ex.message;
+            errBox.style.display = 'block';
+          }
         },
       },
       h('h3', {}, title),
       body,
-      h('div', { class: 'acts' },
-        h('button', { type: 'button', class: 'btn', onclick: () => close(null) }, 'Batal'),
-        h('button', { type: 'submit', class: 'btn ' + (danger ? 'bad' : 'pri') }, submit))
+      status,
+      errBox,
+      h('div', { class: 'acts' }, cancel, ok)
     );
     const wrap = h('div', { class: 'modal-wrap', onmousedown: (e) => e.target === wrap && close(null) }, h('div', { class: 'modal' }, form));
     document.body.append(wrap);
@@ -503,27 +633,27 @@ async function pageGifts() {
     { name: 'icon', label: 'Ikon emoji', value: g ? g.icon : '🎁', hint: 'Dipakai jika tidak ada gambar' },
     { name: 'category', label: 'Kategori', type: 'select', value: g ? g.category : 'normal', options: [{ value: 'normal', label: 'Populer' }, { value: 'luxury', label: 'Mewah (animasi layar penuh)' }] },
     { name: 'sortOrder', label: 'Urutan', type: 'number', value: g ? g.sortOrder : 0, hint: 'Angka kecil tampil lebih dulu' },
-    { name: 'image', label: 'Gambar gift (opsional)', type: 'file', hint: 'PNG/WEBP transparan, maks 5 MB. Menggantikan emoji.' },
+    { name: 'image', label: 'Gambar gift (opsional)', type: 'file', maxMB: 5, preview: 'image', current: g && g.imageUrl, hint: 'PNG/WEBP transparan, maks 5 MB. Menggantikan emoji.' },
     ...(g && g.imageUrl ? [{ name: 'removeImage', label: 'Hapus gambar yang ada', type: 'checkbox', value: false }] : []),
-    { name: 'video', label: 'Efek MP4 layar penuh (opsional)', type: 'file', accept: 'video/mp4', hint: 'MP4 maks 15 MB, disarankan portrait (mis. 720x1280). Diputar maksimal 6 detik lalu memudar halus. Suara tidak diputar.' },
+    { name: 'video', label: 'Efek MP4 layar penuh (opsional)', type: 'file', accept: 'video/mp4', maxMB: 15, preview: 'video', current: g && g.animationUrl, hint: 'MP4 maks 15 MB, disarankan portrait (mis. 720x1280) dan H.264. Diputar maksimal 6 detik lalu memudar halus. Suara tidak diputar.' },
     ...(g && g.animationUrl ? [{ name: 'removeVideo', label: 'Hapus efek MP4 yang ada', type: 'checkbox', value: false }] : []),
     { name: 'blend', label: 'Latar video hitam → jadikan transparan', type: 'checkbox', value: g ? g.animationBlend : false },
     { name: 'active', label: 'Aktif (tampil di panel gift)', type: 'checkbox', value: g ? g.active : true },
   ];
 
-  const save = async (g, r) => {
+  // Unggah file (dengan kemajuan) lalu simpan gift
+  const save = async (g, r, ui) => {
     let imageUrl;
     if (r.image) {
-      const f = new FormData();
-      f.append('file', r.image);
-      imageUrl = (await api('POST', '/api/admin/upload', undefined, f)).url;
+      ui.progress('Mengunggah gambar…', 0);
+      imageUrl = (await xhrUpload('/api/admin/upload', r.image, (p) => ui.progress('Mengunggah gambar… ' + Math.round(p * 100) + '%', p))).url;
     } else if (r.removeImage) imageUrl = '';
     let animationUrl;
     if (r.video) {
-      const f = new FormData();
-      f.append('file', r.video);
-      animationUrl = (await api('POST', '/api/admin/upload-video', undefined, f)).url;
+      ui.progress('Mengunggah efek MP4…', 0);
+      animationUrl = (await xhrUpload('/api/admin/upload-video', r.video, (p) => ui.progress('Mengunggah efek MP4… ' + Math.round(p * 100) + '%', p))).url;
     } else if (r.removeVideo) animationUrl = '';
+    ui.progress('Menyimpan…', 1);
     const body = { name: r.name, price: r.price, icon: r.icon || undefined, category: r.category, sortOrder: r.sortOrder ?? 0, active: r.active, animationBlend: r.blend };
     if (imageUrl !== undefined) body.imageUrl = imageUrl;
     if (animationUrl !== undefined) body.animationUrl = animationUrl;
@@ -531,8 +661,11 @@ async function pageGifts() {
   };
 
   root.append(h('div', { class: 'row', style: 'margin-bottom:14px' }, h('button', { class: 'btn pri', onclick: async () => {
-    const r = await formModal({ title: 'Gift baru', fields: fields(null), submit: 'Buat' });
-    if (r && await act(() => save(null, r), 'Gift dibuat')) render();
+    const r = await formModal({ title: 'Gift baru', fields: fields(null), submit: 'Buat', onSubmit: (v, ui) => save(null, v, ui) });
+    if (r) {
+      toast('Gift dibuat');
+      render();
+    }
   } }, '+ Gift baru')));
   if (!list.length) root.append(empty('Belum ada gift'));
   const grid = h('div', { class: 'grid g2' });
@@ -544,10 +677,14 @@ async function pageGifts() {
         h('div', { style: 'text-align:right' },
           h('span', { class: 'pill ' + (g.category === 'luxury' ? 'amber' : '') }, g.category === 'luxury' ? 'Mewah' : 'Populer'),
           h('div', { style: 'margin-top:4px' }, g.active ? null : h('span', { class: 'pill red' }, 'Nonaktif'), g.animationUrl ? h('span', { class: 'pill purple', style: 'margin-left:4px' }, '🎬 MP4') : null))),
-      h('div', { class: 'row', style: 'margin-top:12px' }, h('button', { class: 'btn sm', onclick: async () => {
-        const r = await formModal({ title: 'Ubah gift', fields: fields(g) });
-        if (r && await act(() => save(g, r), 'Gift diperbarui')) render();
-      } }, 'Ubah'))));
+      h('div', { class: 'row wrap', style: 'margin-top:12px;gap:6px' }, h('button', { class: 'btn sm', onclick: async () => {
+        const r = await formModal({ title: 'Ubah gift', fields: fields(g), onSubmit: (v, ui) => save(g, v, ui) });
+        if (r) {
+          toast('Gift diperbarui');
+          render();
+        }
+      } }, 'Ubah'),
+      g.animationUrl ? h('button', { class: 'btn sm', onclick: () => lightboxVideo(g.animationUrl) }, '▶ Putar efek MP4') : null)));
   }
   root.append(grid);
   return root;
