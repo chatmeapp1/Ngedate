@@ -76,14 +76,14 @@ function HostHeader({ top }: { top: number }) {
       {/* Pendapatan saya */}
       <LinearGradient colors={['#FDE68A', '#FBBF24']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.earnWrap}>
         <Pressable style={s.earnHead} onPress={() => router.push('/level')}>
-          <Text style={{ fontSize: 22 }}>📈</Text>
+          <Text style={{ fontSize: 16 }}>📈</Text>
           <Text style={s.earnTitle}>Pendapatan saya</Text>
           {m ? (
             <View style={s.earnPill}>
               <Text style={s.earnPillText}>Level {m.level}</Text>
             </View>
           ) : null}
-          <Ionicons name="arrow-forward" size={20} color={colors.text} />
+          <Ionicons name="arrow-forward" size={16} color={colors.text} />
         </Pressable>
         <View style={s.earnBody}>
           <Pressable style={s.earnCard} onPress={() => router.push('/wallet')}>
@@ -91,24 +91,24 @@ function HostHeader({ top }: { top: number }) {
               <Text style={s.earnCardTitle}>Data hari ini</Text>
               <Text style={s.earnMore}>Lebih ›</Text>
             </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 14 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 8 }}>
               <Text style={s.earnValue}>{number(m?.earnedToday ?? 0)}</Text>
-              <Text style={{ fontSize: 20 }}>💎</Text>
+              <Text style={{ fontSize: 15 }}>💎</Text>
             </View>
             <Text style={s.earnSub}>Penghasilan hari ini [WIB]</Text>
             {m ? (
               <Text style={s.earnSub7}>
-                7 hari terakhir: {number(m.topupTotal)} 💎 ·{' '}
-                {m.nextLevelAt === null ? 'level tertinggi' : `${number(Math.max(0, m.nextLevelAt - m.topupTotal))} 💎 lagi ke Lv ${m.level + 1}`}
+                7 hari: {number(m.topupTotal)} 💎 ·{' '}
+                {m.nextLevelAt === null ? 'level tertinggi' : `${number(Math.max(0, m.nextLevelAt - m.topupTotal))} lagi ke Lv ${m.level + 1}`}
               </Text>
             ) : null}
           </Pressable>
           <Pressable style={s.earnBalance} onPress={() => router.push('/wallet')}>
-            <Text style={{ fontSize: 26 }}>💎</Text>
+            <Text style={{ fontSize: 19 }}>💎</Text>
             <Text style={s.earnBalanceValue}>{number(user.diamonds ?? 0)}</Text>
             <Text style={s.earnBalanceLabel}>Saldo diamond</Text>
             <View style={{ flex: 1 }} />
-            <Ionicons name="arrow-forward" size={22} color="#fff" />
+            <Ionicons name="arrow-forward" size={18} color="#fff" />
           </Pressable>
         </View>
       </LinearGradient>
@@ -273,22 +273,22 @@ const s = StyleSheet.create({
   verifiedText: { color: '#1D6FB8', fontSize: 11, fontWeight: '800' },
   unverifiedChip: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#FEF3C7', paddingHorizontal: 8, height: 22, borderRadius: radius.pill },
   unverifiedText: { color: '#B45309', fontSize: 11, fontWeight: '800' },
-  earnWrap: { marginTop: 18, borderRadius: radius.lg, paddingTop: 4, overflow: 'hidden' },
-  earnHead: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, height: 52 },
-  earnTitle: { flex: 1, color: colors.text, fontSize: 16, fontWeight: '700' },
-  earnPill: { backgroundColor: colors.primary, paddingHorizontal: 12, height: 26, borderRadius: radius.pill, justifyContent: 'center' },
-  earnPillText: { color: '#fff', fontWeight: '600', fontSize: 12 },
-  earnBody: { backgroundColor: colors.primary, borderRadius: radius.lg, padding: 12, gap: 12 },
-  earnCard: { backgroundColor: '#fff', borderRadius: radius.md, padding: 16 },
+  earnWrap: { marginTop: 14, borderRadius: radius.md, paddingTop: 2, overflow: 'hidden' },
+  earnHead: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, height: 38 },
+  earnTitle: { flex: 1, color: colors.text, fontSize: 14, fontWeight: '600' },
+  earnPill: { backgroundColor: colors.primary, paddingHorizontal: 10, height: 22, borderRadius: radius.pill, justifyContent: 'center' },
+  earnPillText: { color: '#fff', fontWeight: '500', fontSize: 11 },
+  earnBody: { backgroundColor: colors.primary, borderRadius: radius.md, padding: 8, gap: 4 },
+  earnCard: { backgroundColor: '#fff', borderRadius: radius.sm + 2, paddingHorizontal: 12, paddingVertical: 10 },
   earnCardHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  earnCardTitle: { color: colors.text, fontSize: 17, fontWeight: '900' },
-  earnMore: { color: colors.textDim, fontSize: 13, fontWeight: '700' },
-  earnValue: { color: colors.text, fontSize: 30, fontWeight: '900' },
-  earnSub: { color: colors.textDim, fontSize: 13, marginTop: 2 },
-  earnSub7: { color: colors.textSub, fontSize: 12, marginTop: 8 },
-  earnBalance: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 6, height: 48 },
-  earnBalanceValue: { color: '#fff', fontSize: 30, fontWeight: '900' },
-  earnBalanceLabel: { color: 'rgba(255,255,255,0.8)', fontSize: 13, fontWeight: '600', marginTop: 8 },
+  earnCardTitle: { color: colors.text, fontSize: 13, fontWeight: '600' },
+  earnMore: { color: colors.textDim, fontSize: 12, fontWeight: '500' },
+  earnValue: { color: colors.text, fontSize: 21, fontWeight: '600' },
+  earnSub: { color: colors.textDim, fontSize: 11, marginTop: 1 },
+  earnSub7: { color: colors.textSub, fontSize: 11, marginTop: 5 },
+  earnBalance: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 6, height: 36 },
+  earnBalanceValue: { color: '#fff', fontSize: 19, fontWeight: '600' },
+  earnBalanceLabel: { color: 'rgba(255,255,255,0.8)', fontSize: 11, fontWeight: '500', marginTop: 3 },
   idChip: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(255,255,255,0.8)', paddingHorizontal: 8, height: 24, borderRadius: radius.pill },
   idLabel: { color: '#F59E5B', fontWeight: '900', fontSize: 12 },
   idValue: { color: colors.textSub, fontWeight: '700', fontSize: 13 },
