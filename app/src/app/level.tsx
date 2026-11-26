@@ -24,6 +24,8 @@ export default function LevelScreen() {
   const m = user?.membership;
   if (!user || !m) return <Loading />;
   const next = m.nextLevelAt;
+  const isHost = m.kind === 'host';
+  const unit = isHost ? '💎' : 'koin';
 
   return (
     <View style={{ flex: 1, backgroundColor: '#17121F' }}>
@@ -41,15 +43,17 @@ export default function LevelScreen() {
           <Text style={s.heroText}>
             {next === null
               ? 'Kamu sudah di tingkat tertinggi 👑'
-              : `Top up ${number(next - m.topupTotal)} koin lagi untuk naik ke Lv ${m.level + 1}`}
+              : isHost
+                ? `Dapatkan ${number(next - m.topupTotal)} 💎 lagi untuk naik ke Lv ${m.level + 1}`
+                : `Top up ${number(next - m.topupTotal)} koin lagi untuk naik ke Lv ${m.level + 1}`}
           </Text>
           <View style={s.track}>
             <View style={[s.fill, { width: `${Math.round(m.levelProgress * 100)}%` }]} />
           </View>
-          <Text style={s.heroSub}>Total top up: {number(m.topupTotal)} koin</Text>
+          <Text style={s.heroSub}>{isHost ? `Total pendapatan: ${number(m.topupTotal)} 💎` : `Total top up: ${number(m.topupTotal)} koin`}</Text>
         </LinearGradient>
 
-        <Text style={s.hint}>Level naik otomatis dari total koin yang kamu top up dan tidak turun.</Text>
+        <Text style={s.hint}>{isHost ? 'Level host naik otomatis dari total pendapatan diamond dan tidak turun saat kamu menarik diamond.' : 'Level naik otomatis dari total koin yang kamu top up dan tidak turun.'}</Text>
 
         {m.levelThresholds.map((need, level) => {
           const reached = m.level >= level;
@@ -61,7 +65,7 @@ export default function LevelScreen() {
                 <LevelBadge level={level} size={28} />
               </View>
               <Text style={s.need}>
-                {number(need)} <Text style={{ fontSize: 13, color: GOLD }}>koin</Text>
+                {number(need)} <Text style={{ fontSize: 13, color: GOLD }}>{unit}</Text>
               </Text>
               {current ? <Text style={[s.now, { color: st.ring }]}>Sekarang</Text> : reached ? <Ionicons name="checkmark-circle" size={20} color="#4ADE9F" /> : <Ionicons name="lock-closed" size={16} color="#8E86A0" />}
             </View>
@@ -76,9 +80,11 @@ export default function LevelScreen() {
           </Text>
           <Text style={s.id}>ID {user.id}</Text>
         </View>
-        <Pressable onPress={() => router.push('/topup')} style={({ pressed }) => [s.cta, pressed && { opacity: 0.85 }]}>
-          <Text style={s.ctaText}>Top up</Text>
-        </Pressable>
+        {isHost ? null : (
+          <Pressable onPress={() => router.push('/topup')} style={({ pressed }) => [s.cta, pressed && { opacity: 0.85 }]}>
+            <Text style={s.ctaText}>Top up</Text>
+          </Pressable>
+        )}
       </View>
     </View>
   );

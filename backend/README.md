@@ -194,6 +194,11 @@ daftar host + komisi tiap host, riwayat komisi, penarikan, dan ganti password.
   bertanda "AGENCY").
 - Tabel: `agency_payout_accounts`, `agency_withdrawals` (migrasi 017). API agency di `/api/agency/*`.
 
+**Level host:** host juga punya Level 0-10, dari **total pendapatan diamond seumur hidup** (`users.income_total`, bertambah dari
+chat, gift, dan kartu gratis; tidak turun saat menarik). Angka awal sama dengan level pengguna dan dapat diubah di panel admin >
+Pengaturan (`host_level_thresholds`, dalam diamond). Pengguna melihat badge level di profil host (hanya levelnya, bukan jumlah
+pendapatan); host melihat kemajuannya di Profil > kartu Lv.
+
 ## Panel admin web
 
 Buka `http://<alamat-server>:<port>/admin` di browser (HP juga bisa) lalu masuk dengan akun admin

@@ -42,9 +42,12 @@ function publicUser(u, { self = false } = {}) {
   return out;
 }
 
-function hostCard(r) {
+function hostCard(r, levelThresholds) {
+  const { levelOf } = require('../services/membership');
   return {
     ...publicUser(r),
+    // level host dari total pendapatan (pendapatan sendiri tidak dibuka ke pengguna)
+    level: levelThresholds ? levelOf(Number(r.income_total || 0), levelThresholds) : undefined,
     chatPrice: r.chat_price === null || r.chat_price === undefined ? 0 : Number(r.chat_price),
     waAvailable: !!(r.wa_enabled && r.wa_number),
     waUnlockThreshold: r.wa_unlock_threshold === null || r.wa_unlock_threshold === undefined ? null : Number(r.wa_unlock_threshold),

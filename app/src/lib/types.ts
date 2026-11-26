@@ -33,6 +33,8 @@ export interface User {
 
 /** Level (0-10) dan VIP (1-5) dari total top up koin */
 export interface Membership {
+  /** 'host': level dari total pendapatan diamond (topupTotal = pendapatan); 'user': dari total top up koin */
+  kind?: 'user' | 'host';
   topupTotal: number;
   level: number;
   maxLevel: number;
@@ -49,6 +51,8 @@ export interface Membership {
 }
 
 export interface Host extends User {
+  /** level host (0-10) dari total pendapatan */
+  level?: number;
   chatPrice: number;
   waAvailable: boolean;
   waUnlockThreshold: number | null;

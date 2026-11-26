@@ -1122,6 +1122,7 @@ async function pageSettings() {
     { k: 'withdraw_diamonds_per_usd', label: 'Penarikan: diamond per 1 USD', hint: 'Makin besar angkanya, makin kecil nilai 1 diamond (Rp 17.000 ÷ angka ini). Awal 6.667 = Rp 2,55 per diamond. Server menolak nilai yang membuat app rugi.', min: 1 },
     { k: 'withdraw_usd_idr', label: 'Penarikan: Rupiah per 1 USD (host Indonesia)', hint: 'Host Indonesia dibayar Rupiah memakai kurs ini; host negara lain dibayar USDT.', min: 1000 },
     { k: 'level_thresholds', list: true, label: 'Batas level (total top up, koin)', hint: '11 angka dipisah koma untuk Level 0 sampai 10 (Level 0 = 0). Level naik dari TOTAL top up koin.' },
+    { k: 'host_level_thresholds', list: true, label: 'Batas level host (total pendapatan, diamond)', hint: '11 angka dipisah koma untuk Level 0 sampai 10. Level host naik dari TOTAL pendapatan diamond seumur hidup dan tidak turun saat ditarik.' },
     { k: 'vip_thresholds', list: true, label: 'Batas VIP (total top up, koin)', hint: '5 angka dipisah koma untuk VIP 1 sampai 5. VIP bisa kirim foto/video dan memakai kartu pesan gratis.' },
     { k: 'free_cards_per_day', label: 'Kartu pesan gratis per hari (VIP)', hint: 'Pengguna VIP mengirim pesan ke host berbayar tanpa dipotong koin sebanyak ini per hari.', min: 0, max: 100 },
     { k: 'vip_media_per_day', label: 'Foto/video VIP per hari', hint: 'Batas kiriman foto + video di chat per pengguna VIP per hari.', min: 0, max: 1000 },

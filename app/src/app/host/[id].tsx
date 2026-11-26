@@ -10,6 +10,7 @@ import { GiftIcon } from '@/components/GiftIcon';
 import { GiftSheet } from '@/components/GiftSheet';
 import { SafetyMenu } from '@/components/SafetyMenu';
 import { Avatar, Coin, Empty, Loading } from '@/components/ui';
+import { LevelBadge } from '@/components/Badges';
 import { Verified } from '@/components/Verified';
 import { useAuth } from '@/context/auth';
 import { api, errorMessage } from '@/lib/api';
@@ -112,6 +113,7 @@ export default function HostProfileScreen() {
                   {host.displayName}
                 </Text>
                 {host.verified ? <Verified size={22} /> : null}
+                {host.level != null ? <LevelBadge level={host.level} size={22} /> : null}
               </View>
               <View style={s.badges}>
                 {host.age ? (

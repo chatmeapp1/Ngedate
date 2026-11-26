@@ -216,12 +216,12 @@ router.patch('/settings', wrap(async (req, res) => {
     const share = Number(b.host_share);
     if (!(share >= 0 && share <= 1)) throw badRequest('host_share harus 0 sampai 1');
   }
-  for (const [k, count, label] of [['level_thresholds', 11, 'Batas level (Level 0 sampai 10)'], ['vip_thresholds', 5, 'Batas VIP (VIP 1 sampai 5)']]) {
+  for (const [k, count, label] of [['level_thresholds', 11, 'Batas level (Level 0 sampai 10)'], ['host_level_thresholds', 11, 'Batas level host (Level 0 sampai 10)'], ['vip_thresholds', 5, 'Batas VIP (VIP 1 sampai 5)']]) {
     if (b[k] === undefined) continue;
     const list = membership.parseList(b[k], null);
     if (!list || list.length !== count) throw badRequest(`${label}: isi ${count} angka dipisah koma`);
     if (list.some((n, i) => i > 0 && n <= list[i - 1])) throw badRequest(`${label}: angka harus makin besar`);
-    if (k === 'level_thresholds' && list[0] !== 0) throw badRequest('Level 0 harus dimulai dari 0');
+    if ((k === 'level_thresholds' || k === 'host_level_thresholds') && list[0] !== 0) throw badRequest('Level 0 harus dimulai dari 0');
     b[k] = list.map(Math.round);
   }
   if (b.vip_media_per_day !== undefined) b.vip_media_per_day = Math.round(Number(b.vip_media_per_day));

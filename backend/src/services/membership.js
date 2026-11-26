@@ -44,10 +44,12 @@ async function freeCardsUsed(client, userId) {
 /** Ringkasan keanggotaan satu pengguna (level, VIP, kartu gratis). */
 async function summary(client, userId, settings) {
   const s = settings || (await getSettings(client));
-  const { rows } = await client.query(`SELECT topup_total FROM users WHERE id = $1`, [userId]);
-  const total = rows.length ? Number(rows[0].topup_total) : 0;
-  const levels = s.level_thresholds;
-  const vips = s.vip_thresholds;
+  const { rows } = await client.query(`SELECT role, topup_total, income_total FROM users WHERE id = $1`, [userId]);
+  const isHost = rows.length && rows[0].role === 'host';
+  // Host: level dari total pendapatan diamond; pengguna: level & VIP dari total top up koin
+  const total = rows.length ? Number(isHost ? rows[0].income_total : rows[0].topup_total) : 0;
+  const levels = isHost ? s.host_level_thresholds : s.level_thresholds;
+  const vips = isHost ? [] : s.vip_thresholds;
   const level = levelOf(total, levels);
   const vip = vipOf(total, vips);
   const nextLevelAt = level < levels.length - 1 ? levels[level + 1] : null;
@@ -55,7 +57,8 @@ async function summary(client, userId, settings) {
   const perDay = Number(s.free_cards_per_day);
   const used = vip > 0 ? await freeCardsUsed(client, userId) : 0;
   return {
-    topupTotal: total,
+    kind: isHost ? 'host' : 'user',
+    topupTotal: total, // untuk host: total pendapatan diamond
     level,
     maxLevel: levels.length - 1,
     levelThresholds: levels,

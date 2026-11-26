@@ -30,6 +30,10 @@ async function change(client, userId, currency, amount, reason, ref = {}) {
     throw new ApiError(402, 'INSUFFICIENT_COINS', 'Koin tidak cukup');
   }
   const balance = Number(rows[0].balance);
+  // Pendapatan seumur hidup host (dasar level host): hanya diamond masuk dari chat/gift/kartu gratis
+  if (currency === 'diamond' && amount > 0 && /_income$/.test(reason)) {
+    await client.query(`UPDATE users SET income_total = income_total + $2 WHERE id = $1`, [userId, amount]);
+  }
   await client.query(
     `INSERT INTO ledger (user_id, currency, amount, balance_after, reason, ref_type, ref_id, note)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,

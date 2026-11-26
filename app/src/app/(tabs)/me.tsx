@@ -48,7 +48,7 @@ export default function Me() {
                 {user.displayName}
               </Text>
               {user.verified ? <Verified size={20} /> : null}
-              {!isHost && m ? <LevelBadge level={m.level} size={22} /> : null}
+              {m ? <LevelBadge level={m.level} size={22} /> : null}
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <View style={s.idChip}>
@@ -69,13 +69,17 @@ export default function Me() {
           </View>
         </View>
 
-        {!isHost && m ? (
+        {m ? (
           <Pressable onPress={() => router.push('/level')} style={{ marginTop: 18 }}>
             <LinearGradient colors={['#4B3575', '#2B2040']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.levelCard}>
               <View style={{ flex: 1, gap: 8 }}>
                 <Text style={s.levelTitle}>Lv {m.level}</Text>
                 <Text style={s.levelSub}>
-                  {m.nextLevelAt === null ? 'Tingkat tertinggi 👑' : `Top up ${number(m.nextLevelAt - m.topupTotal)} koin lagi untuk Lv ${m.level + 1}`}
+                  {m.nextLevelAt === null
+                    ? 'Tingkat tertinggi 👑'
+                    : isHost
+                      ? `Dapatkan ${number(m.nextLevelAt - m.topupTotal)} 💎 lagi untuk Lv ${m.level + 1}`
+                      : `Top up ${number(m.nextLevelAt - m.topupTotal)} koin lagi untuk Lv ${m.level + 1}`}
                 </Text>
                 <View style={s.track}>
                   <View style={[s.fill, { width: `${Math.max(3, Math.round(m.levelProgress * 100))}%` }]} />

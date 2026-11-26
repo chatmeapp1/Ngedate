@@ -6,6 +6,7 @@ const { wrap, notFound } = require('../lib/errors');
 const { hostCard, publicUser } = require('./serializers');
 const { REGIONS, REGION_KEYS } = require('../lib/regions');
 const safety = require('../services/safety');
+const { getSettings } = require('../services/settings');
 
 const router = express.Router();
 const PAGE_SIZE = 30;
@@ -74,7 +75,8 @@ router.get('/', wrap(async (req, res) => {
     ORDER BY ${order}
     LIMIT ${PAGE_SIZE} OFFSET $${params.length}`;
   const { rows } = await db.query(sql, params);
-  res.json(rows.map(hostCard));
+  const { host_level_thresholds: th } = await getSettings();
+  res.json(rows.map((r) => hostCard(r, th)));
 }));
 
 // Jumlah host per negara (untuk kartu negara di beranda)
@@ -141,7 +143,7 @@ router.get('/:id', wrap(async (req, res) => {
   const s = stats.rows[0];
   const c = conv.rows[0];
   res.json({
-    ...hostCard(rows[0]),
+    ...hostCard(rows[0], (await getSettings()).host_level_thresholds),
     followers: s.followers,
     following: s.following,
     likes: s.likes,
