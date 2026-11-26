@@ -28,6 +28,15 @@ function createApp() {
     })
   );
 
+  // Panel agency web (/agency): halaman statis; data lewat /api/agency dengan login agency
+  app.use(
+    '/agency',
+    express.static(require('path').join(__dirname, '..', 'public', 'agency'), {
+      setHeaders: (res) => res.setHeader('Cache-Control', 'no-store'),
+    })
+  );
+  app.use('/api/agency', require('./routes/agency'));
+
   app.use('/api/auth', require('./routes/auth'));
   app.use('/api/me', authenticate, require('./routes/me'));
   app.use('/api/onboarding', authenticate, require('./routes/onboarding'));

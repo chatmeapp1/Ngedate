@@ -14,6 +14,7 @@ const { REPORT_REASONS } = require('../services/safety');
 const withdraw = require('../services/withdraw');
 const economy = require('../services/economy');
 const membership = require('../services/membership');
+const agencyPanel = require('../services/agencyPanel');
 
 const router = express.Router();
 
@@ -277,9 +278,9 @@ router.get('/stats', wrap(async (req, res) => {
        (SELECT COUNT(*) FROM user_photos WHERE status = 'pending')::int AS pending_photos,
        (SELECT COUNT(*) FROM users WHERE pending_avatar_url IS NOT NULL)::int AS pending_avatars,
        (SELECT COUNT(*) FROM reports WHERE status = 'pending')::int AS pending_reports,
-       (SELECT COUNT(*) FROM withdrawals WHERE status = 'pending')::int AS pending_withdrawals,
-       (SELECT COALESCE(SUM(net), 0) FROM withdrawals WHERE status = 'pending' AND currency = 'IDR')::bigint AS pending_withdraw_idr,
-       (SELECT COALESCE(SUM(net), 0) FROM withdrawals WHERE status = 'pending' AND currency = 'USD')::bigint AS pending_withdraw_usd_cents,
+       ((SELECT COUNT(*) FROM withdrawals WHERE status = 'pending') + (SELECT COUNT(*) FROM agency_withdrawals WHERE status = 'pending'))::int AS pending_withdrawals,
+       ((SELECT COALESCE(SUM(net), 0) FROM withdrawals WHERE status = 'pending' AND currency = 'IDR') + (SELECT COALESCE(SUM(net), 0) FROM agency_withdrawals WHERE status = 'pending' AND currency = 'IDR'))::bigint AS pending_withdraw_idr,
+       ((SELECT COALESCE(SUM(net), 0) FROM withdrawals WHERE status = 'pending' AND currency = 'USD') + (SELECT COALESCE(SUM(net), 0) FROM agency_withdrawals WHERE status = 'pending' AND currency = 'USD'))::bigint AS pending_withdraw_usd_cents,
        (SELECT COUNT(*) FROM users WHERE created_at > now() - interval '24 hours')::int AS new_users_24h,
        (SELECT COUNT(*) FROM messages WHERE type = 'text' AND created_at > now() - interval '24 hours')::int AS messages_24h,
        (SELECT COALESCE(SUM(price), 0) FROM messages WHERE type = 'gift' AND created_at > now() - interval '24 hours')::bigint AS gifts_24h,
@@ -379,7 +380,20 @@ router.post('/reports/:id/review', wrap(async (req, res) => {
 // ---------------------------------------------------------------------------
 router.get('/withdrawals', wrap(async (req, res) => {
   const status = v.str(req.query.status ?? 'pending', 'status', { pattern: /^(pending|paid|rejected|cancelled)$/ });
-  res.json(await withdraw.adminList(status));
+  const host = (await withdraw.adminList(status)).map((w) => ({ ...w, owner: 'host' }));
+  const agency = await agencyPanel.adminList(status); // penarikan komisi agency
+  const dir = status === 'pending' ? 1 : -1;
+  res.json([...host, ...agency].sort((a, b) => dir * (new Date(a.createdAt) - new Date(b.createdAt))));
+}));
+
+router.post('/agency-withdrawals/:id/pay', wrap(async (req, res) => {
+  await agencyPanel.adminPay(req.user.id, req.params.id, req.body || {});
+  res.json({ ok: true });
+}));
+
+router.post('/agency-withdrawals/:id/reject', wrap(async (req, res) => {
+  await agencyPanel.adminReject(req.user.id, req.params.id, req.body || {});
+  res.json({ ok: true });
 }));
 
 router.post('/withdrawals/:id/pay', wrap(async (req, res) => {
@@ -496,6 +510,10 @@ function mapAgency(a) {
     commissionRate: Number(a.commission_rate),
     active: a.active,
     earningsTotal: Number(a.earnings_total),
+    balance: Number(a.balance ?? 0),
+    username: a.username || null,
+    loginSet: !!a.password_hash,
+    countryCode: a.country_code ? a.country_code.trim() : null,
     contact: a.contact,
     hosts: a.hosts === undefined ? undefined : Number(a.hosts),
     createdAt: a.created_at,
@@ -509,6 +527,12 @@ async function checkRate(rate) {
     throw badRequest('Komisi agency harus 0 sampai 1 (persen dari penghasilan host, dibayar dari bagian app)');
   }
 }
+
+// Atur login panel agency (username, password awal / reset, negara untuk metode penarikan)
+router.put('/agencies/:id/login', wrap(async (req, res) => {
+  await agencyPanel.adminSetLogin(req.params.id, req.body || {});
+  res.json({ ok: true });
+}));
 
 router.get('/agencies', wrap(async (req, res) => {
   const { rows } = await db.query(

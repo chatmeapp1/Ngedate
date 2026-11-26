@@ -180,6 +180,20 @@ sedang tidak membuka aplikasi (pesan teks/foto/video tidak, supaya tidak ramai).
 Tanpa langkah 3-4 backend tidak mengirim apa pun (aman). Token perangkat disimpan di tabel `push_tokens`
 (`POST/DELETE /api/me/push-token`).
 
+## Panel agency (web) & penarikan komisi
+
+Agency punya panel web sendiri di **`/agency`** (alamat server + `/agency`), terpisah dari `/admin`. Isinya: ringkasan saldo komisi,
+daftar host + komisi tiap host, riwayat komisi, penarikan, dan ganti password.
+
+- **Akun agency** dibuat admin: panel admin > Agency > "Buat login" (username, password awal, negara). Agency bisa mengganti
+  passwordnya sendiri; mengganti password mencabut semua sesi lama. Token agency (12 jam) tidak berlaku di API pengguna/admin, dan sebaliknya.
+- **Saldo** (`agencies.balance`, diamond) bertambah otomatis dari komisi (10% dari penghasilan host). `earnings_total` = total seumur hidup.
+- **Penarikan** memakai kurs & aturan yang sama dengan host (minimal, biaya, USDT TRC20 untuk agency luar negeri / bank & e-wallet
+  untuk Indonesia, rekening wajib + password, rekening yang diganti menahan penarikan 24 jam, satu pengajuan menunggu).
+  Saldo ditahan saat mengajukan; admin membayar atau menolak (saldo kembali) di halaman **Penarikan** (bersama penarikan host,
+  bertanda "AGENCY").
+- Tabel: `agency_payout_accounts`, `agency_withdrawals` (migrasi 017). API agency di `/api/agency/*`.
+
 ## Panel admin web
 
 Buka `http://<alamat-server>:<port>/admin` di browser (HP juga bisa) lalu masuk dengan akun admin

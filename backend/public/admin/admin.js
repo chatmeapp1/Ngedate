@@ -100,6 +100,7 @@ async function api(method, path, body, form) {
 const get = (p) => api('GET', p);
 const post = (p, b) => api('POST', p, b || {});
 const patch = (p, b) => api('PATCH', p, b || {});
+const put = (p, b) => api('PUT', p, b || {});
 
 async function act(fn, okMsg) {
   try {
@@ -630,8 +631,22 @@ async function pageAgency() {
         h('dt', {}, 'Komisi'), h('dd', {}, +(a.commissionRate * 100).toFixed(2) + '%'),
         h('dt', {}, 'Host'), h('dd', {}, fmt(a.hosts)),
         h('dt', {}, 'Total pendapatan'), h('dd', {}, fmt(a.earningsTotal) + ' diamond'),
+        h('dt', {}, 'Saldo belum ditarik'), h('dd', {}, fmt(a.balance) + ' diamond'),
+        h('dt', {}, 'Login panel'), h('dd', {}, a.loginSet ? a.username : 'belum diatur'),
+        h('dt', {}, 'Negara pembayaran'), h('dd', {}, (a.countryCode || 'ID') + ((a.countryCode || 'ID') === 'ID' ? ' (Rupiah)' : ' (USDT)')),
         h('dt', {}, 'Kontak'), h('dd', {}, a.contact || '-')),
-      h('div', { class: 'row', style: 'margin-top:12px' }, h('button', { class: 'btn sm', onclick: async () => {
+      h('div', { class: 'row wrap', style: 'margin-top:12px;gap:6px' }, h('button', { class: 'btn sm', onclick: async () => {
+        const r = await formModal({
+          title: a.loginSet ? 'Atur login: ' + a.name : 'Buat login: ' + a.name,
+          submit: 'Simpan login',
+          fields: [
+            { name: 'username', label: 'Username', value: a.username || '', hint: 'Huruf, angka, titik, minus, garis bawah (min 4). Agency masuk di ' + location.origin + '/agency' },
+            { name: 'password', label: a.loginSet ? 'Password baru (kosongkan jika tidak diganti)' : 'Password awal', type: 'password', hint: 'Minimal 8 karakter. Sampaikan ke agency lewat jalur aman; agency bisa menggantinya sendiri.' },
+            { name: 'countryCode', label: 'Negara (menentukan metode penarikan)', type: 'select', value: (a.countryCode || 'ID') === 'ID' ? 'ID' : 'XX', options: [{ value: 'ID', label: 'Indonesia: bank / e-wallet (Rupiah)' }, { value: 'XX', label: 'Negara lain: USDT TRC20 (USD)' }] },
+          ],
+        });
+        if (r && await act(() => put('/api/admin/agencies/' + a.id + '/login', { username: r.username, password: r.password || undefined, countryCode: r.countryCode === 'XX' ? ((a.countryCode && a.countryCode !== 'ID') ? a.countryCode : 'US') : 'ID' }), 'Login agency disimpan')) render();
+      } }, a.loginSet ? 'Atur login' : 'Buat login'), h('button', { class: 'btn sm', onclick: async () => {
         const r = await formModal({ title: 'Ubah agency', fields: fields(a) });
         if (r && await act(() => patch('/api/admin/agencies/' + a.id, { name: r.name, commissionRate: (r.commission ?? 0) / 100, contact: r.contact || undefined, active: r.active }), 'Agency diperbarui')) render();
       } }, 'Ubah'))));
@@ -849,10 +864,10 @@ async function pageWithdrawals() {
     grid.append(h('div', { class: 'card' },
       h('div', { class: 'row', style: 'margin-bottom:10px' },
         avatar(w.user.avatarUrl, w.user.displayName),
-        h('div', { class: 'sp', style: 'min-width:0' }, h('b', {}, w.user.displayName), h('div', { class: 'dim' }, 'ID ' + w.user.id + ' · ' + ago(w.createdAt))),
+        h('div', { class: 'sp', style: 'min-width:0' }, h('b', {}, w.user.displayName), h('div', { class: 'dim' }, (w.owner === 'agency' ? 'AGENCY · ' : 'ID ' + w.user.id + ' · ') + ago(w.createdAt))),
         w.status !== 'pending' ? h('span', { class: 'pill ' + (w.status === 'paid' ? 'green' : 'red') }, { paid: 'Dibayar', rejected: 'Ditolak', cancelled: 'Dibatalkan' }[w.status]) : null),
       h('div', { class: 'quote', style: 'font-style:normal;background:#f5f3ff;border-color:var(--primary)' },
-        h('div', { class: 'dim' }, 'Transfer ke host'),
+        h('div', { class: 'dim' }, w.owner === 'agency' ? 'Transfer ke agency (komisi)' : 'Transfer ke host'),
         h('div', { style: 'font-size:26px;font-weight:900;letter-spacing:-.5px' }, money(w.currency, w.net)),
         h('div', { class: 'dim' }, fmt(w.diamonds) + ' diamond ÷ ' + fmt(w.diamondsPerUsd) + ' = $' + (w.diamonds / w.diamondsPerUsd).toFixed(2)
           + (w.currency === 'IDR' ? ' × Rp ' + fmt(w.usdIdr) + ' = ' + rupiah(w.gross) : '')
@@ -866,7 +881,7 @@ async function pageWithdrawals() {
           : [row(w.kind === 'bank' ? 'Bank' : 'E-wallet', w.provider),
              row('Nomor', w.accountNumber, w.accountNumber),
              row('Atas nama', w.accountName, w.accountName)],
-        row('Negara host', w.user.countryCode || '-'),
+        row(w.owner === 'agency' ? 'Negara agency' : 'Negara host', w.user.countryCode || '-'),
         w.paidBefore ? row('Sudah dibayar sebelumnya', money(w.currency, w.paidBefore)) : null),
       w.status === 'pending'
         ? h('div', { class: 'row wrap', style: 'gap:6px;margin-top:10px' },
@@ -886,17 +901,17 @@ async function pageWithdrawals() {
         { name: 'note', label: 'Catatan (opsional)', type: 'textarea' },
       ],
     });
-    if (f && await act(() => post('/api/admin/withdrawals/' + w.id + '/pay', { ref: f.ref || undefined, note: f.note || undefined }), 'Ditandai sudah dibayar')) render();
+    if (f && await act(() => post('/api/admin/' + (w.owner === 'agency' ? 'agency-withdrawals/' : 'withdrawals/') + w.id + '/pay', { ref: f.ref || undefined, note: f.note || undefined }), 'Ditandai sudah dibayar')) render();
   }
 
   async function reject(w) {
     const f = await formModal({
       title: 'Tolak penarikan',
-      submit: 'Tolak & kembalikan diamond',
+      submit: w.owner === 'agency' ? 'Tolak & kembalikan saldo' : 'Tolak & kembalikan diamond',
       danger: true,
       fields: [{ name: 'reason', label: 'Alasan (dilihat host)', type: 'textarea', hint: 'Mis. nama rekening tidak cocok dengan nama akun, atau alamat dompet tidak bisa dipakai' }],
     });
-    if (f && await act(() => post('/api/admin/withdrawals/' + w.id + '/reject', { reason: f.reason }), 'Ditolak, diamond dikembalikan')) render();
+    if (f && await act(() => post('/api/admin/' + (w.owner === 'agency' ? 'agency-withdrawals/' : 'withdrawals/') + w.id + '/reject', { reason: f.reason }), 'Ditolak, diamond dikembalikan')) render();
   }
   return root;
 }

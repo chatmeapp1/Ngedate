@@ -274,6 +274,9 @@ async function adminReject(adminId, idRaw, { reason }) {
 }
 
 module.exports = {
+  providersFor,
+  mask,
+  COOLDOWN_HOURS,
   methodFor,
   mapWithdrawal,
   quote,

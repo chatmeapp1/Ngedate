@@ -11,7 +11,20 @@ function signAccessToken(user) {
 
 function verifyAccessToken(token) {
   const payload = jwt.verify(token, config.jwtSecret);
+  // Token agency tidak boleh dipakai sebagai token pengguna (id agency bisa sama dengan id pengguna)
+  if (payload.typ === 'agency') throw new jwt.JsonWebTokenError('token agency');
   return { id: Number(payload.sub), role: payload.role };
+}
+
+// Token khusus panel agency (masa berlaku 12 jam, tanpa refresh token)
+function signAgencyToken(agency) {
+  return jwt.sign({ sub: String(agency.id), typ: 'agency' }, config.jwtSecret, { expiresIn: '12h' });
+}
+
+function verifyAgencyToken(token) {
+  const payload = jwt.verify(token, config.jwtSecret);
+  if (payload.typ !== 'agency') throw new jwt.JsonWebTokenError('bukan token agency');
+  return { id: Number(payload.sub), issuedAt: payload.iat };
 }
 
 const hash = (token) => crypto.createHash('sha256').update(token).digest('hex');
@@ -45,4 +58,4 @@ async function revokeRefreshToken(token) {
   await db.query(`DELETE FROM refresh_tokens WHERE token_hash = $1`, [hash(token)]);
 }
 
-module.exports = { signAccessToken, verifyAccessToken, issueRefreshToken, rotateRefreshToken, revokeRefreshToken };
+module.exports = { signAgencyToken, verifyAgencyToken, signAccessToken, verifyAccessToken, issueRefreshToken, rotateRefreshToken, revokeRefreshToken };

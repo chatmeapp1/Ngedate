@@ -84,7 +84,7 @@ async function payHost(client, hostId, total, settings, source, ref, opts = {}) 
       `INSERT INTO agency_earnings (agency_id, host_id, amount, source, ref_type, ref_id) VALUES ($1, $2, $3, $4, $5, $6)`,
       [agency.id, hostId, agencyCut, source, ref.type || null, ref.id || null]
     );
-    await client.query(`UPDATE agencies SET earnings_total = earnings_total + $2 WHERE id = $1`, [agency.id, agencyCut]);
+    await client.query(`UPDATE agencies SET earnings_total = earnings_total + $2, balance = balance + $2 WHERE id = $1`, [agency.id, agencyCut]);
   }
   await recordPlatform(client, platform, source, ref);
   return { host, agency: agencyCut, platform };
