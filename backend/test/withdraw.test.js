@@ -78,14 +78,24 @@ test('info penarikan: hanya host; kurs, minimum, bank & e-wallet tersedia', asyn
   const r = await api('GET', '/api/withdrawals/options', { token: sari.token });
   assert.equal(r.status, 200, JSON.stringify(r.body));
   assert.equal(r.body.diamonds, 100000);
-  assert.equal(r.body.rateIdr, 10);
-  assert.equal(r.body.minDiamonds, 10000);
+  // Nilai awal: 1 koin = Rp 2 dan host+agency 50% -> 1 diamond = Rp 2, minimal 50.000 diamond (Rp 100.000)
+  assert.equal(r.body.rateIdr, 2);
+  assert.equal(r.body.minDiamonds, 50000);
   assert.equal(r.body.feePercent, 0);
   assert.equal(r.body.passwordSet, true);
   assert.equal(r.body.account, null);
   assert.equal(r.body.pending, null);
   assert.ok(r.body.providers.some((p) => p.name === 'BCA' && p.kind === 'bank'));
   assert.ok(r.body.providers.some((p) => p.name === 'GoPay' && p.kind === 'ewallet'));
+});
+
+// Tes berikutnya memakai angka bulat yang mudah dihitung: Rp 10 per diamond, minimal 10.000 diamond
+test('pengaturan penarikan bisa diubah admin', async () => {
+  const set = await api('PATCH', '/api/admin/settings', { token: admin.token, body: { withdraw_rate_idr: 10, withdraw_min_diamonds: 10000, withdraw_fee_percent: 0 } });
+  assert.equal(set.status, 200, JSON.stringify(set.body));
+  const o = await api('GET', '/api/withdrawals/options', { token: sari.token });
+  assert.equal(o.body.rateIdr, 10);
+  assert.equal(o.body.minDiamonds, 10000);
 });
 
 test('akun tanpa password (Login cepat) wajib mengatur password dulu', async () => {

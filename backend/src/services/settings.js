@@ -8,8 +8,9 @@ const DEFAULTS = {
   wa_threshold_max: 100000000,
   reply_window_hours: 24,
   // Penarikan diamond host (nilai awal, ubah di panel admin > Pengaturan)
-  withdraw_rate_idr: 10, // rupiah per 1 diamond
-  withdraw_min_diamonds: 10000, // minimal diamond per penarikan
+  // 1 koin dijual Rp 2; host+agency mendapat 50% dalam diamond, jadi 1 diamond = Rp 2 menjaga margin.
+  withdraw_rate_idr: 2, // rupiah per 1 diamond
+  withdraw_min_diamonds: 50000, // minimal diamond per penarikan (= Rp 100.000)
   withdraw_fee_percent: 0, // biaya penarikan (% dari jumlah rupiah)
 };
 

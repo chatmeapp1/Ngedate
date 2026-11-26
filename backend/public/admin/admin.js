@@ -581,7 +581,7 @@ async function pageAgency() {
   const fields = (a) => [
     { name: 'name', label: 'Nama agency', value: a && a.name },
     ...(a ? [] : [{ name: 'code', label: 'Kode undangan', hint: 'Kosongkan untuk dibuat otomatis (4–16 huruf/angka)' }]),
-    { name: 'commission', label: 'Komisi (% dari pendapatan host)', type: 'number', value: a ? +(a.commissionRate * 100).toFixed(2) : 10, hint: 'Maksimal ' + Math.round(share * 100) + '%' },
+    { name: 'commission', label: 'Komisi agency (% dari total koin)', type: 'number', value: a ? +(a.commissionRate * 100).toFixed(2) : 10, hint: 'Diambil dari bagian host. Maksimal ' + Math.round(share * 100) + '%. Contoh: bagian host 50% + komisi 10% = host 40%, agency 10%, platform 50%.' },
     { name: 'contact', label: 'Kontak', value: a && a.contact },
     ...(a ? [{ name: 'active', label: 'Aktif (kode bisa dipakai)', type: 'checkbox', value: a.active }] : []),
   ];
@@ -970,7 +970,7 @@ async function pageSettings() {
     { k: 'wa_threshold_min', label: 'Syarat total gift untuk buka WA — minimum (koin)', min: 0 },
     { k: 'wa_threshold_max', label: 'Syarat total gift untuk buka WA — maksimum (koin)', min: 0 },
     { k: 'reply_window_hours', label: 'Batas balas sebelum koin dikembalikan (jam)', min: 1 },
-    { k: 'withdraw_rate_idr', label: 'Penarikan: rupiah per 1 diamond', hint: 'Kurs pencairan host. Berlaku untuk pengajuan berikutnya.', min: 1 },
+    { k: 'withdraw_rate_idr', label: 'Penarikan: rupiah per 1 diamond', hint: 'Kurs pencairan host. Samakan dengan harga 1 koin (Rp 2) agar margin aman; di atas Rp 3 platform rugi. Berlaku untuk pengajuan berikutnya.', min: 1 },
     { k: 'withdraw_min_diamonds', label: 'Penarikan: minimal diamond per pengajuan', min: 1 },
     { k: 'withdraw_fee_percent', label: 'Penarikan: biaya (%)', hint: 'Dipotong dari jumlah rupiah. 0 = tanpa biaya.', min: 0, max: 50 },
   ];
