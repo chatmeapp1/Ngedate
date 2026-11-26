@@ -9,8 +9,9 @@ const DEFAULTS = {
   wa_threshold_min: 10000,
   wa_threshold_max: 100000000,
   reply_window_hours: 24,
-  // Penarikan diamond host. 6.667 diamond = 1 USD (sama dengan harga jual koin ~ Rp 2,55 pada Rp 17.000/USD)
-  withdraw_diamonds_per_usd: 6667,
+  // Penarikan diamond host. 10.968 diamond = 1 USD, yaitu 1 diamond = Rp 1,55 pada Rp 17.000/USD
+  // (harga jual koin Rp 2, host 30% + agency 10%: aman dari rugi bahkan dengan potongan Google Play 30%)
+  withdraw_diamonds_per_usd: 10968,
   withdraw_usd_idr: 17000, // kurs pembayaran untuk host Indonesia
   withdraw_min_diamonds: 70000, // minimal diamond per penarikan (= sekitar US$ 10,50)
   withdraw_fee_percent: 0, // biaya penarikan (% dari jumlah)

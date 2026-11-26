@@ -1,6 +1,6 @@
 /**
  * Penarikan diamond host: Indonesia -> bank/e-wallet (Rupiah), negara lain -> USDT TRC20 (USD).
- * Kurs awal: 6.667 diamond = 1 USD, 1 USD = Rp 17.000, minimal 70.000 diamond, biaya jaringan USDT US$ 1.
+ * Kurs awal: 10.968 diamond = 1 USD (1 diamond = Rp 1,55), 1 USD = Rp 17.000, minimal 70.000 diamond, biaya jaringan USDT US$ 1.
  * PERINGATAN: database di DATABASE_URL akan DIKOSONGKAN.
  */
 const { test, before, after } = require('node:test');
@@ -48,8 +48,8 @@ async function makeHost(username, country, diamonds) {
 }
 
 const diamonds = async (id) => Number((await db.query(`SELECT diamonds FROM users WHERE id = $1`, [id])).rows[0].diamonds);
-const idr = (d) => Math.floor((d * 17000) / 6667);
-const usdCents = (d) => Math.floor((d * 100) / 6667);
+const idr = (d) => Math.floor((d * 17000) / 10968);
+const usdCents = (d) => Math.floor((d * 100) / 10968);
 const BANK = { provider: 'BCA', accountNumber: '1234 5678 90', accountName: 'Sari Dewi', password: 'rahasia123' };
 // Alamat kontrak USDT TRC20: bentuk & checksum valid, dipakai sebagai contoh alamat dompet
 const TRON = 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t';
@@ -101,7 +101,7 @@ test('info penarikan: hanya host; metode mengikuti negara; kurs & minimal dari p
   assert.equal(id.method, 'idr');
   assert.equal(id.currency, 'IDR');
   assert.equal(id.diamonds, 1000000);
-  assert.equal(id.diamondsPerUsd, 6667);
+  assert.equal(id.diamondsPerUsd, 10968);
   assert.equal(id.usdIdr, 17000);
   assert.equal(id.minDiamonds, 70000);
   assert.equal(id.feePercent, 0);
@@ -184,10 +184,10 @@ test('pengajuan Rupiah: validasi, hitungan dari kurs USD, diamond ditahan, hanya
   assert.equal(ok.body.currency, 'IDR');
   assert.equal(ok.body.diamonds, 100000);
   assert.equal(ok.body.gross, idr(100000));
-  assert.equal(ok.body.gross, 254987, '100.000 diamond / 6.667 x Rp 17.000');
+  assert.equal(ok.body.gross, 154996, '100.000 diamond / 10.968 x Rp 17.000');
   assert.equal(ok.body.fee, 0);
-  assert.equal(ok.body.net, 254987);
-  assert.equal(ok.body.diamondsPerUsd, 6667);
+  assert.equal(ok.body.net, 154996);
+  assert.equal(ok.body.diamondsPerUsd, 10968);
   assert.equal(ok.body.accountNumber, '••••••7890');
   assert.equal(await diamonds(sari.id), 900000, 'diamond ditahan');
   const led = (await db.query(`SELECT amount, balance_after FROM ledger WHERE user_id = $1 AND reason = 'withdraw_hold'`, [sari.id])).rows;
@@ -207,9 +207,9 @@ test('pengajuan USDT: jumlah dalam sen USD, dikurangi biaya jaringan; minimal 70
   assert.equal(ok.status, 201, JSON.stringify(ok.body));
   assert.equal(ok.body.currency, 'USD');
   assert.equal(ok.body.gross, usdCents(70000));
-  assert.equal(ok.body.gross, 1049, '70.000 diamond = US$ 10,49');
+  assert.equal(ok.body.gross, 638, '70.000 diamond = US$ 6,38');
   assert.equal(ok.body.fee, 100, 'biaya jaringan USDT US$ 1');
-  assert.equal(ok.body.net, 949);
+  assert.equal(ok.body.net, 538);
   assert.equal(ok.body.provider, 'USDT (TRC20)');
   assert.equal(await diamonds(maria.id), 930000);
   assert.equal((await req(70000)).status, 409);
@@ -234,17 +234,17 @@ test('batal mengembalikan diamond; biaya % dan biaya jaringan dihitung dari peng
   assert.equal((await set({ withdraw_fee_percent: 5, withdraw_usdt_fee_usd: 2 })).status, 200);
 
   const w = await api('POST', '/api/withdrawals', { token: sari.token, body: { diamonds: 100000 } });
-  assert.equal(w.body.gross, 254987);
-  assert.equal(w.body.fee, Math.floor(254987 * 0.05));
-  assert.equal(w.body.net, 254987 - Math.floor(254987 * 0.05));
+  assert.equal(w.body.gross, 154996);
+  assert.equal(w.body.fee, Math.floor(154996 * 0.05));
+  assert.equal(w.body.net, 154996 - Math.floor(154996 * 0.05));
   await api('POST', `/api/withdrawals/${w.body.id}/cancel`, { token: sari.token });
 
   // maria: batalkan yang lama, ajukan lagi dengan biaya baru
   const mm = (await api('GET', '/api/withdrawals', { token: maria.token })).body;
   await api('POST', `/api/withdrawals/${mm[0].id}/cancel`, { token: maria.token });
   const u = await api('POST', '/api/withdrawals', { token: maria.token, body: { diamonds: 70000 } });
-  assert.equal(u.body.fee, Math.floor(1049 * 0.05) + 200, '5% + biaya jaringan US$ 2');
-  assert.equal(u.body.net, 1049 - u.body.fee);
+  assert.equal(u.body.fee, Math.floor(638 * 0.05) + 200, '5% + biaya jaringan US$ 2');
+  assert.equal(u.body.net, 638 - u.body.fee);
   await api('POST', `/api/withdrawals/${u.body.id}/cancel`, { token: maria.token });
   await set({ withdraw_fee_percent: 0, withdraw_usdt_fee_usd: 1 });
 });
@@ -297,12 +297,12 @@ test('admin: daftar per mata uang, alamat lengkap, bayar (TXID) & tolak; hanya a
   assert.equal(wu.currency, 'USD');
   assert.equal(wu.accountNumber, TRON, 'admin melihat alamat TRC20 lengkap');
   assert.equal(wu.user.countryCode, 'CO');
-  assert.equal(wu.net, 949);
+  assert.equal(wu.net, 538);
 
   const stats = await api('GET', '/api/admin/stats', { token: admin.token });
   assert.equal(stats.body.pending.withdrawals, 2);
   assert.equal(stats.body.pendingWithdrawIdr, idr(70000));
-  assert.equal(stats.body.pendingWithdrawUsdCents, 949);
+  assert.equal(stats.body.pendingWithdrawUsdCents, 538);
 
   // host belum boleh hapus akun saat ada penarikan berjalan
   const del = await api('POST', '/api/account/delete', { token: maria.token, body: { confirm: 'HAPUS', password: 'rahasia123' } });

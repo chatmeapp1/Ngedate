@@ -139,6 +139,14 @@ Pengguna di Indonesia melihat harga Rupiah, negara lain harga USD. Mengetuk pake
 (paket + ID akun); setelah pembayaran masuk, admin menambah koin lewat menu **Top up koin**. Nomor WhatsApp admin dan catatan
 pembayaran diatur di halaman Paket koin. Pembelian otomatis lewat Google Play Billing belum dipasang (butuh APK baru).
 
+### Pengaman anti-rugi
+
+Nilai awal: 1 diamond = Rp 1,55 (`withdraw_diamonds_per_usd` 10.968, kurs Rp 17.000/USD), host 30% + agency 10%.
+Server menghitung untung per koin pada skenario terburuk (PPN 11% + potongan Google Play 30%) memakai paket termurah dan komisi
+agency tertinggi, dan **menolak** (`NEGATIVE_MARGIN`) pengaturan, harga paket, atau komisi agency yang membuat rugi atau
+memperburuk kerugian. Kartu margin tampil di panel admin (Pengaturan dan Paket koin). Migrasi 011 mengembalikan
+`withdraw_diamonds_per_usd` dan `coin_price_idr` ke nilai awal ini.
+
 ## Panel admin web
 
 Buka `http://<alamat-server>:<port>/admin` di browser (HP juga bisa) lalu masuk dengan akun admin

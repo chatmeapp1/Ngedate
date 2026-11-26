@@ -407,6 +407,29 @@ function pageHead(title, lead) {
 
 const empty = (text) => h('div', { class: 'empty' }, text);
 
+// Kartu "Cek untung/rugi per koin" (angka dari server: GET /api/admin/margin)
+const rp2 = (n) => 'Rp ' + n.toFixed(2).replace('.', ',');
+function marginCard(m) {
+  const ok = m.worst.profit >= 0;
+  const row = (k, v, strong) => h('div', { class: 'row', style: 'justify-content:space-between;gap:8px;padding:3px 0' },
+    h('span', { class: 'muted' }, k), h('span', { style: strong ? 'font-weight:800' : 'font-weight:600' }, v));
+  const scenario = (label, sc) => h('div', { style: 'margin-top:8px;padding:8px 10px;border-radius:12px;background:' + (sc.profit >= 0 ? '#f0fdf4' : '#fef2f2') },
+    row(label + ': bersih per koin', rp2(sc.net)),
+    row('Untung / rugi per koin', (sc.profit >= 0 ? '+' : '−') + rp2(Math.abs(sc.profit)) + ' (' + sc.profitPct.toFixed(0) + '% dari harga jual)', true));
+  return h('div', { class: 'card', style: 'max-width:620px;margin-bottom:18px;border-color:' + (ok ? '#bbf7d0' : '#fecaca') },
+    h('div', { class: 'row', style: 'margin-bottom:8px' },
+      h('b', { class: 'sp' }, 'Cek untung/rugi per koin'),
+      h('span', { class: 'pill ' + (ok ? 'green' : 'red') }, ok ? '✔ Aman, tidak rugi' : '⚠ RUGI')),
+    row('Harga jual terendah', rp2(m.pricePerCoin) + ' per koin'),
+    row('Bagian host + komisi agency (tertinggi)', Math.round(m.hostShare * 100) + '% + ' + Math.round(m.agencyRate * 100) + '% = ' + Math.round((m.hostShare + m.agencyRate) * 100) + '%'),
+    row('Nilai 1 diamond (Penarikan)', rp2(m.diamondRp)),
+    row('Bayar host + agency per koin', rp2(m.worst.payout), true),
+    scenario('Potongan Google Play 30% (terburuk)', m.worst),
+    scenario('Potongan Google Play 15%', m.best),
+    h('div', { class: 'dim', style: 'margin-top:8px' }, 'PPN 11% sudah dihitung (perkiraan). Belum termasuk pajak penghasilan, server, dan promosi. Server otomatis menolak pengaturan, harga paket, atau komisi agency yang membuat rugi pada skenario terburuk.'));
+}
+
+
 // ----- Dashboard -----
 async function pageDashboard() {
   const s = await refreshStats();
@@ -876,8 +899,10 @@ async function pageWithdrawals() {
 
 // ----- Paket koin (layar Top up di aplikasi) -----
 async function pagePackages() {
-  const [list, settings] = await Promise.all([get('/api/admin/packages'), get('/api/admin/settings')]);
+  const [list, settings, margin] = await Promise.all([get('/api/admin/packages'), get('/api/admin/settings'), get('/api/admin/margin')]);
   const root = h('div', {}, pageHead('Paket koin', 'Daftar yang tampil di layar Top up aplikasi. Pemesanan lewat WhatsApp admin; koin ditambahkan manual di menu Top up koin setelah pembayaran masuk.'));
+
+  root.append(marginCard(margin));
 
   // --- Kontak & catatan pembayaran ---
   const wa = h('input', { type: 'text', value: settings.topup_contact || '', placeholder: 'mis. 081234567890 atau +14155550100', inputmode: 'tel' });
@@ -1054,8 +1079,9 @@ async function pageGifts() {
 
 // ----- Pengaturan -----
 async function pageSettings() {
-  const s = await get('/api/admin/settings');
+  const [s, margin] = await Promise.all([get('/api/admin/settings'), get('/api/admin/margin')]);
   const root = h('div', {}, pageHead('Pengaturan', 'Berlaku langsung untuk semua pengguna.'));
+  root.append(marginCard(margin));
   const defs = [
     { k: 'host_share', label: 'Bagian host bersih (%)', hint: 'Host menerima persen ini dari tiap koin gift/pesan. Komisi agency (per agency) dibayar dari bagian app, bukan dari host.', conv: (v) => v * 100, back: (v) => v / 100, min: 0, max: 100 },
     { k: 'chat_price_min', label: 'Harga pesan minimum (koin)', min: 0 },
@@ -1064,7 +1090,7 @@ async function pageSettings() {
     { k: 'wa_threshold_max', label: 'Syarat total gift untuk buka WA — maksimum (koin)', min: 0 },
     { k: 'reply_window_hours', label: 'Batas balas sebelum koin dikembalikan (jam)', min: 1 },
     { k: 'coin_price_idr', label: 'Harga jual 1 koin (Rupiah)', hint: 'Dipakai untuk menghitung harga otomatis paket koin. Tidak mengubah paket yang sudah ada.', min: 0.01 },
-    { k: 'withdraw_diamonds_per_usd', label: 'Penarikan: diamond per 1 USD', hint: 'Nilai 1 diamond host dalam USD (tidak harus sama dengan harga jual koin). Berlaku untuk pengajuan berikutnya.', min: 1 },
+    { k: 'withdraw_diamonds_per_usd', label: 'Penarikan: diamond per 1 USD', hint: 'Makin besar angkanya, makin kecil nilai 1 diamond (Rp 17.000 ÷ angka ini). Awal 10.968 = Rp 1,55 per diamond. Server menolak nilai yang membuat app rugi.', min: 1 },
     { k: 'withdraw_usd_idr', label: 'Penarikan: Rupiah per 1 USD (host Indonesia)', hint: 'Host Indonesia dibayar Rupiah memakai kurs ini; host negara lain dibayar USDT.', min: 1000 },
     { k: 'withdraw_min_diamonds', label: 'Penarikan: minimal diamond per pengajuan', min: 1 },
     { k: 'withdraw_fee_percent', label: 'Penarikan: biaya (%)', hint: 'Dipotong dari jumlah penarikan. 0 = tanpa biaya.', min: 0, max: 50 },

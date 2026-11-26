@@ -1,6 +1,9 @@
 -- Paket koin untuk layar Top up (harga ditentukan admin).
 -- Harga awal: Rp 2 per koin (18.000 koin = Rp 36.000). Harga USD memakai kurs Rp 17.000/USD.
 
+-- Nilai awal baru: 1 diamond = Rp 1,55 (10.968 diamond per USD) dan harga jual koin Rp 2.
+DELETE FROM settings WHERE key IN ('withdraw_diamonds_per_usd', 'coin_price_idr');
+
 CREATE TABLE IF NOT EXISTS coin_packages (
   id              SERIAL PRIMARY KEY,
   coins           BIGINT      NOT NULL UNIQUE CHECK (coins > 0),

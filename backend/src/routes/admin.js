@@ -12,6 +12,7 @@ const { publicUser } = require('./serializers');
 const { mapGift } = require('./gifts');
 const { REPORT_REASONS } = require('../services/safety');
 const withdraw = require('../services/withdraw');
+const economy = require('../services/economy');
 
 const router = express.Router();
 
@@ -217,6 +218,8 @@ router.patch('/settings', wrap(async (req, res) => {
     if (typeof b.topup_note !== 'string' || b.topup_note.length > 500) throw badRequest('Catatan pembayaran maksimal 500 karakter');
     b.topup_note = b.topup_note.trim();
   }
+  // Tolak pengaturan yang membuat app rugi (harga, bagian host, nilai diamond)
+  await economy.guard(db, { settings: b });
   res.json(await updateSettings(b));
 }));
 
@@ -386,12 +389,19 @@ router.get('/packages', wrap(async (req, res) => {
 router.post('/packages', wrap(async (req, res) => {
   const f = packageFields(req.body || {}, false);
   try {
-    const { rows } = await db.query(
-      `INSERT INTO coin_packages (coins, price_idr, price_usd_cents, badge, sort_order, active)
-       VALUES ($1, $2, $3, $4, COALESCE($5, 0), COALESCE($6, true)) RETURNING *`,
-      [f.coins, f.price_idr, f.price_usd_cents, f.badge ?? null, f.sort_order, f.active]
-    );
-    res.status(201).json(mapPackage(rows[0]));
+    const created = await db.tx(async (client) => {
+      let row;
+      await economy.guard(client, {}, async () => {
+        const { rows } = await client.query(
+          `INSERT INTO coin_packages (coins, price_idr, price_usd_cents, badge, sort_order, active)
+           VALUES ($1, $2, $3, $4, COALESCE($5, 0), COALESCE($6, true)) RETURNING *`,
+          [f.coins, f.price_idr, f.price_usd_cents, f.badge ?? null, f.sort_order, f.active]
+        );
+        row = rows[0];
+      });
+      return row;
+    });
+    res.status(201).json(mapPackage(created));
   } catch (e) {
     if (e.code === '23505') throw badRequest('Paket dengan jumlah koin ini sudah ada', 'DUPLICATE_PACKAGE');
     throw e;
@@ -409,9 +419,16 @@ router.patch('/packages/:id', wrap(async (req, res) => {
   }
   if (!sets.length) throw badRequest('Tidak ada yang diubah');
   try {
-    const { rows } = await db.query(`UPDATE coin_packages SET ${sets.join(', ')} WHERE id = $1 RETURNING *`, params);
-    if (!rows.length) throw notFound('Paket tidak ditemukan');
-    res.json(mapPackage(rows[0]));
+    const updated = await db.tx(async (client) => {
+      let row;
+      await economy.guard(client, {}, async () => {
+        const { rows } = await client.query(`UPDATE coin_packages SET ${sets.join(', ')} WHERE id = $1 RETURNING *`, params);
+        row = rows[0];
+      });
+      return row;
+    });
+    if (!updated) throw notFound('Paket tidak ditemukan');
+    res.json(mapPackage(updated));
   } catch (e) {
     if (e.code === '23505') throw badRequest('Paket dengan jumlah koin ini sudah ada', 'DUPLICATE_PACKAGE');
     throw e;
@@ -422,6 +439,11 @@ router.delete('/packages/:id', wrap(async (req, res) => {
   const { rowCount } = await db.query(`DELETE FROM coin_packages WHERE id = $1`, [v.id(req.params.id)]);
   if (!rowCount) throw notFound('Paket tidak ditemukan');
   res.json({ ok: true });
+}));
+
+// Kartu margin: untung/rugi platform per koin dengan pengaturan saat ini
+router.get('/margin', wrap(async (req, res) => {
+  res.json(await economy.currentMargin());
 }));
 
 // ---------------------------------------------------------------------------
@@ -464,6 +486,7 @@ router.post('/agencies', wrap(async (req, res) => {
   let code = v.str(b.code, 'Kode', { min: 4, max: 16, optional: true, pattern: /^[A-Za-z0-9]+$/ });
   code = code ? code.toUpperCase() : crypto.randomBytes(4).toString('hex').toUpperCase().slice(0, 6);
   await checkRate(b.commissionRate);
+  await economy.guard(db, { agencyRate: b.commissionRate ?? economy.DEFAULT_AGENCY_RATE });
   const contact = v.str(b.contact, 'Kontak', { max: 120, optional: true });
   try {
     const { rows } = await db.query(
@@ -480,6 +503,7 @@ router.post('/agencies', wrap(async (req, res) => {
 router.patch('/agencies/:id', wrap(async (req, res) => {
   const b = req.body || {};
   await checkRate(b.commissionRate);
+  if (b.commissionRate !== undefined) await economy.guard(db, { agencyRate: b.commissionRate });
   const { rows } = await db.query(
     `UPDATE agencies SET
        name = COALESCE($2, name),

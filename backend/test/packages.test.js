@@ -129,7 +129,7 @@ test('harga jual koin bisa diatur terpisah dari nilai diamond host', async () =>
   assert.equal((await set({ coin_price_idr: 2.5 })).status, 200);
   const s = await get();
   assert.equal(s.coin_price_idr, 2.5);
-  assert.equal(s.withdraw_diamonds_per_usd, 6667, 'nilai diamond host tidak ikut berubah');
+  assert.equal(s.withdraw_diamonds_per_usd, 10968, 'nilai diamond host tidak ikut berubah');
   await set({ coin_price_idr: 2 });
 });
 
