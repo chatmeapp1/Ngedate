@@ -218,3 +218,20 @@ export interface WithdrawOptions {
   account: { kind: 'bank' | 'ewallet' | 'crypto'; provider: string; accountNumber: string; accountName: string | null; cooldownUntil: string | null } | null;
   pending: Withdrawal | null;
 }
+
+export interface CoinPackage {
+  id: number;
+  coins: number;
+  priceIdr: number;
+  priceUsdCents: number;
+  badge: string | null;
+}
+
+export interface TopupInfo {
+  /** IDR untuk pengguna di Indonesia, USD untuk negara lain */
+  currency: 'IDR' | 'USD';
+  /** nomor WhatsApp admin (angka saja), null jika belum diatur */
+  contact: string | null;
+  note: string;
+  packages: CoinPackage[];
+}

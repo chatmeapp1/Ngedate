@@ -217,7 +217,7 @@ export default function ChatRoom() {
       if (e instanceof ApiError && e.code === 'INSUFFICIENT_COINS') {
         Alert.alert('Koin tidak cukup', `Kirim pesan butuh ${number(price)} koin.`, [
           { text: 'Nanti', style: 'cancel' },
-          { text: 'Top up', onPress: () => router.push('/wallet') },
+          { text: 'Top up', onPress: () => router.push('/topup') },
         ]);
       } else if (e instanceof ApiError && (e.code === 'CONTACT_BLOCKED' || e.code === 'WAIT_FOR_REPLY' || e.code === 'BLOCKED')) {
         Alert.alert(e.code === 'WAIT_FOR_REPLY' ? 'Tunggu balasan dulu' : 'Pesan tidak terkirim', e.message);

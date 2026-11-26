@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Alert, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Coin, Empty } from '@/components/ui';
 import { useAuth } from '@/context/auth';
@@ -77,12 +77,7 @@ export default function WalletScreen() {
               {wallet?.heldCoins ? (
                 <Text style={s.cardSub}>{number(wallet.heldCoins)} koin sedang ditahan menunggu balasan host</Text>
               ) : null}
-              <Pressable
-                style={s.topup}
-                onPress={() =>
-                  Alert.alert('Top up', 'Pembelian koin lewat Google Play akan tersedia di update berikutnya. Untuk sementara hubungi admin.')
-                }
-              >
+              <Pressable style={s.topup} onPress={() => router.push('/topup')}>
                 <Ionicons name="add-circle" size={18} color={colors.primary} />
                 <Text style={s.topupText}>Top up</Text>
               </Pressable>

@@ -130,6 +130,14 @@ dan **Tandai sudah dibayar** (nomor referensi / TXID opsional). Jika ditolak (wa
 Host juga bisa membatalkan sendiri. Pengaman: mengubah rekening/alamat menahan penarikan 24 jam; akun tidak bisa dihapus
 saat ada penarikan berjalan.
 
+## Paket koin & Top up
+
+Layar **Top up** di aplikasi menampilkan paket koin dari panel admin > **Paket koin**. Harga awal: Rp 2,55 per koin
+(= US$ 0,00015 per koin, 6.667 koin = 1 USD): 18.000 / 36.000 / 54.000 / 90.000 / 180.000 / 450.000 / 900.000 / 1.800.000 koin.
+Pengguna di Indonesia melihat harga Rupiah, negara lain harga USD. Mengetuk paket membuka WhatsApp admin dengan pesan terisi
+(paket + ID akun); setelah pembayaran masuk, admin menambah koin lewat menu **Top up koin**. Nomor WhatsApp admin dan catatan
+pembayaran diatur di halaman Paket koin. Pembelian otomatis lewat Google Play Billing belum dipasang (butuh APK baru).
+
 ## Panel admin web
 
 Buka `http://<alamat-server>:<port>/admin` di browser (HP juga bisa) lalu masuk dengan akun admin

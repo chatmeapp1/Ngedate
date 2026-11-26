@@ -206,6 +206,16 @@ router.patch('/settings', wrap(async (req, res) => {
   for (const k of ['withdraw_diamonds_per_usd', 'withdraw_usd_idr', 'withdraw_min_diamonds']) {
     if (b[k] !== undefined) b[k] = Math.round(Number(b[k]));
   }
+  if (b.topup_contact !== undefined) {
+    let digits = String(b.topup_contact).replace(/\D/g, '');
+    if (digits.startsWith('0')) digits = `62${digits.slice(1)}`; // 08xx -> 628xx
+    if (digits && (digits.length < 8 || digits.length > 15)) throw badRequest('Nomor WhatsApp tidak valid (sertakan kode negara)');
+    b.topup_contact = digits;
+  }
+  if (b.topup_note !== undefined) {
+    if (typeof b.topup_note !== 'string' || b.topup_note.length > 500) throw badRequest('Catatan pembayaran maksimal 500 karakter');
+    b.topup_note = b.topup_note.trim();
+  }
   res.json(await updateSettings(b));
 }));
 
@@ -340,6 +350,76 @@ router.post('/withdrawals/:id/reject', wrap(async (req, res) => {
   realtime.emitTo(Number(w.user_id), 'withdrawal:update', { id: Number(w.id), status: 'rejected' });
   const b = await wallet.balances(db, Number(w.user_id));
   if (b) realtime.emitTo(Number(w.user_id), 'wallet:update', b);
+  res.json({ ok: true });
+}));
+
+// ---------------------------------------------------------------------------
+// Paket koin (layar Top up)
+// ---------------------------------------------------------------------------
+const mapPackage = (r) => ({
+  id: r.id,
+  coins: Number(r.coins),
+  priceIdr: Number(r.price_idr),
+  priceUsdCents: r.price_usd_cents,
+  badge: r.badge,
+  sortOrder: r.sort_order,
+  active: r.active,
+});
+
+function packageFields(b, optional) {
+  return {
+    coins: v.int(b.coins, 'Jumlah koin', { min: 100, max: 1e9, optional }),
+    price_idr: v.int(b.priceIdr, 'Harga Rupiah', { min: 1, max: 1e12, optional }),
+    price_usd_cents: v.int(b.priceUsdCents, 'Harga USD (sen)', { min: 1, max: 1e9, optional }),
+    badge: b.badge === '' ? null : v.str(b.badge, 'Label', { max: 20, optional: true }),
+    sort_order: v.int(b.sortOrder, 'Urutan', { optional: true }),
+    active: v.bool(b.active, 'Aktif', { optional: true }),
+  };
+}
+
+router.get('/packages', wrap(async (req, res) => {
+  const { rows } = await db.query(`SELECT * FROM coin_packages ORDER BY sort_order, coins`);
+  res.json(rows.map(mapPackage));
+}));
+
+router.post('/packages', wrap(async (req, res) => {
+  const f = packageFields(req.body || {}, false);
+  try {
+    const { rows } = await db.query(
+      `INSERT INTO coin_packages (coins, price_idr, price_usd_cents, badge, sort_order, active)
+       VALUES ($1, $2, $3, $4, COALESCE($5, 0), COALESCE($6, true)) RETURNING *`,
+      [f.coins, f.price_idr, f.price_usd_cents, f.badge ?? null, f.sort_order, f.active]
+    );
+    res.status(201).json(mapPackage(rows[0]));
+  } catch (e) {
+    if (e.code === '23505') throw badRequest('Paket dengan jumlah koin ini sudah ada', 'DUPLICATE_PACKAGE');
+    throw e;
+  }
+}));
+
+router.patch('/packages/:id', wrap(async (req, res) => {
+  const f = packageFields(req.body || {}, true);
+  const sets = [];
+  const params = [v.id(req.params.id)];
+  for (const [col, val] of Object.entries(f)) {
+    if (val === undefined) continue;
+    params.push(val);
+    sets.push(`${col} = $${params.length}`);
+  }
+  if (!sets.length) throw badRequest('Tidak ada yang diubah');
+  try {
+    const { rows } = await db.query(`UPDATE coin_packages SET ${sets.join(', ')} WHERE id = $1 RETURNING *`, params);
+    if (!rows.length) throw notFound('Paket tidak ditemukan');
+    res.json(mapPackage(rows[0]));
+  } catch (e) {
+    if (e.code === '23505') throw badRequest('Paket dengan jumlah koin ini sudah ada', 'DUPLICATE_PACKAGE');
+    throw e;
+  }
+}));
+
+router.delete('/packages/:id', wrap(async (req, res) => {
+  const { rowCount } = await db.query(`DELETE FROM coin_packages WHERE id = $1`, [v.id(req.params.id)]);
+  if (!rowCount) throw notFound('Paket tidak ditemukan');
   res.json({ ok: true });
 }));
 

@@ -15,6 +15,9 @@ const DEFAULTS = {
   withdraw_min_diamonds: 70000, // minimal diamond per penarikan (= sekitar US$ 10,50)
   withdraw_fee_percent: 0, // biaya penarikan (% dari jumlah)
   withdraw_usdt_fee_usd: 1, // biaya jaringan USDT (TRC20) per penarikan, dalam USD
+  // Top up koin: pemesanan lewat WhatsApp admin (sampai Google Play Billing dipasang)
+  topup_contact: '', // nomor WhatsApp admin, hanya angka dengan kode negara (mis. 6281234567890)
+  topup_note: 'Pilih paket, lalu pesan lewat WhatsApp admin. Koin ditambahkan setelah pembayaran dikonfirmasi.',
 };
 
 async function getSettings(client = db) {

@@ -874,6 +874,88 @@ async function pageWithdrawals() {
   return root;
 }
 
+// ----- Paket koin (layar Top up di aplikasi) -----
+async function pagePackages() {
+  const [list, settings] = await Promise.all([get('/api/admin/packages'), get('/api/admin/settings')]);
+  const root = h('div', {}, pageHead('Paket koin', 'Daftar yang tampil di layar Top up aplikasi. Pemesanan lewat WhatsApp admin; koin ditambahkan manual di menu Top up koin setelah pembayaran masuk.'));
+
+  // --- Kontak & catatan pembayaran ---
+  const wa = h('input', { type: 'text', value: settings.topup_contact || '', placeholder: 'mis. 081234567890 atau +14155550100', inputmode: 'tel' });
+  const note = h('textarea', { rows: 3, maxlength: 500, value: settings.topup_note || '' });
+  root.append(h('form', { class: 'card', style: 'max-width:620px;margin-bottom:18px', onsubmit: async (e) => {
+    e.preventDefault();
+    if (await act(() => patch('/api/admin/settings', { topup_contact: wa.value.trim(), topup_note: note.value }), 'Kontak top up disimpan')) render();
+  } },
+    h('b', {}, 'Kontak pemesanan'),
+    h('label', { class: 'f', style: 'margin-top:10px' }, h('span', {}, 'Nomor WhatsApp admin'), wa,
+      h('small', { class: 'hint' }, 'Mengetuk sebuah paket di aplikasi membuka chat WhatsApp ke nomor ini, dengan pesan berisi paket dan ID akun pengguna. Awalan 08 otomatis diubah menjadi 628. Untuk nomor luar negeri tulis dengan kode negara.')),
+    h('label', { class: 'f' }, h('span', {}, 'Catatan pembayaran (tampil di layar Top up)'), note,
+      h('small', { class: 'hint' }, 'Mis. cara bayar yang diterima (transfer bank, e-wallet, QRIS, USDT) dan batas waktu konfirmasi.')),
+    settings.topup_contact ? null : h('div', { class: 'warn-text', style: 'margin-bottom:10px' }, 'Nomor WhatsApp belum diisi: pengguna belum bisa memesan.'),
+    h('button', { class: 'btn pri', type: 'submit' }, 'Simpan')));
+
+  // --- Paket ---
+  const fields = (pk) => [
+    { name: 'coins', label: 'Jumlah koin', type: 'number', value: pk ? pk.coins : '', hint: 'Contoh: 18000' },
+    { name: 'auto', label: 'Hitung harga otomatis dari kurs saat ini', type: 'checkbox', value: !pk,
+      hint: null },
+    { name: 'priceIdr', label: 'Harga Rupiah (Indonesia)', type: 'number', value: pk ? pk.priceIdr : '', hint: 'Diabaikan jika hitung otomatis dicentang' },
+    { name: 'priceUsd', label: 'Harga USD (negara lain)', type: 'number', value: pk ? +(pk.priceUsdCents / 100).toFixed(2) : '', hint: 'Dalam dolar, mis. 2.70' },
+    { name: 'badge', label: 'Label (opsional)', value: pk ? pk.badge || '' : '', hint: 'Mis. Populer, Hemat. Maks 20 karakter.' },
+    { name: 'sortOrder', label: 'Urutan', type: 'number', value: pk ? pk.sortOrder : list.length + 1, hint: 'Angka kecil tampil lebih dulu' },
+    { name: 'active', label: 'Aktif (tampil di aplikasi)', type: 'checkbox', value: pk ? pk.active : true },
+  ];
+  const perUsd = Number(settings.withdraw_diamonds_per_usd);
+  const usdIdr = Number(settings.withdraw_usd_idr);
+  const body = (r) => {
+    const coins = Math.trunc(r.coins || 0);
+    let priceIdr = r.priceIdr;
+    let usdCents = r.priceUsd === null ? null : Math.round(r.priceUsd * 100);
+    if (r.auto) {
+      // Kurs: perUsd koin = 1 USD; Rupiah dibulatkan ke 100 terdekat
+      priceIdr = Math.round(((coins / perUsd) * usdIdr) / 100) * 100;
+      usdCents = Math.round((coins / perUsd) * 100);
+    }
+    return { coins, priceIdr, priceUsdCents: usdCents, badge: r.badge || '', sortOrder: r.sortOrder ?? 0, active: r.active };
+  };
+
+  root.append(h('div', { class: 'row', style: 'margin-bottom:14px' }, h('button', { class: 'btn pri', onclick: async () => {
+    const r = await formModal({ title: 'Paket koin baru', fields: fields(null), submit: 'Buat' });
+    if (r && await act(() => post('/api/admin/packages', body(r)), 'Paket dibuat')) render();
+  } }, '+ Paket baru')));
+  if (!list.length) root.append(empty('Belum ada paket'));
+
+  const grid = h('div', { class: 'grid g2' });
+  for (const pk of list) {
+    const perCoin = (pk.priceIdr / pk.coins).toFixed(2).replace('.', ',');
+    grid.append(h('div', { class: 'card', style: pk.active ? '' : 'opacity:.6' },
+      h('div', { class: 'row' },
+        h('div', { class: 'sp' },
+          h('div', { style: 'font-size:24px;font-weight:900;letter-spacing:-.5px' }, '🪙 ' + fmt(pk.coins) + ' koin'),
+          h('div', { class: 'dim' }, 'Rp ' + perCoin + ' per koin · urutan ' + pk.sortOrder)),
+        h('div', { style: 'text-align:right' },
+          pk.badge ? h('span', { class: 'pill amber' }, pk.badge) : null,
+          pk.active ? null : h('div', { style: 'margin-top:4px' }, h('span', { class: 'pill red' }, 'Nonaktif')))),
+      h('dl', { class: 'kv', style: 'margin-top:10px' },
+        h('dt', {}, 'Harga Rupiah'), h('dd', {}, 'Rp ' + fmt(pk.priceIdr)),
+        h('dt', {}, 'Harga USD'), h('dd', {}, '$' + (pk.priceUsdCents / 100).toFixed(2))),
+      h('div', { class: 'row wrap', style: 'margin-top:12px;gap:6px' },
+        h('button', { class: 'btn sm', onclick: async () => {
+          const r = await formModal({ title: 'Ubah paket', fields: fields(pk) });
+          if (r && await act(() => patch('/api/admin/packages/' + pk.id, body(r)), 'Paket diperbarui')) render();
+        } }, 'Ubah'),
+        h('button', { class: 'btn sm', onclick: async () => {
+          if (await act(() => patch('/api/admin/packages/' + pk.id, { active: !pk.active }), pk.active ? 'Paket disembunyikan' : 'Paket ditampilkan')) render();
+        } }, pk.active ? 'Sembunyikan' : 'Tampilkan'),
+        h('button', { class: 'btn sm bad', onclick: async () => {
+          if (await confirmModal('Hapus paket', fmt(pk.coins) + ' koin akan dihapus dari daftar.', 'Hapus')
+            && await act(() => api('DELETE', '/api/admin/packages/' + pk.id), 'Paket dihapus')) render();
+        } }, 'Hapus'))));
+  }
+  root.append(grid);
+  return root;
+}
+
 // ----- Gift -----
 function giftIcon(g) {
   return h('div', { class: 'gift-ic' }, g.imageUrl ? h('img', { src: g.imageUrl, alt: '' }) : (g.icon || '🎁'));
@@ -1017,6 +1099,7 @@ const pages = {
   foto: { title: 'Foto host', icon: '🖼️', fn: pagePhotos, badge: () => stats && stats.pending.photos + stats.pending.avatars },
   pengguna: { title: 'Pengguna', icon: '👥', fn: pageUsers },
   topup: { title: 'Top up koin', icon: '💰', fn: pageTopup },
+  paket: { title: 'Paket koin', icon: '🪙', fn: pagePackages },
   penarikan: { title: 'Penarikan', icon: '💸', fn: pageWithdrawals, badge: () => stats && stats.pending.withdrawals },
   laporan: { title: 'Laporan', icon: '🚩', fn: pageReports, badge: () => stats && stats.pending.reports },
   agency: { title: 'Agency', icon: '🏢', fn: pageAgency },

@@ -64,7 +64,7 @@ export function GiftSheet({
     if (!enough) {
       Alert.alert('Koin tidak cukup', `Butuh ${number(total)} koin, saldo kamu ${number(coins)}.`, [
         { text: 'Nanti', style: 'cancel' },
-        { text: 'Top up', onPress: () => (onClose(), router.push('/wallet')) },
+        { text: 'Top up', onPress: () => (onClose(), router.push('/topup')) },
       ]);
       return;
     }
@@ -95,7 +95,7 @@ export function GiftSheet({
       if (e instanceof ApiError && e.code === 'INSUFFICIENT_COINS') {
         Alert.alert('Koin tidak cukup', 'Top up koin untuk mengirim gift ini.', [
           { text: 'Nanti', style: 'cancel' },
-          { text: 'Top up', onPress: () => (onClose(), router.push('/wallet')) },
+          { text: 'Top up', onPress: () => (onClose(), router.push('/topup')) },
         ]);
       } else {
         Alert.alert('Gift gagal dikirim', errorMessage(e));
@@ -176,7 +176,7 @@ export function GiftSheet({
         </View>
 
         <View style={s.footer}>
-          <Pressable onPress={() => (onClose(), router.push('/wallet'))} style={s.balance}>
+          <Pressable onPress={() => (onClose(), router.push('/topup'))} style={s.balance}>
             <Coin size={16} />
             <Text style={s.balanceText}>{number(coins)}</Text>
             <Text style={s.topup}>Top up ›</Text>
