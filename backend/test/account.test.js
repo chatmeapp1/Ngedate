@@ -85,8 +85,8 @@ test('akun Login cepat: atur password pertama kali tanpa password lama, lalu bis
   assert.equal((await api('POST', '/api/auth/refresh', { body: { refreshToken: q.refresh } })).status, 401);
   assert.equal((await api('POST', '/api/auth/refresh', { body: { refreshToken: set.body.refreshToken } })).status, 200);
 
-  const login = await api('POST', '/api/auth/login', { body: { login: q.user.username, password: 'passwordbaru1' } });
-  assert.equal(login.status, 200, 'login via akun dengan password yang baru diatur');
+  const login = await api('POST', '/api/auth/login', { body: { login: String(q.id), password: 'passwordbaru1' } });
+  assert.equal(login.status, 200, 'login via akun (ID) dengan password yang baru diatur');
   // Login cepat dari HP yang sama tetap menuju akun yang sama
   assert.equal((await quick(key)).id, q.id);
 });
@@ -106,19 +106,23 @@ test('ubah password: wajib password lama, harus berbeda', async () => {
   assert.equal((await api('POST', '/api/auth/login', { body: { login: 'pewe', password: 'barubanget1' } })).status, 200);
 });
 
-test('ubah username: valid, unik, bukan nama terlarang', async () => {
-  const a = await register('nama.a');
-  await register('namab');
-  assert.equal((await api('POST', '/api/account/username', { token: a.token, body: { username: 'namab' } })).status, 409);
-  assert.equal((await api('POST', '/api/account/username', { token: a.token, body: { username: 'NamaB' } })).status, 409, 'huruf besar-kecil dianggap sama');
-  assert.equal((await api('POST', '/api/account/username', { token: a.token, body: { username: 'admin' } })).status, 400);
-  assert.equal((await api('POST', '/api/account/username', { token: a.token, body: { username: 'deleted_1' } })).status, 400);
-  assert.equal((await api('POST', '/api/account/username', { token: a.token, body: { username: 'a b' } })).status, 400);
-  assert.equal((await api('POST', '/api/account/username', { token: a.token, body: { username: 'ab' } })).status, 400);
-  const ok = await api('POST', '/api/account/username', { token: a.token, body: { username: 'Nama_Baru' } });
-  assert.equal(ok.status, 200, JSON.stringify(ok.body));
-  assert.equal(ok.body.username, 'nama_baru');
-  assert.equal((await api('POST', '/api/auth/login', { body: { login: 'nama_baru', password: 'rahasia123' } })).status, 200);
+test('login via akun memakai ID pengguna + password', async () => {
+  const u = await register('masukid', 'rahasia123');
+  const byId = await api('POST', '/api/auth/login', { body: { login: String(u.id), password: 'rahasia123' } });
+  assert.equal(byId.status, 200, JSON.stringify(byId.body));
+  assert.equal(byId.body.user.id, u.id);
+  assert.equal((await api('POST', '/api/auth/login', { body: { login: String(u.id), password: 'salah-salah' } })).status, 401);
+  assert.equal((await api('POST', '/api/auth/login', { body: { login: '99999999', password: 'rahasia123' } })).status, 401, 'ID tak dikenal sama seperti password salah');
+  // akun lama / admin tetap bisa lewat username
+  assert.equal((await api('POST', '/api/auth/login', { body: { login: 'masukid', password: 'rahasia123' } })).status, 200);
+  // username semua angka ditolak supaya tidak bentrok dengan ID orang lain
+  const numeric = await api('POST', '/api/auth/register', { body: { username: '12345678', password: 'rahasia123' } });
+  assert.equal(numeric.status, 400);
+  // akun Login cepat yang belum mengatur password tidak bisa masuk dengan ID
+  const q = await quick('i'.repeat(40));
+  assert.equal((await api('POST', '/api/auth/login', { body: { login: String(q.id), password: 'apa-saja-123' } })).status, 401);
+  // endpoint ubah username sudah tidak ada
+  assert.equal((await api('POST', '/api/account/username', { token: u.token, body: { username: 'baru.baru' } })).status, 404);
 });
 
 test('keluar dari semua perangkat mencabut semua refresh token', async () => {
@@ -177,6 +181,7 @@ test('hapus akun host: konfirmasi wajib, koin tertahan kembali, data dianonimkan
   assert.equal((await api('POST', '/api/auth/refresh', { body: { refreshToken: host.refresh } })).status, 401);
   assert.equal((await api('POST', '/api/auth/login', { body: { login: 'hostdel', password: 'rahasia123' } })).status, 401);
   assert.equal((await api('POST', '/api/auth/login', { body: { login: `deleted_${host.id}`, password: 'rahasia123' } })).status, 401);
+  assert.equal((await api('POST', '/api/auth/login', { body: { login: String(host.id), password: 'rahasia123' } })).status, 401, 'ID akun terhapus tidak bisa masuk');
 
   // tidak muncul di daftar & tidak bisa dikirimi pesan
   assert.ok(!(await api('GET', '/api/hosts', { token: fan.token })).body.some((h) => h.id === host.id));

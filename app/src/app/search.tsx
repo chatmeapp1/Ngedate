@@ -77,7 +77,7 @@ export default function Search() {
           header={<View style={{ height: 8 }} />}
         />
       ) : (
-        <Empty icon="search-outline" title={`Cari ${who}`} subtitle={`Ketik nama tampilan, username, atau ID ${who}`} />
+        <Empty icon="search-outline" title={`Cari ${who}`} subtitle={`Ketik nama tampilan atau ID ${who}`} />
       )}
     </View>
   );

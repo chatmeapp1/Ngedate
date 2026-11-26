@@ -24,7 +24,7 @@ async function issueSession(user) {
 
 // Daftar: selalu sebagai "user". Akun host dibuat/dinaikkan oleh admin.
 router.post('/register', limiter, wrap(async (req, res) => {
-  const username = v.str(req.body.username, 'Username', { min: 3, max: 30, pattern: /^[a-zA-Z0-9_.]+$/ }).toLowerCase();
+  const username = v.str(req.body.username, 'Username', { min: 3, max: 30, pattern: /^(?!\d+$)[a-zA-Z0-9_.]+$/ }).toLowerCase();
   const password = v.str(req.body.password, 'Password', { min: 6, max: 100 });
   const displayName = v.str(req.body.displayName ?? username, 'Nama', { min: 1, max: 50 });
   const email = v.str(req.body.email, 'Email', { max: 120, optional: true, pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/ });
@@ -47,12 +47,16 @@ router.post('/register', limiter, wrap(async (req, res) => {
 }));
 
 router.post('/login', limiter, wrap(async (req, res) => {
-  const login = v.str(req.body.login, 'Username/email', { max: 120 }).toLowerCase();
+  const login = v.str(req.body.login, 'ID pengguna', { max: 120 }).toLowerCase();
   const password = v.str(req.body.password, 'Password', { max: 100 });
-  const { rows } = await db.query(`SELECT * FROM users WHERE username = $1 OR email = $1`, [login]);
+  // Angka saja = ID pengguna (cara masuk utama). Selain itu username/email (akun lama & admin).
+  const byId = /^\d{1,15}$/.test(login);
+  const { rows } = byId
+    ? await db.query(`SELECT * FROM users WHERE id = $1`, [login])
+    : await db.query(`SELECT * FROM users WHERE username = $1 OR email = $1`, [login]);
   const user = rows[0];
   if (!user || !(await bcrypt.compare(password, user.password_hash))) {
-    throw unauthorized('Username atau password salah', 'INVALID_CREDENTIALS');
+    throw unauthorized('ID atau password salah', 'INVALID_CREDENTIALS');
   }
   if (user.status !== 'active') throw forbidden('Akun ditangguhkan', 'SUSPENDED');
   res.json(await issueSession(user));

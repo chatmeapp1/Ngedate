@@ -15,10 +15,6 @@ router.post('/password', wrap(async (req, res) => {
   res.json({ ok: true, ...session });
 }));
 
-router.post('/username', wrap(async (req, res) => {
-  res.json({ ok: true, username: await account.changeUsername(req.user.id, (req.body || {}).username) });
-}));
-
 router.post('/logout-all', wrap(async (req, res) => {
   await account.logoutAll(req.user.id);
   res.json({ ok: true });

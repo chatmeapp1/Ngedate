@@ -5,9 +5,7 @@ const v = require('../lib/validate');
 const wallet = require('./wallet');
 const storage = require('../lib/storage');
 const tokens = require('../lib/tokens');
-const { ApiError, badRequest, forbidden, notFound, unauthorized, conflict } = require('../lib/errors');
-
-const RESERVED = /^(admin|administrator|root|support|amora|system|deleted_.*)$/i;
+const { badRequest, forbidden, notFound, unauthorized } = require('../lib/errors');
 
 async function loadUser(client, userId) {
   const { rows } = await client.query(`SELECT * FROM users WHERE id = $1`, [userId]);
@@ -42,20 +40,6 @@ async function changePassword(userId, { currentPassword, newPassword }) {
     accessToken: tokens.signAccessToken(fresh),
     refreshToken: await tokens.issueRefreshToken(userId),
   };
-}
-
-/** Ubah username (dipakai untuk "Login via Akun"). */
-async function changeUsername(userId, raw) {
-  const username = v.str(raw, 'Username', { min: 3, max: 30, pattern: /^[a-zA-Z0-9_.]+$/ }).toLowerCase();
-  if (RESERVED.test(username)) throw badRequest('Username ini tidak tersedia');
-  await loadUser(db, userId);
-  try {
-    const { rows } = await db.query(`UPDATE users SET username = $2, updated_at = now() WHERE id = $1 RETURNING username`, [userId, username]);
-    return rows[0].username;
-  } catch (e) {
-    if (e.code === '23505') throw conflict('Username sudah dipakai orang lain', 'USERNAME_TAKEN');
-    throw e;
-  }
 }
 
 /** Keluar dari semua perangkat: semua refresh token dicabut. */
@@ -155,4 +139,4 @@ async function deleteAccount(userId, { confirm, password }) {
   return result;
 }
 
-module.exports = { changePassword, changeUsername, logoutAll, deleteAccount };
+module.exports = { changePassword, logoutAll, deleteAccount };

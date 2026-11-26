@@ -24,7 +24,6 @@ interface AuthState {
   ready: boolean;
   user: User | null;
   login: (login: string, password: string) => Promise<void>;
-  register: (data: { username: string; displayName: string; password: string; countryCode?: string }) => Promise<void>;
   quickLogin: () => Promise<void>;
   logout: () => Promise<void>;
   refreshMe: () => Promise<User | null>;
@@ -86,9 +85,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       },
       quickLogin: async () => {
         await startSession(await api.post<SessionResponse>('/api/auth/quick', { deviceKey: await deviceKey() }));
-      },
-      register: async (data) => {
-        await startSession(await api.post<SessionResponse>('/api/auth/register', data));
       },
       logout: async () => {
         await setSession(null);

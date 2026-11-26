@@ -59,7 +59,7 @@ export default function BlockedUsers() {
                 <Text style={s.name} numberOfLines={1}>
                   {item.displayName}
                 </Text>
-                <Text style={s.sub}>@{item.username}</Text>
+                <Text style={s.sub}>ID {item.id}</Text>
               </View>
               <Pressable onPress={() => unblock(item)} style={s.btn}>
                 <Text style={s.btnText}>Buka blokir</Text>

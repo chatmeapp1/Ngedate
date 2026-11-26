@@ -7,18 +7,20 @@ import { useAuth } from '@/context/auth';
 import { errorMessage } from '@/lib/api';
 import { colors } from '@/lib/theme';
 
+// Login via Akun: ID pengguna + password (ID ada di menu Saya)
 export default function AccountLogin() {
   const { login } = useAuth();
-  const [username, setUsername] = useState('');
+  const [userId, setUserId] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const submit = async () => {
+    if (!userId || !password || loading) return;
     setError(null);
     setLoading(true);
     try {
-      await login(username.trim(), password);
+      await login(userId, password);
     } catch (e) {
       setError(errorMessage(e));
     } finally {
@@ -27,16 +29,24 @@ export default function AccountLogin() {
   };
 
   return (
-    <AuthShell title="Selamat datang" subtitle="Masuk untuk mulai ngobrol dengan host favoritmu">
-      <Field label="Username atau email" value={username} onChangeText={setUsername} autoCapitalize="none" />
-      <Field label="Password" value={password} onChangeText={setPassword} secureTextEntry onSubmitEditing={submit} />
+    <AuthShell title="Masuk dengan akun" subtitle="Pakai ID pengguna dan password yang sudah kamu atur">
+      <Field
+        label="ID pengguna"
+        value={userId}
+        onChangeText={(t) => setUserId(t.replace(/\D/g, ''))}
+        keyboardType="number-pad"
+        placeholder="Contoh: 12345678"
+        maxLength={15}
+      />
+      <Field label="Password" value={password} onChangeText={setPassword} secureTextEntry autoCapitalize="none" onSubmitEditing={submit} />
       {error ? <Text style={{ color: colors.danger }}>{error}</Text> : null}
-      <GradientButton title="Masuk" onPress={submit} loading={loading} disabled={!username || !password} />
-      <Text style={{ textAlign: 'center', color: colors.textSub }}>
-        Belum punya akun?{' '}
-        <Link href="/register" style={{ color: colors.primary, fontWeight: '800' }}>
-          Daftar
+      <GradientButton title="Masuk" onPress={submit} loading={loading} disabled={!userId || !password} />
+      <Text style={{ textAlign: 'center', color: colors.textSub, lineHeight: 20 }}>
+        ID pengguna ada di menu Saya. Akun baru dibuat otomatis lewat{' '}
+        <Link href="/login" style={{ color: colors.primary, fontWeight: '800' }}>
+          Login cepat
         </Link>
+        , lalu atur password di Saya &gt; Pengaturan akun.
       </Text>
     </AuthShell>
   );

@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as Clipboard from 'expo-clipboard';
 import { useState } from 'react';
 import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -27,10 +28,8 @@ export default function AccountSettings() {
   const insets = useSafeAreaInsets();
   const passwordSet = user?.passwordSet !== false;
 
-  // --- username ---
-  const [username, setUsername] = useState(user?.username ?? '');
-  const [savingName, setSavingName] = useState(false);
-  const [nameError, setNameError] = useState<string | null>(null);
+  // --- salin ID ---
+  const [copied, setCopied] = useState(false);
 
   // --- password ---
   const [current, setCurrent] = useState('');
@@ -44,20 +43,10 @@ export default function AccountSettings() {
 
   if (!user) return null;
 
-  const saveUsername = async () => {
-    const value = username.trim().toLowerCase();
-    if (value === user.username) return;
-    setSavingName(true);
-    setNameError(null);
-    try {
-      await api.post('/api/account/username', { username: value });
-      await refreshMe();
-      Alert.alert('Username diubah', `Kamu sekarang bisa masuk lewat "Login via Akun" dengan username ${value}.`);
-    } catch (e) {
-      setNameError(errorMessage(e));
-    } finally {
-      setSavingName(false);
-    }
+  const copyId = async () => {
+    await Clipboard.setStringAsync(String(user.id));
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   const savePassword = async () => {
@@ -76,7 +65,7 @@ export default function AccountSettings() {
       setCurrent('');
       setNext('');
       setAgain('');
-      Alert.alert(passwordSet ? 'Password diubah' : 'Password diatur', 'Perangkat lain yang memakai akun ini otomatis keluar.');
+      Alert.alert(passwordSet ? 'Password diubah' : 'Password diatur', `Sekarang kamu bisa masuk di HP lain lewat Login via Akun dengan ID ${user.id} dan password ini. Perangkat lain yang memakai akun ini otomatis keluar.`);
     } catch (e) {
       setPassError(errorMessage(e));
     } finally {
@@ -108,35 +97,30 @@ export default function AccountSettings() {
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 40 }} keyboardShouldPersistTaps="handled">
           <Section title="Akun">
-            <View style={s.kv}>
-              <Text style={s.k}>ID</Text>
-              <Text style={s.v}>{user.id}</Text>
+            <View style={s.idBox}>
+              <Text style={s.k}>ID pengguna kamu</Text>
+              <View style={s.idRow}>
+                <Text style={s.idText} selectable>
+                  {user.id}
+                </Text>
+                <Pressable onPress={copyId} style={s.copyBtn} hitSlop={8}>
+                  <Ionicons name={copied ? 'checkmark' : 'copy-outline'} size={16} color={colors.primaryDark} />
+                  <Text style={s.copyText}>{copied ? 'Tersalin' : 'Salin'}</Text>
+                </Pressable>
+              </View>
             </View>
             <View style={s.kv}>
               <Text style={s.k}>Cara masuk</Text>
-              <Text style={s.v}>{passwordSet ? 'Username & password' : 'Login cepat (HP ini)'}</Text>
+              <Text style={s.v}>{passwordSet ? 'ID + password' : 'Login cepat (HP ini)'}</Text>
             </View>
-            {!passwordSet ? (
-              <View style={s.note}>
-                <Ionicons name="information-circle-outline" size={18} color={colors.primary} />
-                <Text style={s.noteText}>
-                  Akunmu terikat ke HP ini. Atur password di bawah supaya bisa masuk dari HP lain lewat Login via Akun.
-                </Text>
-              </View>
-            ) : null}
-          </Section>
-
-          <Section title="Username">
-            <Field
-              label="Username untuk Login via Akun"
-              value={username}
-              onChangeText={(t) => setUsername(t.replace(/\s/g, ''))}
-              autoCapitalize="none"
-              maxLength={30}
-              error={nameError}
-            />
-            <Text style={s.hint}>3–30 karakter: huruf, angka, titik, atau garis bawah.</Text>
-            <GradientButton title="Simpan username" onPress={saveUsername} loading={savingName} disabled={username.trim().toLowerCase() === user.username || username.trim().length < 3} />
+            <View style={s.note}>
+              <Ionicons name="information-circle-outline" size={18} color={colors.primary} />
+              <Text style={s.noteText}>
+                {passwordSet
+                  ? `Untuk masuk di HP lain: pilih Login via Akun, isi ID ${user.id} dan passwordmu.`
+                  : `Akunmu terikat ke HP ini. Atur password di bawah, lalu di HP lain pilih Login via Akun dengan ID ${user.id} dan password itu.`}
+              </Text>
+            </View>
           </Section>
 
           <Section title={passwordSet ? 'Ubah password' : 'Atur password'}>
@@ -255,9 +239,13 @@ const s = StyleSheet.create({
   kv: { flexDirection: 'row', justifyContent: 'space-between' },
   k: { color: colors.textSub },
   v: { color: colors.text, fontWeight: '700' },
+  idBox: { backgroundColor: '#F6F1FA', borderRadius: radius.md, padding: 12, gap: 4 },
+  idRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  idText: { fontSize: 30, fontWeight: '900', color: colors.text, letterSpacing: 1 },
+  copyBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, height: 34, borderRadius: radius.pill, backgroundColor: '#EDE3FF' },
+  copyText: { color: colors.primaryDark, fontWeight: '800', fontSize: 13 },
   note: { flexDirection: 'row', gap: 8, backgroundColor: '#F3E8FF', borderRadius: radius.sm, padding: 10 },
   noteText: { flex: 1, color: colors.textSub, fontSize: 13, lineHeight: 18 },
-  hint: { color: colors.textDim, fontSize: 12, marginTop: -4 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   rowTitle: { fontSize: 15, fontWeight: '700', color: colors.text },
   rowSub: { fontSize: 12, color: colors.textDim, marginTop: 2 },
