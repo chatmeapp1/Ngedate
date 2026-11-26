@@ -11,6 +11,8 @@ import { colors, radius } from '@/lib/theme';
 import type { Withdrawal, WithdrawOptions } from '@/lib/types';
 
 const rp = (n: number) => `Rp ${number(n)}`;
+// Jumlah dalam satuan terkecil: Rupiah utuh (IDR) atau sen (USD)
+const money = (cur: 'IDR' | 'USD', n: number) => (cur === 'USD' ? `$${(n / 100).toFixed(2)}` : rp(n));
 const STATUS: Record<Withdrawal['status'], { label: string; bg: string; fg: string }> = {
   pending: { label: 'Diproses', bg: '#FEF3C7', fg: '#B45309' },
   paid: { label: 'Sudah ditransfer', bg: '#DCFCE7', fg: '#15803D' },
@@ -72,22 +74,26 @@ export default function Withdraw() {
   }
 
   const diamonds = Math.floor(Number(amount.replace(/\D/g, '')) || 0);
-  const gross = diamonds * opt.rateIdr;
-  const fee = Math.floor((gross * opt.feePercent) / 100);
+  const isUsdt = opt.method === 'usdt';
+  // Sama persis dengan hitungan di server
+  const gross = isUsdt ? Math.floor((diamonds * 100) / opt.diamondsPerUsd) : Math.floor((diamonds * opt.usdIdr) / opt.diamondsPerUsd);
+  const fee = Math.floor((gross * opt.feePercent) / 100) + (isUsdt ? Math.round(opt.usdtFeeUsd * 100) : 0);
   const net = gross - fee;
+  const usdValue = (n: number) => `US$ ${(n / opt.diamondsPerUsd).toFixed(2)}`;
   const cooldown = opt.account?.cooldownUntil ? new Date(opt.account.cooldownUntil) : null;
   const canRequest =
-    !opt.pending && !!opt.account && opt.passwordSet && !cooldown && diamonds >= opt.minDiamonds && diamonds <= opt.diamonds;
+    !opt.pending && !!opt.account && opt.passwordSet && !cooldown && diamonds >= opt.minDiamonds && diamonds <= opt.diamonds && net > 0;
 
   const saveAccount = async () => {
-    if (!provider) return setAccError('Pilih bank atau e-wallet');
+    const chosen = isUsdt ? 'USDT (TRC20)' : provider;
+    if (!chosen) return setAccError('Pilih bank atau e-wallet');
     setAccError(null);
     setSavingAcc(true);
     try {
       const r = await api.put<{ cooldownUntil: string | null }>('/api/withdrawals/account', {
-        provider,
-        accountNumber: accNumber,
-        accountName: accName.trim(),
+        provider: chosen,
+        accountNumber: isUsdt ? accNumber.trim() : accNumber,
+        accountName: isUsdt ? undefined : accName.trim(),
         password: accPass,
       });
       setAccPass('');
@@ -96,7 +102,7 @@ export default function Withdraw() {
       await load();
       Alert.alert(
         'Rekening disimpan',
-        r.cooldownUntil ? `Demi keamanan, penarikan bisa diajukan lagi setelah ${opt.cooldownHours} jam sejak rekening diubah.` : 'Sekarang kamu bisa mengajukan penarikan.'
+        r.cooldownUntil ? `Demi keamanan, penarikan bisa diajukan lagi setelah ${opt.cooldownHours} jam sejak ${isUsdt ? 'alamat' : 'rekening'} diubah.` : 'Sekarang kamu bisa mengajukan penarikan.'
       );
     } catch (e) {
       if (e instanceof ApiError && e.code === 'PASSWORD_REQUIRED') setAccError(e.message);
@@ -110,7 +116,7 @@ export default function Withdraw() {
     if (!canRequest || sending || !opt.account) return;
     Alert.alert(
       'Ajukan penarikan?',
-      `${number(diamonds)} diamond → ${rp(net)}\nke ${opt.account.provider} ${opt.account.accountNumber} a.n. ${opt.account.accountName}.\n\nDiamond langsung dipotong dan transfer diproses admin. Kamu bisa membatalkan selama belum diproses.`,
+      `${number(diamonds)} diamond → ${money(opt.currency, net)}${isUsdt ? ' USDT' : ''}\nke ${opt.account.provider} ${opt.account.accountNumber}${opt.account.accountName ? ` a.n. ${opt.account.accountName}` : ''}.\n\nDiamond langsung dipotong dan pembayaran diproses admin. Kamu bisa membatalkan selama belum diproses.`,
       [
         { text: 'Batal', style: 'cancel' },
         {
@@ -153,6 +159,7 @@ export default function Withdraw() {
 
   const banks = opt.providers.filter((p) => p.kind === 'bank');
   const wallets = opt.providers.filter((p) => p.kind === 'ewallet');
+  const accountLabel = isUsdt ? 'Alamat dompet USDT' : 'Rekening penarikan';
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -168,7 +175,14 @@ export default function Withdraw() {
             </View>
           </View>
           <Text style={s.rateText}>
-            1 💎 = {rp(opt.rateIdr)} · minimal {number(opt.minDiamonds)} 💎 ({rp(opt.minDiamonds * opt.rateIdr)}){opt.feePercent > 0 ? ` · biaya ${opt.feePercent}%` : ''}
+            {number(opt.diamondsPerUsd)} 💎 = US$ 1{isUsdt ? '' : ` (${rp(opt.usdIdr)})`} · minimal {number(opt.minDiamonds)} 💎 ({usdValue(opt.minDiamonds)})
+            {opt.feePercent > 0 ? ` · biaya ${opt.feePercent}%` : ''}
+          </Text>
+          <Text style={s.methodNote}>
+            {isUsdt
+              ? `Dibayar dalam USDT lewat jaringan TRC20${opt.usdtFeeUsd > 0 ? ` (biaya jaringan US$ ${opt.usdtFeeUsd} per penarikan)` : ''}.`
+              : 'Dibayar dalam Rupiah ke rekening bank atau e-wallet.'}{' '}
+            Metode mengikuti negara di profilmu (Indonesia: Rupiah, negara lain: USDT). Ubah negara di Edit profil.
           </Text>
 
           {/* Perlu password */}
@@ -191,7 +205,7 @@ export default function Withdraw() {
                 <Text style={s.cardTitle}>Penarikan sedang diproses</Text>
                 <Pill status="pending" />
               </View>
-              <Text style={s.bigRp}>{rp(opt.pending.netIdr)}</Text>
+              <Text style={s.bigRp}>{money(opt.pending.currency, opt.pending.net)}</Text>
               <Text style={s.sub}>
                 {number(opt.pending.diamonds)} 💎 → {opt.pending.provider} {opt.pending.accountNumber}
               </Text>
@@ -205,7 +219,7 @@ export default function Withdraw() {
           {/* Rekening */}
           <View style={s.card}>
             <View style={s.rowBetween}>
-              <Text style={s.cardTitle}>Rekening penarikan</Text>
+              <Text style={s.cardTitle}>{accountLabel}</Text>
               {opt.account && !editing ? (
                 <Pressable onPress={() => setEditing(true)} hitSlop={8}>
                   <Text style={s.link}>Ubah</Text>
@@ -215,12 +229,12 @@ export default function Withdraw() {
             {opt.account && !editing ? (
               <>
                 <View style={s.accBox}>
-                  <Ionicons name={opt.account.kind === 'bank' ? 'business-outline' : 'wallet-outline'} size={22} color={colors.primaryDark} />
+                  <Ionicons name={opt.account.kind === 'bank' ? 'business-outline' : opt.account.kind === 'crypto' ? 'logo-bitcoin' : 'wallet-outline'} size={22} color={colors.primaryDark} />
                   <View style={{ flex: 1 }}>
                     <Text style={s.accMain}>
                       {opt.account.provider} · {opt.account.accountNumber}
                     </Text>
-                    <Text style={s.sub}>a.n. {opt.account.accountName}</Text>
+                    {opt.account.accountName ? <Text style={s.sub}>a.n. {opt.account.accountName}</Text> : <Text style={s.sub}>Jaringan TRC20 (Tron)</Text>}
                   </View>
                 </View>
                 {cooldown ? (
@@ -229,23 +243,48 @@ export default function Withdraw() {
               </>
             ) : (
               <View style={{ gap: 12 }}>
-                <Text style={s.groupLabel}>Bank</Text>
-                <View style={s.chips}>
-                  {banks.map((p) => (
-                    <Chip key={p.name} label={p.name} active={provider === p.name} onPress={() => setProvider(p.name)} />
-                  ))}
-                </View>
-                <Text style={s.groupLabel}>E-wallet</Text>
-                <View style={s.chips}>
-                  {wallets.map((p) => (
-                    <Chip key={p.name} label={p.name} active={provider === p.name} onPress={() => setProvider(p.name)} />
-                  ))}
-                </View>
-                <Field label="Nomor rekening / nomor HP e-wallet" value={accNumber} onChangeText={(t) => setAccNumber(t.replace(/\D/g, ''))} keyboardType="number-pad" maxLength={20} />
-                <Field label="Nama pemilik rekening" value={accName} onChangeText={setAccName} autoCapitalize="words" maxLength={80} />
+                {isUsdt ? (
+                  <>
+                    <View style={s.accBox}>
+                      <Ionicons name="logo-bitcoin" size={22} color={colors.primaryDark} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={s.accMain}>USDT (TRC20)</Text>
+                        <Text style={s.sub}>Jaringan Tron</Text>
+                      </View>
+                    </View>
+                    <Field
+                      label="Alamat dompet USDT (TRC20)"
+                      value={accNumber}
+                      onChangeText={(t) => setAccNumber(t.replace(/\s/g, ''))}
+                      autoCapitalize="none"
+                      maxLength={34}
+                      placeholder="Diawali huruf T, 34 karakter"
+                    />
+                    <Text style={s.warn}>Pastikan alamat jaringan TRC20 (Tron), bukan ERC20 atau BEP20. Kiriman ke jaringan atau alamat yang salah tidak bisa ditarik kembali.</Text>
+                  </>
+                ) : (
+                  <>
+                    <Text style={s.groupLabel}>Bank</Text>
+                    <View style={s.chips}>
+                      {banks.map((p) => (
+                        <Chip key={p.name} label={p.name} active={provider === p.name} onPress={() => setProvider(p.name)} />
+                      ))}
+                    </View>
+                    <Text style={s.groupLabel}>E-wallet</Text>
+                    <View style={s.chips}>
+                      {wallets.map((p) => (
+                        <Chip key={p.name} label={p.name} active={provider === p.name} onPress={() => setProvider(p.name)} />
+                      ))}
+                    </View>
+                    <Field label="Nomor rekening / nomor HP e-wallet" value={accNumber} onChangeText={(t) => setAccNumber(t.replace(/\D/g, ''))} keyboardType="number-pad" maxLength={20} />
+                    <Field label="Nama pemilik rekening" value={accName} onChangeText={setAccName} autoCapitalize="words" maxLength={80} />
+                  </>
+                )}
                 <Field label="Password akunmu" value={accPass} onChangeText={setAccPass} secureTextEntry autoCapitalize="none" error={accError} />
-                <Text style={s.hint}>Pastikan nama sama dengan nama akun bank/e-wallet. Mengubah rekening menahan penarikan {opt.cooldownHours} jam demi keamanan.</Text>
-                <GradientButton title="Simpan rekening" onPress={saveAccount} loading={savingAcc} disabled={!provider || accNumber.length < 5 || accName.trim().length < 3 || !accPass} />
+                <Text style={s.hint}>
+                  {isUsdt ? '' : 'Pastikan nama sama dengan nama akun bank/e-wallet. '}Mengubah {isUsdt ? 'alamat' : 'rekening'} menahan penarikan {opt.cooldownHours} jam demi keamanan.
+                </Text>
+                <GradientButton title="Simpan rekening" onPress={saveAccount} loading={savingAcc} disabled={isUsdt ? accNumber.length !== 34 || !accPass : !provider || accNumber.length < 5 || accName.trim().length < 3 || !accPass} />
                 {opt.account ? (
                   <Pressable onPress={() => setEditing(false)} style={{ alignItems: 'center', paddingVertical: 6 }}>
                     <Text style={s.link}>Batal</Text>
@@ -279,26 +318,26 @@ export default function Withdraw() {
                 <View style={s.preview}>
                   <View style={s.rowBetween}>
                     <Text style={s.sub}>
-                      {number(diamonds)} 💎 × {rp(opt.rateIdr)}
+                      {number(diamonds)} 💎 = {usdValue(diamonds)}
                     </Text>
-                    <Text style={s.previewVal}>{rp(gross)}</Text>
+                    <Text style={s.previewVal}>{money(opt.currency, gross)}</Text>
                   </View>
                   {fee > 0 ? (
                     <View style={s.rowBetween}>
-                      <Text style={s.sub}>Biaya {opt.feePercent}%</Text>
-                      <Text style={s.previewVal}>− {rp(fee)}</Text>
+                      <Text style={s.sub}>{isUsdt ? 'Biaya (jaringan' + (opt.feePercent > 0 ? ` + ${opt.feePercent}%` : '') + ')' : `Biaya ${opt.feePercent}%`}</Text>
+                      <Text style={s.previewVal}>− {money(opt.currency, fee)}</Text>
                     </View>
                   ) : null}
                   <View style={[s.rowBetween, { marginTop: 4 }]}>
                     <Text style={s.cardTitle}>Kamu terima</Text>
-                    <Text style={s.bigRp}>{rp(net)}</Text>
+                    <Text style={s.bigRp}>{money(opt.currency, Math.max(0, net))}</Text>
                   </View>
                 </View>
               ) : null}
               {diamonds > 0 && diamonds < opt.minDiamonds ? <Text style={s.warn}>Minimal penarikan {number(opt.minDiamonds)} diamond.</Text> : null}
               {diamonds > opt.diamonds ? <Text style={s.warn}>Diamond kamu tidak cukup.</Text> : null}
               <GradientButton title="Ajukan penarikan" onPress={submit} loading={sending} disabled={!canRequest} />
-              {!opt.account ? <Text style={s.hint}>Simpan rekening penarikan dulu.</Text> : null}
+              {!opt.account ? <Text style={s.hint}>{isUsdt ? 'Simpan alamat dompet USDT dulu.' : 'Simpan rekening penarikan dulu.'}</Text> : null}
             </View>
           ) : null}
 
@@ -310,14 +349,14 @@ export default function Withdraw() {
             history.map((w) => (
               <View key={w.id} style={s.hist}>
                 <View style={s.rowBetween}>
-                  <Text style={s.histRp}>{rp(w.netIdr)}</Text>
+                  <Text style={s.histRp}>{money(w.currency, w.net)}{w.currency === 'USD' ? ' USDT' : ''}</Text>
                   <Pill status={w.status} />
                 </View>
                 <Text style={s.sub}>
                   {number(w.diamonds)} 💎 · {w.provider} {w.accountNumber}
                 </Text>
                 <Text style={s.hint}>{when(w.createdAt)}</Text>
-                {w.status === 'paid' && w.transferRef ? <Text style={s.hint}>Ref transfer: {w.transferRef}</Text> : null}
+                {w.status === 'paid' && w.transferRef ? <Text style={s.hint}>{w.currency === 'USD' ? 'TXID' : 'Ref transfer'}: {w.transferRef}</Text> : null}
                 {w.status === 'rejected' && w.adminNote ? <Text style={s.warn}>Alasan: {w.adminNote}. Diamond sudah dikembalikan.</Text> : null}
               </View>
             ))
@@ -341,6 +380,7 @@ const s = StyleSheet.create({
   balance: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#F3E8FF', borderRadius: radius.lg, padding: 18 },
   balanceLabel: { color: colors.textSub, fontWeight: '700' },
   balanceValue: { color: colors.text, fontSize: 32, fontWeight: '900' },
+  methodNote: { color: colors.textDim, fontSize: 12, textAlign: 'center', lineHeight: 17, marginTop: -8 },
   rateText: { color: colors.textSub, fontSize: 13, textAlign: 'center', marginTop: -6 },
   card: { backgroundColor: colors.surface, borderRadius: radius.md, padding: 16, gap: 12 },
   cardTitle: { fontSize: 16, fontWeight: '800', color: colors.text },

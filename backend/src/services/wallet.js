@@ -59,21 +59,22 @@ function split(amount, hostShare) {
 
 /**
  * Bagi koin ke host, agency host (jika ada), dan platform.
- *   host_share = bagian host sebelum komisi agency (mis. 0.5)
- *   komisi agency (mis. 0.1 dari total) diambil dari bagian host
- *   -> host 40%, agency 10%, platform 50%
+ *   host_share      = bagian host BERSIH (mis. 0.3)
+ *   komisi agency   = bagian agency dari TOTAL (mis. 0.1), dibayar dari bagian platform, bukan dari host
+ *   -> host 30%, agency 10%, platform 60%
+ * Host tanpa agency: host 30%, platform 70%.
  */
 async function payHost(client, hostId, total, settings, source, ref) {
-  const hostGross = Math.floor(total * Number(settings.host_share));
+  const host = Math.floor(total * Number(settings.host_share));
   const { rows } = await client.query(
     `SELECT a.id, a.commission_rate FROM users u JOIN agencies a ON a.id = u.agency_id
      WHERE u.id = $1 AND a.active`,
     [hostId]
   );
   const agency = rows[0];
-  const agencyCut = agency ? Math.min(hostGross, Math.floor(total * Number(agency.commission_rate))) : 0;
-  const host = hostGross - agencyCut;
-  const platform = total - hostGross;
+  // Komisi agency tidak boleh melebihi sisa setelah bagian host (platform tidak boleh minus)
+  const agencyCut = agency ? Math.min(total - host, Math.floor(total * Number(agency.commission_rate))) : 0;
+  const platform = total - host - agencyCut;
 
   await creditDiamonds(client, hostId, host, `${source}_income`, ref);
   if (agencyCut > 0) {

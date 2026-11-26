@@ -425,7 +425,7 @@ async function pageDashboard() {
             s.pending.verifications ? h('a', { class: 'btn pri sm', href: '#verifikasi' }, 'Verifikasi wajah (' + s.pending.verifications + ')') : null,
             s.pending.photos + s.pending.avatars ? h('a', { class: 'btn pri sm', href: '#foto' }, 'Foto host (' + (s.pending.photos + s.pending.avatars) + ')') : null,
             s.pending.reports ? h('a', { class: 'btn pri sm', href: '#laporan' }, 'Laporan (' + s.pending.reports + ')') : null,
-            s.pending.withdrawals ? h('a', { class: 'btn pri sm', href: '#penarikan' }, 'Penarikan (' + s.pending.withdrawals + ' · Rp ' + fmt(s.pendingWithdrawIdr) + ')') : null))
+            s.pending.withdrawals ? h('a', { class: 'btn pri sm', href: '#penarikan' }, 'Penarikan (' + s.pending.withdrawals + ' · ' + [s.pendingWithdrawIdr ? 'Rp ' + fmt(s.pendingWithdrawIdr) : null, s.pendingWithdrawUsdCents ? '$' + (s.pendingWithdrawUsdCents / 100).toFixed(2) : null].filter(Boolean).join(' + ') + ')') : null))
       : null,
     h('div', { class: 'grid g3' },
       stat(fmt(s.users.user || 0), 'Pengguna'),
@@ -577,11 +577,11 @@ async function pageUsers(param) {
 async function pageAgency() {
   const [list, settings] = await Promise.all([get('/api/admin/agencies'), get('/api/admin/settings')]);
   const share = Number(settings.host_share);
-  const root = h('div', {}, pageHead('Agency', 'Komisi agency diambil dari bagian host (maksimal ' + Math.round(share * 100) + '%).'));
+  const root = h('div', {}, pageHead('Agency', 'Komisi agency dibayar dari bagian app, bukan dari host (maksimal ' + Math.round((1 - share) * 100) + '% dari total koin).'));
   const fields = (a) => [
     { name: 'name', label: 'Nama agency', value: a && a.name },
     ...(a ? [] : [{ name: 'code', label: 'Kode undangan', hint: 'Kosongkan untuk dibuat otomatis (4–16 huruf/angka)' }]),
-    { name: 'commission', label: 'Komisi agency (% dari total koin)', type: 'number', value: a ? +(a.commissionRate * 100).toFixed(2) : 10, hint: 'Diambil dari bagian host. Maksimal ' + Math.round(share * 100) + '%. Contoh: bagian host 50% + komisi 10% = host 40%, agency 10%, platform 50%.' },
+    { name: 'commission', label: 'Komisi agency (% dari total koin)', type: 'number', value: a ? +(a.commissionRate * 100).toFixed(2) : 10, hint: 'Dibayar dari bagian app. Maksimal ' + Math.round((1 - share) * 100) + '%. Contoh: host 30% bersih + komisi 10% = host 30%, agency 10%, app 60%.' },
     { name: 'contact', label: 'Kontak', value: a && a.contact },
     ...(a ? [{ name: 'active', label: 'Aktif (kode bisa dipakai)', type: 'checkbox', value: a.active }] : []),
   ];
@@ -786,6 +786,8 @@ async function pageReports() {
 // ----- Penarikan diamond host -----
 let wdTab = 'pending';
 const rupiah = (n) => 'Rp ' + fmt(n);
+// Jumlah dalam satuan terkecil: Rupiah utuh (IDR) atau sen (USD)
+const money = (cur, n) => (cur === 'USD' ? '$' + (n / 100).toFixed(2) + ' USDT' : rupiah(n));
 
 function copyText(text, label) {
   const done = () => toast((label || 'Teks') + ' disalin');
@@ -797,15 +799,16 @@ function copyText(text, label) {
 async function pageWithdrawals() {
   const list = await get('/api/admin/withdrawals?status=' + wdTab);
   const root = h('div');
-  const totalNet = list.reduce((a, w) => a + w.netIdr, 0);
   root.append(
     ...pageHead('Penarikan diamond', 'Transfer manual ke rekening host, lalu tandai sudah dibayar. Jika ditolak, diamond otomatis dikembalikan ke host.'),
     h('div', { class: 'tabs' }, [['pending', 'Menunggu'], ['paid', 'Dibayar'], ['rejected', 'Ditolak'], ['cancelled', 'Dibatalkan']].map(([k, l]) =>
       h('button', { class: 'tab' + (wdTab === k ? ' on' : ''), onclick: () => { wdTab = k; render(); } }, l)))
   );
   if (wdTab === 'pending' && list.length) {
+    const sum = (cur) => list.filter((w) => w.currency === cur).reduce((a, w) => a + w.net, 0);
+    const parts = [sum('IDR') ? rupiah(sum('IDR')) : null, sum('USD') ? money('USD', sum('USD')) : null].filter(Boolean);
     root.append(h('div', { class: 'card stat warn', style: 'margin-bottom:14px' },
-      h('div', { class: 'n' }, rupiah(totalNet)),
+      h('div', { class: 'n' }, parts.join(' + ')),
       h('div', { class: 'l' }, list.length + ' pengajuan menunggu — total yang perlu ditransfer')));
   }
   if (!list.length) root.append(empty('Tidak ada penarikan'));
@@ -823,13 +826,21 @@ async function pageWithdrawals() {
         w.status !== 'pending' ? h('span', { class: 'pill ' + (w.status === 'paid' ? 'green' : 'red') }, { paid: 'Dibayar', rejected: 'Ditolak', cancelled: 'Dibatalkan' }[w.status]) : null),
       h('div', { class: 'quote', style: 'font-style:normal;background:#f5f3ff;border-color:var(--primary)' },
         h('div', { class: 'dim' }, 'Transfer ke host'),
-        h('div', { style: 'font-size:26px;font-weight:900;letter-spacing:-.5px' }, rupiah(w.netIdr)),
-        h('div', { class: 'dim' }, fmt(w.diamonds) + ' diamond × Rp ' + fmt(w.rateIdr) + ' = ' + rupiah(w.grossIdr) + (w.feeIdr ? ' − biaya ' + rupiah(w.feeIdr) : ''))),
+        h('div', { style: 'font-size:26px;font-weight:900;letter-spacing:-.5px' }, money(w.currency, w.net)),
+        h('div', { class: 'dim' }, fmt(w.diamonds) + ' diamond ÷ ' + fmt(w.diamondsPerUsd) + ' = $' + (w.diamonds / w.diamondsPerUsd).toFixed(2)
+          + (w.currency === 'IDR' ? ' × Rp ' + fmt(w.usdIdr) + ' = ' + rupiah(w.gross) : '')
+          + (w.fee ? ' − biaya ' + (w.currency === 'USD' ? '$' + (w.fee / 100).toFixed(2) : rupiah(w.fee)) : ''))),
       h('div', { style: 'margin:8px 0' },
-        row(w.kind === 'bank' ? 'Bank' : 'E-wallet', w.provider),
-        row('Nomor', w.accountNumber, w.accountNumber),
-        row('Atas nama', w.accountName, w.accountName),
-        w.paidBeforeIdr ? row('Sudah dibayar sebelumnya', rupiah(w.paidBeforeIdr)) : null),
+        w.kind === 'crypto'
+          ? [row('Jaringan', 'USDT · TRC20 (Tron)'),
+             h('div', { class: 'quote', style: 'font-style:normal;word-break:break-all;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;margin:6px 0' }, w.accountNumber),
+             row('Alamat dompet', 'Salin alamat', w.accountNumber),
+             w.status === 'pending' ? h('div', { class: 'warn-text' }, 'Periksa jaringan TRC20 sebelum mengirim. Kiriman ke jaringan lain tidak bisa ditarik kembali.') : null]
+          : [row(w.kind === 'bank' ? 'Bank' : 'E-wallet', w.provider),
+             row('Nomor', w.accountNumber, w.accountNumber),
+             row('Atas nama', w.accountName, w.accountName)],
+        row('Negara host', w.user.countryCode || '-'),
+        w.paidBefore ? row('Sudah dibayar sebelumnya', money(w.currency, w.paidBefore)) : null),
       w.status === 'pending'
         ? h('div', { class: 'row wrap', style: 'gap:6px;margin-top:10px' },
             h('button', { class: 'btn ok sp', onclick: () => pay(w) }, 'Tandai sudah dibayar'),
@@ -844,7 +855,7 @@ async function pageWithdrawals() {
       title: 'Tandai sudah dibayar',
       submit: 'Sudah ditransfer',
       fields: [
-        { name: 'ref', label: 'Nomor referensi transfer (opsional)', type: 'text', hint: 'Dari bukti transfer, untuk pembukuan' },
+        { name: 'ref', label: w.currency === 'USD' ? 'Hash transaksi / TXID (opsional)' : 'Nomor referensi transfer (opsional)', type: 'text', hint: w.currency === 'USD' ? 'Dari Tronscan atau dompetmu, untuk pembukuan' : 'Dari bukti transfer, untuk pembukuan' },
         { name: 'note', label: 'Catatan (opsional)', type: 'textarea' },
       ],
     });
@@ -856,7 +867,7 @@ async function pageWithdrawals() {
       title: 'Tolak penarikan',
       submit: 'Tolak & kembalikan diamond',
       danger: true,
-      fields: [{ name: 'reason', label: 'Alasan (dilihat host)', type: 'textarea', hint: 'Mis. nama rekening tidak cocok dengan nama akun' }],
+      fields: [{ name: 'reason', label: 'Alasan (dilihat host)', type: 'textarea', hint: 'Mis. nama rekening tidak cocok dengan nama akun, atau alamat dompet tidak bisa dipakai' }],
     });
     if (f && await act(() => post('/api/admin/withdrawals/' + w.id + '/reject', { reason: f.reason }), 'Ditolak, diamond dikembalikan')) render();
   }
@@ -964,15 +975,17 @@ async function pageSettings() {
   const s = await get('/api/admin/settings');
   const root = h('div', {}, pageHead('Pengaturan', 'Berlaku langsung untuk semua pengguna.'));
   const defs = [
-    { k: 'host_share', label: 'Bagian host (%)', hint: 'Sisanya untuk platform. Komisi agency dipotong dari bagian host.', conv: (v) => v * 100, back: (v) => v / 100, min: 0, max: 100 },
+    { k: 'host_share', label: 'Bagian host bersih (%)', hint: 'Host menerima persen ini dari tiap koin gift/pesan. Komisi agency (per agency) dibayar dari bagian app, bukan dari host.', conv: (v) => v * 100, back: (v) => v / 100, min: 0, max: 100 },
     { k: 'chat_price_min', label: 'Harga pesan minimum (koin)', min: 0 },
     { k: 'chat_price_max', label: 'Harga pesan maksimum (koin)', min: 0 },
     { k: 'wa_threshold_min', label: 'Syarat total gift untuk buka WA — minimum (koin)', min: 0 },
     { k: 'wa_threshold_max', label: 'Syarat total gift untuk buka WA — maksimum (koin)', min: 0 },
     { k: 'reply_window_hours', label: 'Batas balas sebelum koin dikembalikan (jam)', min: 1 },
-    { k: 'withdraw_rate_idr', label: 'Penarikan: rupiah per 1 diamond', hint: 'Kurs pencairan host. Samakan dengan harga 1 koin (Rp 2) agar margin aman; di atas Rp 3 platform rugi. Berlaku untuk pengajuan berikutnya.', min: 1 },
+    { k: 'withdraw_diamonds_per_usd', label: 'Penarikan: diamond per 1 USD', hint: 'Kurs pencairan host. Samakan dengan harga jual koin (6.667 koin = 1 USD). Berlaku untuk pengajuan berikutnya.', min: 1 },
+    { k: 'withdraw_usd_idr', label: 'Penarikan: Rupiah per 1 USD (host Indonesia)', hint: 'Host Indonesia dibayar Rupiah memakai kurs ini; host negara lain dibayar USDT.', min: 1000 },
     { k: 'withdraw_min_diamonds', label: 'Penarikan: minimal diamond per pengajuan', min: 1 },
-    { k: 'withdraw_fee_percent', label: 'Penarikan: biaya (%)', hint: 'Dipotong dari jumlah rupiah. 0 = tanpa biaya.', min: 0, max: 50 },
+    { k: 'withdraw_fee_percent', label: 'Penarikan: biaya (%)', hint: 'Dipotong dari jumlah penarikan. 0 = tanpa biaya.', min: 0, max: 50 },
+    { k: 'withdraw_usdt_fee_usd', label: 'Penarikan USDT: biaya jaringan TRC20 (USD)', hint: 'Dipotong dari tiap penarikan USDT untuk menutup biaya kirim di jaringan Tron.', min: 0, max: 50 },
   ];
   const inputs = {};
   const form = h('form', { class: 'card', style: 'max-width:520px', onsubmit: async (e) => {

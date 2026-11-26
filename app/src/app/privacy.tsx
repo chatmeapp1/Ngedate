@@ -27,7 +27,7 @@ export default function Privacy() {
         },
         {
           title: 'Penarikan penghasilan host',
-          body: 'Untuk menarik diamond, host mengisi data rekening bank atau e-wallet (nama bank, nomor, dan nama pemilik). Data ini hanya dilihat tim kami untuk memproses transfer, disimpan terenkripsi di perangkat Anda selama login, dan dihapus saat akun dihapus. Catatan penarikan yang sudah selesai disimpan untuk pembukuan, hanya dengan 4 digit terakhir nomor rekening.',
+          body: 'Untuk menarik diamond, host di Indonesia mengisi data rekening bank atau e-wallet (nama bank, nomor, dan nama pemilik), sedangkan host di negara lain mengisi alamat dompet USDT jaringan TRC20. Data ini hanya dilihat tim kami untuk memproses pembayaran, dan dihapus saat akun dihapus. Catatan penarikan yang sudah selesai disimpan untuk pembukuan, hanya dengan 4 karakter terakhir nomor rekening atau alamat dompet.',
         },
         {
           title: 'Berbagi data',

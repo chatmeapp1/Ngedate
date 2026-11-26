@@ -183,14 +183,17 @@ export interface SendGiftResult {
 export interface Withdrawal {
   id: number;
   diamonds: number;
-  rateIdr: number;
-  grossIdr: number;
-  feeIdr: number;
-  netIdr: number;
-  kind: 'bank' | 'ewallet';
+  currency: 'IDR' | 'USD';
+  diamondsPerUsd: number;
+  usdIdr: number;
+  /** satuan terkecil: Rupiah utuh (IDR) atau sen (USD) */
+  gross: number;
+  fee: number;
+  net: number;
+  kind: 'bank' | 'ewallet' | 'crypto';
   provider: string;
   accountNumber: string;
-  accountName: string;
+  accountName: string | null;
   status: 'pending' | 'paid' | 'rejected' | 'cancelled';
   adminNote: string | null;
   transferRef: string | null;
@@ -200,12 +203,18 @@ export interface Withdrawal {
 
 export interface WithdrawOptions {
   diamonds: number;
-  rateIdr: number;
+  /** idr = bank/e-wallet dalam Rupiah (Indonesia); usdt = USDT TRC20 dalam USD (negara lain) */
+  method: 'idr' | 'usdt';
+  currency: 'IDR' | 'USD';
+  countryCode: string | null;
+  diamondsPerUsd: number;
+  usdIdr: number;
   minDiamonds: number;
   feePercent: number;
+  usdtFeeUsd: number;
   passwordSet: boolean;
   cooldownHours: number;
-  providers: { kind: 'bank' | 'ewallet'; name: string }[];
-  account: { kind: 'bank' | 'ewallet'; provider: string; accountNumber: string; accountName: string; cooldownUntil: string | null } | null;
+  providers: { kind: 'bank' | 'ewallet' | 'crypto'; name: string }[];
+  account: { kind: 'bank' | 'ewallet' | 'crypto'; provider: string; accountNumber: string; accountName: string | null; cooldownUntil: string | null } | null;
   pending: Withdrawal | null;
 }

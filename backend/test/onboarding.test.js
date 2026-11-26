@@ -78,8 +78,8 @@ after(async () => {
   await db.pool.end();
 });
 
-test('admin membuat agency: kode otomatis, komisi tidak boleh melebihi bagian host', async () => {
-  const bad = await api('POST', '/api/admin/agencies', { token: admin, body: { name: 'Rakus', commissionRate: 0.6 } });
+test('admin membuat agency: kode otomatis, komisi tidak boleh melebihi sisa setelah bagian host (30%)', async () => {
+  const bad = await api('POST', '/api/admin/agencies', { token: admin, body: { name: 'Rakus', commissionRate: 0.8 } });
   assert.equal(bad.status, 400);
   const r = await api('POST', '/api/admin/agencies', { token: admin, body: { name: 'Bintang Agency', commissionRate: 0.1 } });
   assert.equal(r.status, 201, JSON.stringify(r.body));
@@ -236,7 +236,7 @@ test('admin menolak lalu menyetujui verifikasi: host dapat centang biru & tampil
   assert.equal(h.verified, true);
 });
 
-test('bagi hasil: host 40%, agency 10%, platform 50%', async () => {
+test('bagi hasil: host 30% bersih, agency 10% dari bagian app, platform 60%', async () => {
   await db.query(`UPDATE host_profiles SET chat_price = 100 WHERE user_id = $1`, [host.id]);
   const buyer = await withAvatar(await quickUser());
   await api('POST', `/api/admin/users/${buyer.id}/coins`, { token: admin, body: { amount: 5000 } });
@@ -245,22 +245,22 @@ test('bagi hasil: host 40%, agency 10%, platform 50%', async () => {
 
   await api('POST', `/api/conversations/${conv.body.id}/messages`, { token: buyer.token, body: { body: 'halo' } });
   const reply = await api('POST', `/api/conversations/${conv.body.id}/messages`, { token: host.token, body: { body: 'hai' } });
-  assert.equal(reply.body.settled.hostIncome, 40);
+  assert.equal(reply.body.settled.hostIncome, 30);
 
   const { rows: g } = await db.query(`INSERT INTO gifts (name, price) VALUES ('Mawar', 1000) RETURNING id`);
   const gift = await api('POST', `/api/conversations/${conv.body.id}/gifts`, { token: buyer.token, body: { giftId: g[0].id } });
   assert.equal(gift.status, 201);
 
   const { rows: u } = await db.query(`SELECT diamonds FROM users WHERE id = $1`, [host.id]);
-  assert.equal(Number(u[0].diamonds), 40 + 400);
+  assert.equal(Number(u[0].diamonds), 30 + 300);
   const { rows: a } = await db.query(`SELECT earnings_total FROM agencies WHERE id = $1`, [agency.id]);
-  assert.equal(Number(a[0].earnings_total), 10 + 100);
+  assert.equal(Number(a[0].earnings_total), 10 + 100, 'agency 10% dari total, bukan dari bagian host');
   const { rows: p } = await db.query(`SELECT SUM(amount)::int AS s FROM platform_earnings`);
-  assert.equal(p[0].s, 50 + 500);
+  assert.equal(p[0].s, 60 + 600);
 
-  // Agency nonaktif: komisi kembali ke host
+  // Agency nonaktif: host tetap 30%, sisanya ke platform (komisi tidak pindah ke host)
   await api('PATCH', `/api/admin/agencies/${agency.id}`, { token: admin, body: { active: false } });
   await api('POST', `/api/conversations/${conv.body.id}/gifts`, { token: buyer.token, body: { giftId: g[0].id } });
   const { rows: u2 } = await db.query(`SELECT diamonds FROM users WHERE id = $1`, [host.id]);
-  assert.equal(Number(u2[0].diamonds), 440 + 500);
+  assert.equal(Number(u2[0].diamonds), 330 + 300);
 });

@@ -164,7 +164,7 @@ test('orang lain tidak bisa membaca atau mengirim ke percakapan ini', async () =
   assert.equal(r2.status, 404);
 });
 
-test('host membalas: koin yang ditahan dibagi 50% host / 50% platform', async () => {
+test('host membalas: koin yang ditahan dibagi 30% host / 70% platform (tanpa agency)', async () => {
   await api('POST', `/api/conversations/${convId}/messages`, { token: user.token, body: { body: 'Kak?' } });
   assert.equal((await balance(user.id)).coins, 19800);
 
@@ -173,13 +173,13 @@ test('host membalas: koin yang ditahan dibagi 50% host / 50% platform', async ()
   assert.equal(r.body.message.paymentStatus, 'free', 'pesan host gratis');
   assert.equal(r.body.settled.messages, 2);
   assert.equal(r.body.settled.coins, 200);
-  assert.equal(r.body.settled.hostIncome, 100);
+  assert.equal(r.body.settled.hostIncome, 60);
   assert.equal(r.body.settled.messageIds.length, 2);
-  assert.equal((await balance(host.id)).diamonds, 100);
+  assert.equal((await balance(host.id)).diamonds, 60);
   assert.equal((await balance(user.id)).coins, 19800, 'koin user tidak berubah saat dibagi');
 
   const { rows } = await db.query(`SELECT SUM(amount)::int AS s FROM platform_earnings WHERE source = 'chat'`);
-  assert.equal(rows[0].s, 100);
+  assert.equal(rows[0].s, 140);
 
   const msgs = await api('GET', `/api/conversations/${convId}/messages`, { token: user.token });
   assert.deepEqual(msgs.body.map((m) => m.paymentStatus), ['paid', 'paid', 'free']);
@@ -204,7 +204,7 @@ test('nomor WA tersembunyi sebelum syarat gift terpenuhi', async () => {
   assert.equal(r.body.threshold, 10000);
 });
 
-test('gift: koin dipotong, host dapat 50%, WA terbuka setelah total gift >= syarat', async () => {
+test('gift: koin dipotong, host dapat 30%, WA terbuka setelah total gift >= syarat', async () => {
   const hostBefore = (await balance(host.id)).diamonds;
 
   const g1 = await api('POST', `/api/conversations/${convId}/gifts`, { token: user.token, body: { giftId, count: 10 } });
@@ -215,7 +215,7 @@ test('gift: koin dipotong, host dapat 50%, WA terbuka setelah total gift >= syar
   assert.equal(g1.body.message.gift.count, 10);
   assert.equal(g1.body.waUnlocked, false);
   assert.equal((await balance(user.id)).coins, 19800 - 5000);
-  assert.equal((await balance(host.id)).diamonds, hostBefore + 2500);
+  assert.equal((await balance(host.id)).diamonds, hostBefore + 1500);
 
   const hostGift = await api('POST', `/api/conversations/${convId}/gifts`, { token: host.token, body: { giftId } });
   assert.equal(hostGift.status, 403, 'host tidak bisa kirim gift');

@@ -112,17 +112,23 @@ CONFIRM_RESET=HAPUS-SEMUA-DATA ADMIN_USERNAME=amora ADMIN_PASSWORD=ganti-ini npm
 Tanpa `CONFIRM_RESET=HAPUS-SEMUA-DATA` perintah ini dibatalkan. Hanya file unggahan buatan aplikasi yang dihapus,
 file lain di folder yang sama tidak disentuh. Admin mendapat ID 100001, akun pertama pengguna 100002.
 
-## Penarikan diamond host
+## Pembagian hasil & penarikan diamond host
 
-Host menarik diamond di aplikasi (Dompet > Tarik, atau Saya > Tarik diamond). Alurnya manual:
+Tiap koin gift/pesan dibagi: **host 30% bersih**, **agency 10%** (komisi per agency, dibayar dari bagian app, bukan dari host),
+**platform 60%**. Host tanpa agency: host 30%, platform 70%. Bagian host diatur di panel admin > Pengaturan.
 
-1. Host mengisi rekening bank/e-wallet (wajib punya password; wajib mengisi password saat menyimpan rekening).
-2. Host mengajukan penarikan: diamond **langsung dipotong (ditahan)**. Satu pengajuan menunggu per host.
-3. Admin membuka **Penarikan** di panel, transfer manual ke rekening itu, lalu **Tandai sudah dibayar**
-   (opsional nomor referensi). Jika ditolak (wajib alasan), diamond otomatis dikembalikan. Host juga bisa membatalkan sendiri.
+Host menarik diamond di aplikasi (Dompet > Tarik, atau Saya > Tarik diamond). Kurs awal: **6.667 diamond = 1 USD**
+(sama dengan harga jual koin ~ Rp 2,55 pada Rp 17.000/USD), minimal **70.000 diamond** (US$ 10,50). Metode mengikuti negara di profil host:
 
-Pengaturan di panel admin > Pengaturan: **rupiah per diamond** (awal 10), **minimal diamond** (awal 10.000), **biaya %** (awal 0).
-Pengaman: mengubah rekening menahan penarikan 24 jam; akun tidak bisa dihapus saat ada penarikan berjalan.
+- **Indonesia**: bank / e-wallet, dibayar dalam **Rupiah** (kurs Rp 17.000/USD, bisa diubah).
+- **Negara lain**: **USDT jaringan TRC20**, dibayar dalam **USD** (dikurangi biaya jaringan tetap, awal US$ 1).
+  Alamat dompet divalidasi (awalan T, 34 karakter, checksum Base58) supaya salah ketik langsung ditolak.
+
+Alurnya manual: host menyimpan rekening/alamat (wajib punya password dan mengisi password), mengajukan penarikan
+(diamond **langsung ditahan**, satu pengajuan menunggu per host), lalu admin membuka **Penarikan** di panel, transfer/kirim USDT,
+dan **Tandai sudah dibayar** (nomor referensi / TXID opsional). Jika ditolak (wajib alasan), diamond otomatis dikembalikan.
+Host juga bisa membatalkan sendiri. Pengaman: mengubah rekening/alamat menahan penarikan 24 jam; akun tidak bisa dihapus
+saat ada penarikan berjalan.
 
 ## Panel admin web
 

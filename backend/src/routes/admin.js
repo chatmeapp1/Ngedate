@@ -198,11 +198,14 @@ router.patch('/settings', wrap(async (req, res) => {
     const n = Number(b[k]);
     if (!Number.isFinite(n) || n < min || n > max) throw badRequest(`${label} harus antara ${min} dan ${max}`);
   };
-  whole('withdraw_rate_idr', 'Kurs rupiah per diamond', 1, 1000000);
+  whole('withdraw_diamonds_per_usd', 'Diamond per 1 USD', 1, 1e7);
+  whole('withdraw_usd_idr', 'Kurs Rupiah per 1 USD', 1000, 100000);
   whole('withdraw_min_diamonds', 'Minimal penarikan', 1, 1e9);
   whole('withdraw_fee_percent', 'Biaya penarikan (%)', 0, 50);
-  if (b.withdraw_rate_idr !== undefined) b.withdraw_rate_idr = Math.round(Number(b.withdraw_rate_idr));
-  if (b.withdraw_min_diamonds !== undefined) b.withdraw_min_diamonds = Math.round(Number(b.withdraw_min_diamonds));
+  whole('withdraw_usdt_fee_usd', 'Biaya jaringan USDT (USD)', 0, 50);
+  for (const k of ['withdraw_diamonds_per_usd', 'withdraw_usd_idr', 'withdraw_min_diamonds']) {
+    if (b[k] !== undefined) b[k] = Math.round(Number(b[k]));
+  }
   res.json(await updateSettings(b));
 }));
 
@@ -222,7 +225,8 @@ router.get('/stats', wrap(async (req, res) => {
        (SELECT COUNT(*) FROM users WHERE pending_avatar_url IS NOT NULL)::int AS pending_avatars,
        (SELECT COUNT(*) FROM reports WHERE status = 'pending')::int AS pending_reports,
        (SELECT COUNT(*) FROM withdrawals WHERE status = 'pending')::int AS pending_withdrawals,
-       (SELECT COALESCE(SUM(net_idr), 0) FROM withdrawals WHERE status = 'pending')::bigint AS pending_withdraw_idr,
+       (SELECT COALESCE(SUM(net), 0) FROM withdrawals WHERE status = 'pending' AND currency = 'IDR')::bigint AS pending_withdraw_idr,
+       (SELECT COALESCE(SUM(net), 0) FROM withdrawals WHERE status = 'pending' AND currency = 'USD')::bigint AS pending_withdraw_usd_cents,
        (SELECT COUNT(*) FROM users WHERE created_at > now() - interval '24 hours')::int AS new_users_24h,
        (SELECT COUNT(*) FROM messages WHERE type = 'text' AND created_at > now() - interval '24 hours')::int AS messages_24h,
        (SELECT COALESCE(SUM(price), 0) FROM messages WHERE type = 'gift' AND created_at > now() - interval '24 hours')::bigint AS gifts_24h,
@@ -242,6 +246,7 @@ router.get('/stats', wrap(async (req, res) => {
       withdrawals: x.pending_withdrawals,
     },
     pendingWithdrawIdr: Number(x.pending_withdraw_idr),
+    pendingWithdrawUsdCents: Number(x.pending_withdraw_usd_cents),
     newUsers24h: x.new_users_24h,
     messages24h: x.messages_24h,
     gifts24h: Number(x.gifts_24h),
@@ -359,8 +364,9 @@ async function checkRate(rate) {
   if (rate === undefined) return;
   const n = Number(rate);
   const { host_share } = await getSettings();
-  if (!(n >= 0 && n <= Number(host_share))) {
-    throw badRequest(`Komisi agency harus 0 sampai ${host_share} (tidak boleh melebihi bagian host)`);
+  const max = Math.round((1 - Number(host_share)) * 100) / 100;
+  if (!(n >= 0 && n <= max)) {
+    throw badRequest(`Komisi agency harus 0 sampai ${max} (dibayar dari bagian app, tidak boleh melebihi sisa setelah bagian host)`);
   }
 }
 

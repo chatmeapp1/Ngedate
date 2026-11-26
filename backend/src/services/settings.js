@@ -1,17 +1,20 @@
 const db = require('../db');
 
 const DEFAULTS = {
-  host_share: 0.5,
+  // Pembagian hasil: host 30% BERSIH; komisi agency (default 10%, per agency) dibayar dari bagian app
+  // -> host 30%, agency 10%, platform 60%.
+  host_share: 0.3,
   chat_price_min: 0,
   chat_price_max: 10000,
   wa_threshold_min: 10000,
   wa_threshold_max: 100000000,
   reply_window_hours: 24,
-  // Penarikan diamond host (nilai awal, ubah di panel admin > Pengaturan)
-  // 1 koin dijual Rp 2; host+agency mendapat 50% dalam diamond, jadi 1 diamond = Rp 2 menjaga margin.
-  withdraw_rate_idr: 2, // rupiah per 1 diamond
-  withdraw_min_diamonds: 50000, // minimal diamond per penarikan (= Rp 100.000)
-  withdraw_fee_percent: 0, // biaya penarikan (% dari jumlah rupiah)
+  // Penarikan diamond host. 6.667 diamond = 1 USD (sama dengan harga jual koin ~ Rp 2,55 pada Rp 17.000/USD)
+  withdraw_diamonds_per_usd: 6667,
+  withdraw_usd_idr: 17000, // kurs pembayaran untuk host Indonesia
+  withdraw_min_diamonds: 70000, // minimal diamond per penarikan (= sekitar US$ 10,50)
+  withdraw_fee_percent: 0, // biaya penarikan (% dari jumlah)
+  withdraw_usdt_fee_usd: 1, // biaya jaringan USDT (TRC20) per penarikan, dalam USD
 };
 
 async function getSettings(client = db) {
