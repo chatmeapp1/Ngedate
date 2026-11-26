@@ -35,6 +35,8 @@ export interface User {
 export interface Membership {
   /** 'host': level dari total pendapatan diamond (topupTotal = pendapatan); 'user': dari total top up koin */
   kind?: 'user' | 'host';
+  /** host: penghasilan diamond hari ini (WIB) */
+  earnedToday?: number;
   topupTotal: number;
   level: number;
   maxLevel: number;

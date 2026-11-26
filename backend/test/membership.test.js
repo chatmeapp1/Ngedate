@@ -234,6 +234,7 @@ test('level host dari penghasilan diamond 7 hari terakhir (bergulir); terlihat d
   assert.equal(g.status, 201, JSON.stringify(g.body));
   own = (await me(h2)).membership;
   assert.equal(own.topupTotal, 2000, 'penghasilan 7 hari = 10% dari 20.000');
+  assert.equal(own.earnedToday, 2000, 'penghasilan hari ini (WIB)');
   assert.equal(own.level, 1);
 
   // pengguna melihat level host (bukan jumlah penghasilannya)

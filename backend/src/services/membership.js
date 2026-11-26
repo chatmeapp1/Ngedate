@@ -62,8 +62,19 @@ async function summary(client, userId, settings) {
   const nextVipAt = vip < vips.length ? vips[vip] : null;
   const perDay = Number(s.free_cards_per_day);
   const used = vip > 0 ? await freeCardsUsed(client, userId) : 0;
+  // Host: penghasilan diamond hari ini (hari WIB)
+  let earnedToday = 0;
+  if (isHost) {
+    const { rows: td } = await client.query(
+      `SELECT COALESCE(SUM(amount), 0) AS n FROM ledger WHERE user_id = $1 AND currency = 'diamond' AND amount > 0
+         AND reason IN ('chat_income', 'gift_income', 'free_card_income') AND created_at >= ${DAY_START_SQL}`,
+      [userId]
+    );
+    earnedToday = Number(td[0].n);
+  }
   return {
     kind: isHost ? 'host' : 'user',
+    earnedToday,
     topupTotal: total, // untuk host: penghasilan diamond 7 hari terakhir
     level,
     maxLevel: levels.length - 1,

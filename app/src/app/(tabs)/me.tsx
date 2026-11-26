@@ -9,6 +9,7 @@ import { HostLevelBadge, LevelBadge, VipBadge } from '@/components/Badges';
 import { Avatar, Coin } from '@/components/ui';
 import { Verified } from '@/components/Verified';
 import { versionLabel } from '@/components/UpdateWatcher';
+import * as Clipboard from 'expo-clipboard';
 import Constants from 'expo-constants';
 import { useAuth } from '@/context/auth';
 import { countryName, flag } from '@/lib/countries';
@@ -22,6 +23,96 @@ function Item({ icon, label, onPress, danger }: { icon: ComponentProps<typeof Io
       <Text style={[s.itemText, danger && { color: colors.danger }]}>{label}</Text>
       <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
     </Pressable>
+  );
+}
+
+// Profil akun host: identitas + kartu "Pendapatan saya" (penghasilan hari ini, saldo diamond, level)
+function HostHeader({ top }: { top: number }) {
+  const { user } = useAuth();
+  if (!user) return null;
+  const m = user.membership;
+  const copy = () => {
+    Clipboard.setStringAsync(String(user.id))
+      .then(() => Alert.alert('ID disalin', `ID ${user.id} sudah disalin.`))
+      .catch(() => {});
+  };
+  return (
+    <LinearGradient colors={gradients.header} style={{ paddingTop: top + 20, paddingHorizontal: 16, paddingBottom: 8 }}>
+      <Pressable style={s.profile} onPress={() => router.push('/edit-profile')}>
+        <Avatar uri={user.avatarUrl} name={user.displayName} size={78} />
+        <View style={{ flex: 1, gap: 6 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Text style={[s.name, { flexShrink: 1 }]} numberOfLines={1}>
+              {user.displayName}
+            </Text>
+            {user.verified ? <Verified size={20} /> : null}
+            {m ? <HostLevelBadge level={m.level} size={18} /> : null}
+          </View>
+          <Pressable onPress={copy} hitSlop={8} style={s.idRow}>
+            <Text style={s.idPlain}>ID: {user.id}</Text>
+            <Ionicons name="copy-outline" size={16} color={colors.textDim} />
+          </Pressable>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <View style={s.hostBadge}>
+              <Ionicons name="star" size={12} color="#fff" />
+              <Text style={s.hostBadgeText}>Host</Text>
+            </View>
+            {user.verified ? (
+              <View style={s.verifiedChip}>
+                <Ionicons name="checkmark-circle" size={13} color="#1D9BF0" />
+                <Text style={s.verifiedText}>Terverifikasi</Text>
+              </View>
+            ) : (
+              <Pressable style={s.unverifiedChip} onPress={() => router.push('/verification')}>
+                <Ionicons name="scan-outline" size={13} color="#B45309" />
+                <Text style={s.unverifiedText}>{user.verificationStatus === 'pending' ? 'Sedang ditinjau' : 'Verifikasi wajah'}</Text>
+              </Pressable>
+            )}
+          </View>
+        </View>
+        <Ionicons name="arrow-forward" size={22} color={colors.text} />
+      </Pressable>
+
+      {/* Pendapatan saya */}
+      <LinearGradient colors={['#FDE68A', '#FBBF24']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.earnWrap}>
+        <Pressable style={s.earnHead} onPress={() => router.push('/level')}>
+          <Text style={{ fontSize: 22 }}>📈</Text>
+          <Text style={s.earnTitle}>Pendapatan saya</Text>
+          {m ? (
+            <View style={s.earnPill}>
+              <Text style={s.earnPillText}>Level {m.level}</Text>
+            </View>
+          ) : null}
+          <Ionicons name="arrow-forward" size={20} color={colors.text} />
+        </Pressable>
+        <View style={s.earnBody}>
+          <Pressable style={s.earnCard} onPress={() => router.push('/wallet')}>
+            <View style={s.earnCardHead}>
+              <Text style={s.earnCardTitle}>Data hari ini</Text>
+              <Text style={s.earnMore}>Lebih ›</Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 14 }}>
+              <Text style={s.earnValue}>{number(m?.earnedToday ?? 0)}</Text>
+              <Text style={{ fontSize: 20 }}>💎</Text>
+            </View>
+            <Text style={s.earnSub}>Penghasilan hari ini [WIB]</Text>
+            {m ? (
+              <Text style={s.earnSub7}>
+                7 hari terakhir: {number(m.topupTotal)} 💎 ·{' '}
+                {m.nextLevelAt === null ? 'level tertinggi' : `${number(Math.max(0, m.nextLevelAt - m.topupTotal))} 💎 lagi ke Lv ${m.level + 1}`}
+              </Text>
+            ) : null}
+          </Pressable>
+          <Pressable style={s.earnBalance} onPress={() => router.push('/wallet')}>
+            <Text style={{ fontSize: 26 }}>💎</Text>
+            <Text style={s.earnBalanceValue}>{number(user.diamonds ?? 0)}</Text>
+            <Text style={s.earnBalanceLabel}>Saldo diamond</Text>
+            <View style={{ flex: 1 }} />
+            <Ionicons name="arrow-forward" size={22} color="#fff" />
+          </Pressable>
+        </View>
+      </LinearGradient>
+    </LinearGradient>
   );
 }
 
@@ -39,6 +130,8 @@ export default function Me() {
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: colors.bg }} contentContainerStyle={{ paddingBottom: 32 }}>
+      {isHost ? <HostHeader top={insets.top} /> : null}
+      {isHost ? null : (
       <LinearGradient colors={gradients.header} style={{ paddingTop: insets.top + 20, paddingHorizontal: 16, paddingBottom: 8 }}>
         <View style={s.profile}>
           <Avatar uri={user.avatarUrl} name={user.displayName} size={78} />
@@ -128,6 +221,7 @@ export default function Me() {
           )}
         </View>
       </LinearGradient>
+      )}
 
       <View style={s.group}>
         <Item icon="person-circle-outline" label="Edit profil" onPress={() => router.push('/edit-profile')} />
@@ -173,6 +267,28 @@ const s = StyleSheet.create({
   meta: { color: colors.textSub, fontSize: 13 },
   hostBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', backgroundColor: colors.primary, paddingHorizontal: 8, height: 22, borderRadius: radius.pill },
   hostBadgeText: { color: '#fff', fontSize: 11, fontWeight: '800' },
+  idRow: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start' },
+  idPlain: { color: colors.textSub, fontSize: 15, fontWeight: '600' },
+  verifiedChip: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#E6F4FF', paddingHorizontal: 8, height: 22, borderRadius: radius.pill },
+  verifiedText: { color: '#1D6FB8', fontSize: 11, fontWeight: '800' },
+  unverifiedChip: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#FEF3C7', paddingHorizontal: 8, height: 22, borderRadius: radius.pill },
+  unverifiedText: { color: '#B45309', fontSize: 11, fontWeight: '800' },
+  earnWrap: { marginTop: 18, borderRadius: radius.lg, paddingTop: 4, overflow: 'hidden' },
+  earnHead: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, height: 52 },
+  earnTitle: { flex: 1, color: colors.text, fontSize: 18, fontWeight: '900' },
+  earnPill: { backgroundColor: colors.primary, paddingHorizontal: 14, height: 30, borderRadius: radius.pill, justifyContent: 'center' },
+  earnPillText: { color: '#fff', fontWeight: '800', fontSize: 13 },
+  earnBody: { backgroundColor: colors.primary, borderRadius: radius.lg, padding: 12, gap: 12 },
+  earnCard: { backgroundColor: '#fff', borderRadius: radius.md, padding: 16 },
+  earnCardHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  earnCardTitle: { color: colors.text, fontSize: 17, fontWeight: '900' },
+  earnMore: { color: colors.textDim, fontSize: 13, fontWeight: '700' },
+  earnValue: { color: colors.text, fontSize: 30, fontWeight: '900' },
+  earnSub: { color: colors.textDim, fontSize: 13, marginTop: 2 },
+  earnSub7: { color: colors.textSub, fontSize: 12, marginTop: 8 },
+  earnBalance: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 6, height: 48 },
+  earnBalanceValue: { color: '#fff', fontSize: 30, fontWeight: '900' },
+  earnBalanceLabel: { color: 'rgba(255,255,255,0.8)', fontSize: 13, fontWeight: '600', marginTop: 8 },
   idChip: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(255,255,255,0.8)', paddingHorizontal: 8, height: 24, borderRadius: radius.pill },
   idLabel: { color: '#F59E5B', fontWeight: '900', fontSize: 12 },
   idValue: { color: colors.textSub, fontWeight: '700', fontSize: 13 },
