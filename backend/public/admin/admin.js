@@ -604,11 +604,11 @@ async function pageUsers(param) {
 async function pageAgency() {
   const [list, settings] = await Promise.all([get('/api/admin/agencies'), get('/api/admin/settings')]);
   const share = Number(settings.host_share);
-  const root = h('div', {}, pageHead('Agency', 'Komisi agency dibayar dari bagian app, bukan dari host (maksimal ' + Math.round((1 - share) * 100) + '% dari total koin).'));
+  const root = h('div', {}, pageHead('Agency', 'Komisi agency adalah persen dari penghasilan host, dibayar dari bagian app (host tidak berkurang).'));
   const fields = (a) => [
     { name: 'name', label: 'Nama agency', value: a && a.name },
     ...(a ? [] : [{ name: 'code', label: 'Kode undangan', hint: 'Kosongkan untuk dibuat otomatis (4–16 huruf/angka)' }]),
-    { name: 'commission', label: 'Komisi agency (% dari total koin)', type: 'number', value: a ? +(a.commissionRate * 100).toFixed(2) : 10, hint: 'Dibayar dari bagian app. Maksimal ' + Math.round((1 - share) * 100) + '%. Contoh: host 30% bersih + komisi 10% = host 30%, agency 10%, app 60%.' },
+    { name: 'commission', label: 'Komisi agency (% dari penghasilan host)', type: 'number', value: a ? +(a.commissionRate * 100).toFixed(2) : 10, hint: 'Dibayar dari bagian app, host tidak berkurang. Contoh: host dapat 100 diamond, komisi 10% = agency dapat 10 diamond.' },
     { name: 'contact', label: 'Kontak', value: a && a.contact },
     ...(a ? [{ name: 'active', label: 'Aktif (kode bisa dipakai)', type: 'checkbox', value: a.active }] : []),
   ];

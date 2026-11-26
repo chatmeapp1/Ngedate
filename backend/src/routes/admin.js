@@ -505,10 +505,8 @@ function mapAgency(a) {
 async function checkRate(rate) {
   if (rate === undefined) return;
   const n = Number(rate);
-  const { host_share } = await getSettings();
-  const max = Math.round((1 - Number(host_share)) * 100) / 100;
-  if (!(n >= 0 && n <= max)) {
-    throw badRequest(`Komisi agency harus 0 sampai ${max} (dibayar dari bagian app, tidak boleh melebihi sisa setelah bagian host)`);
+  if (!(n >= 0 && n <= 1)) {
+    throw badRequest('Komisi agency harus 0 sampai 1 (persen dari penghasilan host, dibayar dari bagian app)');
   }
 }
 

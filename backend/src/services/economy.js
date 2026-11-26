@@ -5,7 +5,7 @@ const { ApiError } = require('../lib/errors');
 /**
  * Pengaman anti-rugi. Menghitung untung/rugi platform per 1 koin yang dibelanjakan pengguna:
  *   bersih   = harga jual per koin, dikurangi PPN dan potongan Google Play
- *   bayar    = (bagian host + komisi agency) x nilai Rupiah 1 diamond
+ *   bayar    = bagian host x (1 + komisi agency) x nilai Rupiah 1 diamond   (komisi agency = % dari penghasilan host)
  *   untung   = bersih - bayar
  * Dihitung untuk skenario terburuk (potongan Play 30%) dan terbaik (15%). Angka PPN & potongan adalah perkiraan.
  * Belum termasuk pajak penghasilan, server, dan promosi.
@@ -17,7 +17,7 @@ const DEFAULT_AGENCY_RATE = 0.1; // agency baru dibuat dengan komisi ini
 
 function compute({ pricePerCoin, hostShare, agencyRate, diamondRp }, playFee) {
   const net = (pricePerCoin / (1 + VAT)) * (1 - playFee);
-  const payout = (hostShare + agencyRate) * diamondRp;
+  const payout = hostShare * (1 + agencyRate) * diamondRp;
   const profit = net - payout;
   return { net, payout, profit, profitPct: pricePerCoin > 0 ? (profit / pricePerCoin) * 100 : 0 };
 }

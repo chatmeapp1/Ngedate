@@ -62,11 +62,11 @@ test('nilai awal: 1 diamond = Rp 2,55, harga jual Rp 2 per koin, untung positif 
   assert.ok(Math.abs(m.diamondRp - 2.55) < 0.001, '1 diamond ~ Rp 2,55');
   assert.equal(m.hostShare, 0.3);
   assert.equal(m.agencyRate, 0.1);
-  // bayar host+agency = 0,4 x 1,55 = Rp 0,62 per koin
-  assert.ok(Math.abs(m.worst.payout - 1.02) < 0.001);
+  // bayar host + komisi agency (chat 30%, komisi 10% dari penghasilan host) = 0,3 x 1,1 x 2,55 = Rp 0,8415 per koin
+  assert.ok(Math.abs(m.worst.payout - 0.8415) < 0.001);
   // bersih terburuk = 2 / 1,11 x 0,7 = Rp 1,26
   assert.ok(Math.abs(m.worst.net - 1.2613) < 0.001);
-  assert.ok(m.worst.profit > 0.23 && m.worst.profit < 0.25, `untung terburuk ${m.worst.profit}`);
+  assert.ok(m.worst.profit > 0.41 && m.worst.profit < 0.43, `untung terburuk ${m.worst.profit}`);
   assert.ok(m.best.profit > m.worst.profit, 'potongan 15% lebih untung');
   assert.equal((await api('GET', '/api/admin/margin', { token: 'x' })).status, 401);
 });
@@ -109,13 +109,13 @@ test('paket koin yang terlalu murah ditolak (ubah, tambah), dan tidak ada yang b
 });
 
 test('komisi agency terlalu besar ditolak walau masih di bawah batas teknis', async () => {
-  // batas teknis = 1 - bagian host = 0,7; tapi 0,6 sudah membuat rugi
-  const rakus = await A('POST', '/api/admin/agencies', { name: 'Rakus', commissionRate: 0.6 });
+  // komisi 90% dari penghasilan host: 0,3 x 1,9 x 2,55 = Rp 1,45 > Rp 1,26 -> rugi
+  const rakus = await A('POST', '/api/admin/agencies', { name: 'Rakus', commissionRate: 0.9 });
   assert.equal(rakus.status, 400);
   assert.equal(rakus.body.error.code, 'NEGATIVE_MARGIN');
   const ok = await A('POST', '/api/admin/agencies', { name: 'Wajar', commissionRate: 0.15 });
   assert.equal(ok.status, 201, JSON.stringify(ok.body));
-  const up = await A('PATCH', `/api/admin/agencies/${ok.body.id}`, { commissionRate: 0.6 });
+  const up = await A('PATCH', `/api/admin/agencies/${ok.body.id}`, { commissionRate: 0.9 });
   assert.equal(up.body.error.code, 'NEGATIVE_MARGIN');
   assert.equal((await A('GET', '/api/admin/agencies')).body.find((a) => a.id === ok.body.id).commissionRate, 0.15);
   const m = (await A('GET', '/api/admin/margin')).body;

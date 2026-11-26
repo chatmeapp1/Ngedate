@@ -78,7 +78,7 @@ after(async () => {
   await db.pool.end();
 });
 
-test('admin membuat agency: kode otomatis, komisi tidak boleh melebihi sisa setelah bagian host (30%)', async () => {
+test('admin membuat agency: kode otomatis, komisi terlalu besar (membuat app rugi) ditolak', async () => {
   const bad = await api('POST', '/api/admin/agencies', { token: admin, body: { name: 'Rakus', commissionRate: 0.8 } });
   assert.equal(bad.status, 400);
   const r = await api('POST', '/api/admin/agencies', { token: admin, body: { name: 'Bintang Agency', commissionRate: 0.1 } });
@@ -236,7 +236,7 @@ test('admin menolak lalu menyetujui verifikasi: host dapat centang biru & tampil
   assert.equal(h.verified, true);
 });
 
-test('bagi hasil: host 30% bersih, agency 10% dari bagian app, platform 60%', async () => {
+test('bagi hasil: komisi agency 10% dari PENGHASILAN host, dibayar dari bagian app', async () => {
   await db.query(`UPDATE host_profiles SET chat_price = 100 WHERE user_id = $1`, [host.id]);
   const buyer = await withAvatar(await quickUser());
   await api('POST', `/api/admin/users/${buyer.id}/coins`, { token: admin, body: { amount: 5000 } });
@@ -254,9 +254,9 @@ test('bagi hasil: host 30% bersih, agency 10% dari bagian app, platform 60%', as
   const { rows: u } = await db.query(`SELECT diamonds FROM users WHERE id = $1`, [host.id]);
   assert.equal(Number(u[0].diamonds), 30 + 100);
   const { rows: a } = await db.query(`SELECT earnings_total FROM agencies WHERE id = $1`, [agency.id]);
-  assert.equal(Number(a[0].earnings_total), 10 + 100, 'agency 10% dari total, bukan dari bagian host');
+  assert.equal(Number(a[0].earnings_total), 3 + 10, 'agency 10% dari penghasilan host (30 dan 100), bukan dari total koin');
   const { rows: p } = await db.query(`SELECT SUM(amount)::int AS s FROM platform_earnings`);
-  assert.equal(p[0].s, 60 + 800);
+  assert.equal(p[0].s, 67 + 890);
 
   // Agency nonaktif: host tetap 10%, sisanya ke platform (komisi tidak pindah ke host)
   await api('PATCH', `/api/admin/agencies/${agency.id}`, { token: admin, body: { active: false } });

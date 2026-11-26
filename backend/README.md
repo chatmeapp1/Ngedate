@@ -114,8 +114,8 @@ file lain di folder yang sama tidak disentuh. Admin mendapat ID 100001, akun per
 
 ## Pembagian hasil & penarikan diamond host
 
-Tiap koin gift/pesan dibagi: **host 30% bersih**, **agency 10%** (komisi per agency, dibayar dari bagian app, bukan dari host),
-**platform 60%**. Host tanpa agency: host 30%, platform 70%. Bagian host diatur di panel admin > Pengaturan.
+Tiap koin gift/pesan dibagi: **host 30% bersih**, **komisi agency 10% dari PENGHASILAN HOST** (per agency, dibayar dari bagian app, host tidak berkurang;
+mis. chat 100 koin: host 30, agency 3, platform 67). Host tanpa agency: host 30%, platform 70%. Bagian host diatur di panel admin > Pengaturan.
 
 Host menarik diamond di aplikasi (Dompet > Tarik, atau Saya > Tarik diamond). Kurs awal: **6.667 diamond = 1 USD**
 (sama dengan harga jual koin ~ Rp 2,55 pada Rp 17.000/USD), minimal **70.000 diamond** (US$ 10,50). Metode mengikuti negara di profil host:
@@ -143,7 +143,7 @@ pembayaran diatur di halaman Paket koin. Pembelian otomatis lewat Google Play Bi
 
 Nilai awal: 1 diamond = Rp 2,55 (`withdraw_diamonds_per_usd` 6.667, kurs Rp 17.000/USD). Host menerima 10% dari harga gift
 (`gift_host_share`); gift bertanda **x2** (diatur per gift di panel admin) memberi host 20%. Pesan chat berbayar tetap 30% (`host_share`).
-Agency 10% dari total. Pengaman margin selalu memakai jalur host terbesar (termasuk pengali gift).
+Komisi agency 10% dari penghasilan host. Pengaman margin selalu memakai jalur host terbesar (termasuk pengali gift).
 Server menghitung untung per koin pada skenario terburuk (PPN 11% + potongan Google Play 30%) memakai paket termurah dan komisi
 agency tertinggi, dan **menolak** (`NEGATIVE_MARGIN`) pengaturan, harga paket, atau komisi agency yang membuat rugi atau
 memperburuk kerugian. Kartu margin tampil di panel admin (Pengaturan dan Paket koin). Migrasi 011/012 mengembalikan
@@ -224,8 +224,8 @@ Foto profil & album host masuk antrean cek admin; publik hanya melihat foto yang
 | POST | `/api/admin/photos/:id/approve` / `reject` | `reject`: `{ reason }` |
 | POST | `/api/admin/users/:id/avatar/approve` / `reject` | Foto profil host yang baru |
 
-Bagi hasil dengan agency: komisi agency diambil dari bagian host.
-Contoh `host_share 0.5` + komisi agency `0.1` → host 40%, agency 10%, platform 50%.
+Bagi hasil dengan agency: komisi agency = persen dari penghasilan host, dibayar dari bagian app (host tidak berkurang).
+Contoh `host_share 0.5` + komisi `0.1` → host 50%, agency 5%, platform 45%.
 
 ## Realtime (socket.io)
 

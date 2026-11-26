@@ -60,8 +60,8 @@ function split(amount, hostShare) {
 /**
  * Bagi koin ke host, agency host (jika ada), dan platform.
  *   host_share      = bagian host BERSIH (mis. 0.3)
- *   komisi agency   = bagian agency dari TOTAL (mis. 0.1), dibayar dari bagian platform, bukan dari host
- *   -> host 30%, agency 10%, platform 60%
+ *   komisi agency   = persen dari PENGHASILAN HOST (mis. 0.1), dibayar dari bagian platform, bukan dari host
+ *   -> chat 100 koin: host 30, agency 3 (10% dari 30), platform 67
  * Host tanpa agency: host 30%, platform 70%.
  */
 async function payHost(client, hostId, total, settings, source, ref, opts = {}) {
@@ -74,8 +74,8 @@ async function payHost(client, hostId, total, settings, source, ref, opts = {}) 
     [hostId]
   );
   const agency = rows[0];
-  // Komisi agency tidak boleh melebihi sisa setelah bagian host (platform tidak boleh minus)
-  const agencyCut = agency ? Math.min(total - host, Math.floor(total * Number(agency.commission_rate))) : 0;
+  // Komisi agency = persen dari penghasilan host; tidak boleh melebihi sisa setelah bagian host (platform tidak boleh minus)
+  const agencyCut = agency ? Math.min(total - host, Math.floor(host * Number(agency.commission_rate))) : 0;
   const platform = total - host - agencyCut;
 
   await creditDiamonds(client, hostId, host, `${source}_income`, ref);
