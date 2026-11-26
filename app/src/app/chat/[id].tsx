@@ -18,6 +18,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GiftIcon } from '@/components/GiftIcon';
 import { MediaBubble } from '@/components/ChatMedia';
+import { LockedMedia, PrivateMediaSheet } from '@/components/PrivateMedia';
 import { GiftSheet } from '@/components/GiftSheet';
 import { SafetyMenu } from '@/components/SafetyMenu';
 import { Avatar, Coin } from '@/components/ui';
@@ -194,6 +195,9 @@ export default function ChatRoom() {
         }
         if (e.message.type !== 'text') loadWa();
       }),
+      onRealtime<{ conversationId: number; messageId: number }>('media:unlocked', (e) => {
+        if (e.conversationId === convId) setMessages((cur) => cur.map((m) => (m.id === e.messageId ? { ...m, mediaUnlocked: true } : m)));
+      }),
       onRealtime<{ conversationId: number; messageIds: number[] }>('chat:settled', (e) => {
         if (e.conversationId === convId) setStatus(e.messageIds, 'paid');
       }),
@@ -227,6 +231,75 @@ export default function ChatRoom() {
       lastTypingSent.current = Date.now();
       emitRealtime('typing', { conversationId: convId });
     }
+  };
+
+  // Host: kirim foto/video privat berharga
+  const [privateOpen, setPrivateOpen] = useState(false);
+  const sendPrivate = async (kind: 'image' | 'video', price: number) => {
+    if (sending) return;
+    const res = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: [kind === 'image' ? 'images' : 'videos'],
+      quality: 0.85,
+      videoMaxDuration: 300,
+    });
+    if (res.canceled) return;
+    const a = res.assets[0];
+    if (kind === 'video' && a.duration && a.duration > 300_000) {
+      Alert.alert('Video terlalu panjang', 'Video privat maksimal 5 menit. Pilih video yang lebih pendek.');
+      return;
+    }
+    if (a.fileSize && a.fileSize > 80 * 1024 * 1024) {
+      Alert.alert('File terlalu besar', 'Ukuran maksimal 80 MB. Pilih file yang lebih kecil.');
+      return;
+    }
+    setSending(true);
+    try {
+      const mime = a.mimeType ?? (kind === 'video' ? 'video/mp4' : 'image/jpeg');
+      const form = new FormData();
+      form.append('file', { uri: a.uri, name: `${kind === 'video' ? 'video' : 'foto'}.${mime.split('/')[1] ?? 'jpg'}`, type: mime } as unknown as Blob);
+      form.append('price', String(price));
+      const r = await api.post<{ message: Message }>(`/api/conversations/${convId}/private-media`, form);
+      addMessage(r.message);
+    } catch (e) {
+      Alert.alert('Gagal mengirim', errorMessage(e));
+    } finally {
+      setSending(false);
+    }
+  };
+
+  // Pengguna: buka foto/video privat dengan koin
+  const [unlocking, setUnlocking] = useState<number | null>(null);
+  const unlockMedia = (m: Message) => {
+    const price = m.mediaPrice ?? 0;
+    Alert.alert(
+      m.type === 'image' ? 'Buka foto privat?' : 'Buka video privat?',
+      `${number(price)} koin akan dipotong dari saldomu.`,
+      [
+        { text: 'Batal', style: 'cancel' },
+        {
+          text: `Buka · ${number(price)} koin`,
+          onPress: async () => {
+            setUnlocking(m.id);
+            try {
+              const r = await api.post<{ message: Message }>(`/api/conversations/${convId}/media/${m.id}/unlock`);
+              setMessages((cur) => cur.map((x) => (x.id === m.id ? { ...x, ...r.message } : x)));
+              refreshMe();
+            } catch (e) {
+              if (e instanceof ApiError && e.code === 'INSUFFICIENT_COINS') {
+                Alert.alert('Koin tidak cukup', `Buka media ini butuh ${number(price)} koin.`, [
+                  { text: 'Nanti', style: 'cancel' },
+                  { text: 'Top up', onPress: () => router.push('/topup') },
+                ]);
+              } else {
+                Alert.alert('Gagal membuka', errorMessage(e));
+              }
+            } finally {
+              setUnlocking(null);
+            }
+          },
+        },
+      ]
+    );
   };
 
   // Kirim foto/video (khusus VIP)
@@ -391,7 +464,7 @@ export default function ChatRoom() {
           return (
             <View>
               {showDate ? <DateLabel iso={item.createdAt} /> : null}
-              <Bubble message={item} mine={item.senderId === myId} showPayment={isUser} hostView={!isUser} />
+              <Bubble message={item} mine={item.senderId === myId} showPayment={isUser} hostView={!isUser} unlockingId={unlocking} onUnlock={unlockMedia} />
             </View>
           );
         }}
@@ -425,6 +498,11 @@ export default function ChatRoom() {
             <Ionicons name="gift" size={22} color="#F59E0B" />
           </Pressable>
         ) : null}
+        {!isUser ? (
+          <Pressable onPress={() => setPrivateOpen(true)} style={s.giftBtn} hitSlop={6}>
+            <Ionicons name="lock-closed" size={20} color={colors.primary} />
+          </Pressable>
+        ) : null}
         {isUser ? (
           <Pressable onPress={pickMedia} style={s.giftBtn} hitSlop={6}>
             <Ionicons name="image" size={22} color={(user?.membership?.vip ?? 0) > 0 ? colors.primary : colors.textDim} />
@@ -451,6 +529,8 @@ export default function ChatRoom() {
           </LinearGradient>
         </Pressable>
       </View>
+
+      {!isUser ? <PrivateMediaSheet visible={privateOpen} onClose={() => setPrivateOpen(false)} onPick={sendPrivate} /> : null}
 
       {isUser ? (
         <GiftSheet
@@ -511,7 +591,21 @@ function DateLabel({ iso }: { iso: string }) {
   return <Text style={s.date}>{label}</Text>;
 }
 
-function Bubble({ message: m, mine, showPayment, hostView }: { message: Message; mine: boolean; showPayment: boolean; hostView: boolean }) {
+function Bubble({
+  message: m,
+  mine,
+  showPayment,
+  hostView,
+  unlockingId,
+  onUnlock,
+}: {
+  message: Message;
+  mine: boolean;
+  showPayment: boolean;
+  hostView: boolean;
+  unlockingId: number | null;
+  onUnlock: (m: Message) => void;
+}) {
   if (m.type === 'system') {
     return (
       <View style={s.system}>
@@ -562,8 +656,18 @@ function Bubble({ message: m, mine, showPayment, hostView }: { message: Message;
   if ((m.type === 'image' || m.type === 'video') && m.mediaUrl) {
     return (
       <View style={[s.row, mine ? s.rowMine : s.rowTheirs]}>
-        <MediaBubble type={m.type} url={m.mediaUrl} />
-        <Text style={[s.meta, mine && { textAlign: 'right' }]}>{time(m.createdAt)}</Text>
+        {m.mediaPrivate && !hostView && !m.mediaUnlocked ? (
+          <LockedMedia type={m.type} price={m.mediaPrice ?? 0} busy={unlockingId === m.id} onUnlock={() => onUnlock(m)} />
+        ) : (
+          <MediaBubble type={m.type} url={m.mediaUrl} />
+        )}
+        {m.mediaPrivate ? (
+          <Text style={[s.meta, mine && { textAlign: 'right' }]}>
+            🔒 {hostView ? ((m.mediaPrice ?? 0) > 0 ? `${number(m.mediaPrice ?? 0)} koin · ${m.mediaUnlocked ? 'dibuka ✓' : 'belum dibuka'}` : 'gratis') : m.mediaUnlocked ? 'dibuka' : 'privat'} · {time(m.createdAt)}
+          </Text>
+        ) : (
+          <Text style={[s.meta, mine && { textAlign: 'right' }]}>{time(m.createdAt)}</Text>
+        )}
       </View>
     );
   }

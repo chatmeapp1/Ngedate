@@ -45,7 +45,7 @@ async function freeCardsUsed(client, userId) {
 // Penghasilan diamond host 7 hari terakhir (chat, gift, kartu gratis)
 const WEEK_INCOME_SQL = `(SELECT COALESCE(SUM(l.amount), 0) FROM ledger l
   WHERE l.user_id = {id} AND l.currency = 'diamond' AND l.amount > 0
-    AND l.reason IN ('chat_income', 'gift_income', 'free_card_income') AND l.created_at > now() - interval '7 days')`;
+    AND l.reason IN ('chat_income', 'gift_income', 'free_card_income', 'media_income') AND l.created_at > now() - interval '7 days')`;
 const weekIncomeSql = (idExpr) => WEEK_INCOME_SQL.replace('{id}', idExpr);
 
 async function summary(client, userId, settings) {
@@ -67,7 +67,7 @@ async function summary(client, userId, settings) {
   if (isHost) {
     const { rows: td } = await client.query(
       `SELECT COALESCE(SUM(amount), 0) AS n FROM ledger WHERE user_id = $1 AND currency = 'diamond' AND amount > 0
-         AND reason IN ('chat_income', 'gift_income', 'free_card_income') AND created_at >= ${DAY_START_SQL}`,
+         AND reason IN ('chat_income', 'gift_income', 'free_card_income', 'media_income') AND created_at >= ${DAY_START_SQL}`,
       [userId]
     );
     earnedToday = Number(td[0].n);

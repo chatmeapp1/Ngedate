@@ -25,6 +25,10 @@ const DEFAULTS = {
   vip_thresholds: [300000, 700000, 1400000, 2800000, 4000000],
   // Level host (0-10) dari total PENGHASILAN diamond 7 hari terakhir (bergulir)
   host_level_thresholds: [0, 300, 3000, 5000, 10000, 70000, 150000, 300000, 500000, 1000000, 5000000],
+  // Foto/video privat dari host: harga buka maksimum (koin), batas kiriman per host per hari, panjang video maksimum (detik)
+  host_media_price_max: 100000,
+  host_media_per_day: 30,
+  host_video_max_seconds: 300,
   // Kartu pesan gratis (VIP): jumlah per hari, dan diamond untuk host per pesan gratis (dibayar app)
   free_cards_per_day: 5,
   free_card_host_diamonds: 5,

@@ -5,6 +5,7 @@ android/
 ios/
 .expo/
 backend/uploads/
+backend/private-media/
 
 # Kunci rahasia (jangan pernah di-commit)
 backend/fcm-key.json

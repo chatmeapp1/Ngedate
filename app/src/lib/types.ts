@@ -137,6 +137,10 @@ export interface Message {
   paymentStatus: 'free' | 'held' | 'paid' | 'refunded';
   /** gift: diamond yang diterima host (host melihat ini, bukan harga gift) */
   hostIncome?: number | null;
+  /** media privat dari host: dibuka pengguna dengan koin (mediaUrl berupa path API terproteksi) */
+  mediaPrivate?: boolean;
+  mediaPrice?: number;
+  mediaUnlocked?: boolean;
   /** foto/video di chat (VIP) */
   mediaUrl?: string | null;
   /** pesan memakai kartu gratis VIP */

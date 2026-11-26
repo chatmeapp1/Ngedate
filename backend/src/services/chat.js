@@ -43,7 +43,11 @@ function mapMessage(r) {
     paymentStatus: r.payment_status,
     // gift: diamond yang diterima host (host melihat ini, bukan harga gift)
     hostIncome: r.host_income == null ? null : Number(r.host_income),
-    mediaUrl: r.media_url || null,
+    // Media privat host: URL lewat API terproteksi; pengguna wajib membuka dengan koin dulu
+    mediaPrivate: !!r.media_private,
+    mediaPrice: Number(r.media_price || 0),
+    mediaUnlocked: !!r.media_private && (Number(r.media_price || 0) === 0 || r.media_unlock_user != null),
+    mediaUrl: r.media_private ? `/api/media/${r.id}` : r.media_url || null,
     freeCard: !!r.free_card,
     createdAt: r.created_at,
   };
@@ -79,8 +83,8 @@ const MESSAGE_SELECT = `
   SELECT m.*, g.name AS gift_name, g.image_url AS gift_image_url, g.icon AS gift_icon,
          g.category AS gift_category, g.price AS gift_price,
          g.animation_url AS gift_animation_url, g.animation_blend AS gift_animation_blend,
-         g.sound_url AS gift_sound_url
-  FROM messages m LEFT JOIN gifts g ON g.id = m.gift_id`;
+         g.sound_url AS gift_sound_url, mu.user_id AS media_unlock_user
+  FROM messages m LEFT JOIN gifts g ON g.id = m.gift_id LEFT JOIN media_unlocks mu ON mu.message_id = m.id`;
 
 async function fetchMessage(client, id) {
   const { rows } = await client.query(`${MESSAGE_SELECT} WHERE m.id = $1`, [id]);
@@ -212,8 +216,8 @@ async function touchConversation(client, conv, senderIsUser, preview) {
 
 async function insertMessage(client, fields) {
   const { rows } = await client.query(
-    `INSERT INTO messages (conversation_id, sender_id, type, body, gift_id, gift_count, price, payment_status, settled_at, free_card, media_url)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8::varchar, CASE WHEN $8::varchar IN ('paid', 'refunded') THEN now() END, $9, $10)
+    `INSERT INTO messages (conversation_id, sender_id, type, body, gift_id, gift_count, price, payment_status, settled_at, free_card, media_url, media_private, media_price, media_file)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8::varchar, CASE WHEN $8::varchar IN ('paid', 'refunded') THEN now() END, $9, $10, $11, $12, $13)
      RETURNING id`,
     [
       fields.conversationId,
@@ -226,6 +230,9 @@ async function insertMessage(client, fields) {
       fields.paymentStatus ?? 'free',
       !!fields.freeCard,
       fields.mediaUrl ?? null,
+      !!fields.mediaPrivate,
+      fields.mediaPrice ?? 0,
+      fields.mediaFile ?? null,
     ]
   );
   return Number(rows[0].id);
@@ -379,6 +386,110 @@ async function sendMedia(senderId, convIdRaw, req) {
 // Gift & buka WhatsApp
 // ---------------------------------------------------------------------------
 
+// Buka nomor WhatsApp host jika total belanja koin di percakapan ini sudah memenuhi syarat
+async function maybeUnlockWa(client, conv, giftTotal) {
+  let unlocked = false;
+  let systemMessage = null;
+  if (!conv.wa_unlocked_at) {
+    const { rows: hp } = await client.query(
+      `SELECT wa_enabled, wa_number, wa_unlock_threshold FROM host_profiles WHERE user_id = $1`,
+      [conv.host_id]
+    );
+    const p = hp[0];
+    if (p && p.wa_enabled && p.wa_number && giftTotal >= Number(p.wa_unlock_threshold)) {
+      await client.query(`UPDATE conversations SET wa_unlocked_at = now() WHERE id = $1`, [conv.id]);
+      const sysId = await insertMessage(client, {
+        conversationId: conv.id,
+        type: 'system',
+        body: 'Selamat! Nomor WhatsApp host sudah terbuka 🎉',
+      });
+      systemMessage = await fetchMessage(client, sysId);
+      unlocked = true;
+    }
+  }
+  return { unlocked, systemMessage };
+}
+
+// ---------------------------------------------------------------------------
+// Foto & video PRIVAT dari host (dibuka pengguna dengan koin)
+// ---------------------------------------------------------------------------
+
+/** Host mengirim foto/video privat dengan harga buka yang ia tentukan. File sudah disimpan di folder privat oleh multer. */
+async function sendPrivateMedia(senderId, convIdRaw, req) {
+  const file = req.file;
+  if (!file) throw badRequest('File wajib diisi', 'FILE_REQUIRED');
+  const remove = () => require('fs').promises.unlink(file.path).catch(() => {});
+  try {
+    const convId = v.id(convIdRaw, 'conversationId');
+    const settings = await getSettings();
+    const price = v.int(req.body.price ?? 0, 'Harga buka', { min: 0, max: Number(settings.host_media_price_max) });
+    const checked = await storage.checkPrivateMedia(file, { maxVideoSeconds: Number(settings.host_video_max_seconds) });
+    const kind = checked.kind;
+    return await db.tx(async (client) => {
+      const conv = await lockConversation(client, convId, senderId);
+      if (Number(conv.host_id) !== senderId) throw forbidden('Hanya host yang bisa mengirim foto/video privat');
+      await safety.assertNotBlocked(client, senderId, Number(conv.user_id));
+      const { rows: cnt } = await client.query(
+        `SELECT COUNT(*)::int AS n FROM messages WHERE sender_id = $1 AND media_private AND created_at >= ${membership.DAY_START_SQL}`,
+        [senderId]
+      );
+      const limit = Number(settings.host_media_per_day);
+      if (cnt[0].n >= limit) throw new ApiError(429, 'MEDIA_LIMIT', `Batas kirim foto/video privat hari ini (${limit}) sudah tercapai`);
+      const messageId = await insertMessage(client, {
+        conversationId: conv.id,
+        senderId,
+        type: kind,
+        body: kind === 'image' ? 'Foto privat' : 'Video privat',
+        paymentStatus: 'free',
+        mediaPrivate: true,
+        mediaPrice: price,
+        mediaFile: require('path').basename(file.path),
+      });
+      await touchConversation(client, conv, false, kind === 'image' ? '🔒 Foto privat' : '🔒 Video privat');
+      return {
+        conversationId: Number(conv.id),
+        userId: Number(conv.user_id),
+        hostId: Number(conv.host_id),
+        message: await fetchMessage(client, messageId),
+      };
+    });
+  } catch (e) {
+    await remove();
+    throw e;
+  }
+}
+
+/** Pengguna membuka media privat: koin dipotong seperti gift (host menerima bagian gift), file bisa diakses setelahnya. */
+async function unlockMedia(userId, convIdRaw, messageIdRaw) {
+  const convId = v.id(convIdRaw, 'conversationId');
+  const messageId = v.id(messageIdRaw, 'messageId');
+  return db.tx(async (client) => {
+    const conv = await lockConversation(client, convId, userId);
+    if (Number(conv.user_id) !== userId) throw forbidden('Hanya pengguna yang bisa membuka media ini');
+    await safety.assertNotBlocked(client, userId, Number(conv.host_id));
+    const { rows } = await client.query(`SELECT * FROM messages WHERE id = $1 AND conversation_id = $2 AND media_private FOR UPDATE`, [messageId, conv.id]);
+    if (!rows.length) throw notFound('Media tidak ditemukan');
+    const m = rows[0];
+    const { rows: done } = await client.query(`SELECT 1 FROM media_unlocks WHERE message_id = $1`, [messageId]);
+    const base = { conversationId: Number(conv.id), userId: Number(conv.user_id), hostId: Number(conv.host_id) };
+    if (done.length) return { ...base, message: await fetchMessage(client, messageId), systemMessage: null, already: true, paid: 0 };
+
+    const price = Number(m.media_price);
+    const settings = await getSettings(client);
+    let giftTotal = Number(conv.gift_total);
+    if (price > 0) {
+      await wallet.debitCoins(client, userId, price, 'media_unlock', { type: 'message', id: messageId });
+      const { host } = await wallet.payHost(client, Number(conv.host_id), price, settings, 'media', { type: 'message', id: messageId }, { share: Number(settings.gift_host_share) });
+      await client.query(`UPDATE messages SET host_income = $2 WHERE id = $1`, [messageId, host]);
+      const { rows: upd } = await client.query(`UPDATE conversations SET gift_total = gift_total + $2 WHERE id = $1 RETURNING gift_total`, [conv.id, price]);
+      giftTotal = Number(upd[0].gift_total);
+    }
+    await client.query(`INSERT INTO media_unlocks (message_id, user_id, paid) VALUES ($1, $2, $3)`, [messageId, userId, price]);
+    const { unlocked, systemMessage } = await maybeUnlockWa(client, conv, giftTotal);
+    return { ...base, message: await fetchMessage(client, messageId), systemMessage, already: false, paid: price, unlockedWa: unlocked, giftTotal };
+  });
+}
+
 async function sendGift(senderId, convIdRaw, giftIdRaw, countRaw) {
   const convId = v.id(convIdRaw, 'conversationId');
   const giftId = v.id(giftIdRaw, 'giftId');
@@ -426,25 +537,7 @@ async function sendGift(senderId, convIdRaw, giftIdRaw, countRaw) {
     await touchConversation(client, conv, true, `🎁 ${gift.name} x${count}`);
 
     // Cek syarat buka WhatsApp
-    let unlocked = false;
-    let systemMessage = null;
-    if (!conv.wa_unlocked_at) {
-      const { rows: hp } = await client.query(
-        `SELECT wa_enabled, wa_number, wa_unlock_threshold FROM host_profiles WHERE user_id = $1`,
-        [conv.host_id]
-      );
-      const p = hp[0];
-      if (p && p.wa_enabled && p.wa_number && giftTotal >= Number(p.wa_unlock_threshold)) {
-        await client.query(`UPDATE conversations SET wa_unlocked_at = now() WHERE id = $1`, [conv.id]);
-        const sysId = await insertMessage(client, {
-          conversationId: conv.id,
-          type: 'system',
-          body: 'Selamat! Nomor WhatsApp host sudah terbuka 🎉',
-        });
-        systemMessage = await fetchMessage(client, sysId);
-        unlocked = true;
-      }
-    }
+    const { unlocked, systemMessage } = await maybeUnlockWa(client, conv, giftTotal);
 
     return {
       conversationId: Number(conv.id),
@@ -575,6 +668,8 @@ module.exports = {
   listConversations,
   sendText,
   sendMedia,
+  sendPrivateMedia,
+  unlockMedia,
   sendGift,
   whatsappStatus,
   listMessages,

@@ -199,6 +199,20 @@ bisa naik dan turun, menarik diamond tidak berpengaruh). Batas awal: 0, 300, 3.0
 1.000.000, 5.000.000 diamond; dapat diubah di panel admin > Pengaturan (`host_level_thresholds`). Pengguna melihat badge level host di profil
 host (hanya levelnya, bukan jumlah penghasilan); host melihat kemajuannya di Profil > kartu Lv.
 
+## Foto & video privat dari host
+
+Host dapat mengirim foto atau video **privat** di chat (tombol gembok di kolom tulis) dengan harga buka yang ia tentukan (0 = gratis,
+maksimum `host_media_price_max`, awal 100.000 koin). Video maksimal **5 menit** (`host_video_max_seconds`; durasi dibaca dari file di
+server), foto maks 8 MB, video maks 80 MB, batas `host_media_per_day` (awal 30) per host per hari.
+
+- Pengguna melihat kartu terkunci "Foto privat / Video privat · Buka N koin". Saat dibuka, koin dipotong seperti gift: host menerima
+  `gift_host_share` (10%), agency komisi dari penghasilan host, sisanya platform (`ledger.reason = media_income`). Satu media hanya
+  dibayar sekali (`media_unlocks`), dan nilainya ikut total belanja koin untuk membuka WhatsApp host.
+- File disimpan di folder **privat** (`PRIVATE_DIR`, awal `../private-media` di samping folder uploads), BUKAN di `/uploads`. Hanya
+  host pengirim dan pengguna di percakapan itu yang bisa mengambilnya lewat `GET /api/media/:id` (butuh login; pengguna yang belum
+  membuka mendapat 402; mendukung Range untuk video). Sertakan folder ini dalam cadangan.
+- API: `POST /api/conversations/:id/private-media` (multipart `file` + `price`), `POST /api/conversations/:id/media/:messageId/unlock`.
+
 ## Panel admin web
 
 Buka `http://<alamat-server>:<port>/admin` di browser (HP juga bisa) lalu masuk dengan akun admin

@@ -168,6 +168,96 @@ async function saveAudio(req) {
   return { name, url: `${publicBase(req)}/uploads/${name}` };
 }
 
+// ---- Media PRIVAT host (foto 8 MB, video 80 MB): disimpan di luar /uploads, hanya bisa dibuka lewat API terproteksi ----
+const PRIVATE_DIR = path.resolve(process.env.PRIVATE_DIR || path.join(UPLOAD_DIR, '..', 'private-media'));
+fs.mkdirSync(PRIVATE_DIR, { recursive: true });
+const PRIVATE_EXT = { 'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp', 'video/mp4': '.mp4', 'video/quicktime': '.mov' };
+const privateUpload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => cb(null, PRIVATE_DIR),
+    filename: (req, file, cb) => cb(null, `${Date.now()}-${crypto.randomBytes(10).toString('hex')}${PRIVATE_EXT[file.mimetype] || ''}`),
+  }),
+  limits: { fileSize: 80 * 1024 * 1024, files: 1 },
+  fileFilter: (req, file, cb) => {
+    if (PRIVATE_EXT[file.mimetype]) cb(null, true);
+    else cb(badRequest('Hanya foto (JPG, PNG, WEBP) atau video MP4', 'INVALID_FILE'));
+  },
+}).single('file');
+
+function privateMedia(req, res, next) {
+  privateUpload(req, res, (err) => {
+    if (!err) return next();
+    if (err.code === 'LIMIT_FILE_SIZE') return next(badRequest('Ukuran file maksimal 80 MB (foto 8 MB)', 'FILE_TOO_LARGE'));
+    next(err);
+  });
+}
+
+// Durasi MP4/MOV dalam detik dari kotak "mvhd" (null jika tidak terbaca)
+async function mp4Seconds(file) {
+  const fh = await fs.promises.open(file, 'r');
+  try {
+    const { size } = await fh.stat();
+    let pos = 0;
+    const head = Buffer.alloc(16);
+    while (pos + 8 <= size) {
+      await fh.read(head, 0, 16, pos);
+      let boxSize = head.readUInt32BE(0);
+      const type = head.toString('latin1', 4, 8);
+      let headerLen = 8;
+      if (boxSize === 1) { boxSize = Number(head.readBigUInt64BE(8)); headerLen = 16; }
+      else if (boxSize === 0) boxSize = size - pos;
+      if (boxSize < headerLen) return null;
+      if (type === 'moov') {
+        const len = Math.min(boxSize - headerLen, 8 * 1024 * 1024);
+        const moov = Buffer.alloc(len);
+        await fh.read(moov, 0, len, pos + headerLen);
+        const i = moov.indexOf('mvhd', 0, 'latin1');
+        if (i < 0) return null;
+        const v = moov[i + 4];
+        const timescale = v === 1 ? moov.readUInt32BE(i + 4 + 4 + 16) : moov.readUInt32BE(i + 4 + 4 + 8);
+        const dur = v === 1 ? Number(moov.readBigUInt64BE(i + 4 + 4 + 20)) : moov.readUInt32BE(i + 4 + 4 + 12);
+        return timescale > 0 && dur > 0 ? dur / timescale : null;
+      }
+      pos += boxSize;
+    }
+    return null;
+  } finally {
+    await fh.close();
+  }
+}
+
+// Periksa isi file yang sudah disimpan; hapus file jika tidak valid. Mengembalikan { kind, seconds }
+async function checkPrivateMedia(file, { maxVideoSeconds }) {
+  const remove = () => fs.promises.unlink(file.path).catch(() => {});
+  try {
+    const head = Buffer.alloc(16);
+    const fh = await fs.promises.open(file.path, 'r');
+    const { size } = await fh.stat();
+    await fh.read(head, 0, 16, 0);
+    await fh.close();
+    const isVideo = file.mimetype.startsWith('video/');
+    let ok;
+    if (isVideo) ok = size > 12 && head.toString('latin1', 4, 8) === 'ftyp';
+    else if (file.mimetype === 'image/jpeg') ok = head[0] === 0xff && head[1] === 0xd8 && head[2] === 0xff;
+    else if (file.mimetype === 'image/png') ok = head.toString('latin1', 1, 4) === 'PNG';
+    else ok = head.toString('latin1', 0, 4) === 'RIFF' && head.toString('latin1', 8, 12) === 'WEBP';
+    if (!ok) throw badRequest('File rusak atau bukan foto/video yang valid', 'INVALID_FILE');
+    if (!isVideo && size > 8 * 1024 * 1024) throw badRequest('Ukuran foto maksimal 8 MB', 'FILE_TOO_LARGE');
+    let seconds = null;
+    if (isVideo) {
+      seconds = await mp4Seconds(file.path);
+      if (seconds === null) throw badRequest('Durasi video tidak terbaca. Gunakan video MP4 biasa.', 'INVALID_FILE');
+      if (seconds > maxVideoSeconds) {
+        throw badRequest(`Video terlalu panjang (${Math.ceil(seconds / 60)} menit). Maksimal ${Math.floor(maxVideoSeconds / 60)} menit.`, 'VIDEO_TOO_LONG');
+      }
+    }
+    return { kind: isVideo ? 'video' : 'image', seconds };
+  } catch (e) {
+    await remove();
+    throw e;
+  }
+}
+
 async function save(req) {
   if (!req.file) throw badRequest('File gambar wajib diisi', 'FILE_REQUIRED');
   return saveFile(req, req.file);
@@ -179,4 +269,4 @@ async function remove(url) {
   await fs.promises.unlink(path.join(UPLOAD_DIR, name)).catch(() => {});
 }
 
-module.exports = { singleAudio, saveAudio, UPLOAD_DIR, chatMedia, saveChatMedia, single, many, save, saveFile, remove, singleVideo, saveVideo };
+module.exports = { PRIVATE_DIR, privateMedia, checkPrivateMedia, singleAudio, saveAudio, UPLOAD_DIR, chatMedia, saveChatMedia, single, many, save, saveFile, remove, singleVideo, saveVideo };

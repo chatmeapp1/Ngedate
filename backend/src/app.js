@@ -52,6 +52,7 @@ function createApp() {
   app.use('/api/wallet', authenticate, require('./routes/wallet'));
   app.use('/api/gifts', authenticate, require('./routes/gifts'));
   app.use('/api/conversations', authenticate, require('./routes/conversations'));
+  app.use('/api/media', authenticate, require('./routes/media'));
   app.use('/api/admin', authenticate, requireRole('admin'), require('./routes/admin'));
 
   app.use((req, res) => res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Endpoint tidak ditemukan' } }));

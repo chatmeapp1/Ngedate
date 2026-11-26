@@ -5,14 +5,24 @@ import { useVideoPlayer, VideoView } from 'expo-video';
 import { useState } from 'react';
 import { Modal, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { getAccessToken, getServerUrl } from '@/lib/api';
 import { radius } from '@/lib/theme';
+
+// URL publik dipakai apa adanya; path /api/... (media privat) diberi alamat server dan header login
+function mediaSource(url: string) {
+  if (url.startsWith('/api/')) {
+    const token = getAccessToken();
+    return { uri: `${getServerUrl()}${url}`, headers: token ? { authorization: `Bearer ${token}` } : undefined };
+  }
+  return { uri: url };
+}
 
 const W = 210;
 const H = 260;
 
 // Pemutar layar penuh (dipasang hanya saat dibuka supaya video tidak dimuat sebelum diketuk)
 function FullVideo({ url }: { url: string }) {
-  const player = useVideoPlayer(url, (p) => {
+  const player = useVideoPlayer(mediaSource(url), (p) => {
     p.loop = false;
     p.play();
   });
@@ -27,7 +37,7 @@ export function MediaBubble({ type, url }: { type: 'image' | 'video'; url: strin
     <>
       <Pressable onPress={() => setOpen(true)} style={s.thumb}>
         {type === 'image' ? (
-          <Image source={{ uri: url }} style={StyleSheet.absoluteFill} contentFit="cover" transition={150} />
+          <Image source={mediaSource(url)} style={StyleSheet.absoluteFill} contentFit="cover" transition={150} />
         ) : (
           <LinearGradient colors={['#2B2040', '#17121F']} style={[StyleSheet.absoluteFill, s.center]}>
             <View style={s.play}>
@@ -43,7 +53,7 @@ export function MediaBubble({ type, url }: { type: 'image' | 'video'; url: strin
         <View style={s.backdrop}>
           {type === 'image' ? (
             <Pressable style={StyleSheet.absoluteFill} onPress={() => setOpen(false)}>
-              <Image source={{ uri: url }} style={s.full} contentFit="contain" />
+              <Image source={mediaSource(url)} style={s.full} contentFit="contain" />
             </Pressable>
           ) : open ? (
             <FullVideo url={url} />
