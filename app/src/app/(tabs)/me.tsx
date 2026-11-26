@@ -53,11 +53,13 @@ export default function Me() {
           </View>
         </View>
         <View style={s.balances}>
-          <Pressable style={s.balance} onPress={() => router.push('/wallet')}>
-            <Coin size={20} />
-            <Text style={s.balanceValue}>{number(user.coins ?? 0)}</Text>
-            <Text style={s.balanceLabel}>Koin</Text>
-          </Pressable>
+          {!isHost ? (
+            <Pressable style={s.balance} onPress={() => router.push('/wallet')}>
+              <Coin size={20} />
+              <Text style={s.balanceValue}>{number(user.coins ?? 0)}</Text>
+              <Text style={s.balanceLabel}>Koin</Text>
+            </Pressable>
+          ) : null}
           {isHost ? (
             <Pressable style={s.balance} onPress={() => router.push('/wallet')}>
               <Text style={{ fontSize: 18 }}>💎</Text>
@@ -74,7 +76,6 @@ export default function Me() {
           <>
             <Item icon="eye-outline" label="Lihat profil saya" onPress={() => router.push({ pathname: '/host/[id]', params: { id: String(user.id) } })} />
             <Item icon="options-outline" label="Pengaturan host (tarif & WhatsApp)" onPress={() => router.push('/host-settings')} />
-            <Item icon="cash-outline" label="Tarik diamond" onPress={() => router.push('/withdraw')} />
             {!user.verified ? (
               <Item
                 icon="scan-outline"
@@ -84,7 +85,6 @@ export default function Me() {
             ) : null}
           </>
         ) : null}
-        <Item icon="wallet-outline" label="Dompet" onPress={() => router.push('/wallet')} />
       </View>
 
       <View style={s.group}>

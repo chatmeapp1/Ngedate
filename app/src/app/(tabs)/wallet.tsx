@@ -51,7 +51,7 @@ export default function WalletScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <FlatList
-        data={ledger}
+        data={isHost ? ledger.filter((e) => e.currency !== 'coin') : ledger}
         keyExtractor={(e) => String(e.id)}
         contentContainerStyle={{ paddingBottom: 24 }}
         refreshControl={
@@ -68,6 +68,7 @@ export default function WalletScreen() {
         ListHeaderComponent={
           <View style={{ paddingTop: insets.top + 12, paddingHorizontal: 16, gap: 14 }}>
             <Text style={s.title}>Dompet</Text>
+            {!isHost ? (
             <LinearGradient colors={gradients.brand} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.card}>
               <Text style={s.cardLabel}>Saldo koin</Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -82,6 +83,7 @@ export default function WalletScreen() {
                 <Text style={s.topupText}>Top up</Text>
               </Pressable>
             </LinearGradient>
+            ) : null}
 
             {isHost ? (
               <View style={s.diamond}>
