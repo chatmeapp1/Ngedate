@@ -148,3 +148,11 @@ label.chk input { width: 18px; height: 18px; }
 .progress > i { display: block; height: 100%; width: 0; background: var(--brand); transition: width .15s; }
 .warn-text { color: #b45309; font-size: 12px; font-weight: 600; margin-top: 4px; }
 div.f { margin: 0 0 12px; }
+
+/* ---------- Laporan ---------- */
+.quote { margin: 10px 0; padding: 8px 12px; border-left: 3px solid var(--pink); background: #fff0f7; border-radius: 8px; color: var(--text); font-style: italic; }
+.chatlog { margin-top: 8px; padding: 8px; background: var(--alt); border-radius: 12px; max-height: 240px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+.chatlog .msg { padding: 6px 10px; border-radius: 10px; background: #fff; }
+.chatlog .msg.terlapor { background: #fee2e2; }
+.chatlog .msg.pelapor { background: #ede9fe; }
+.chatlog .msg.system { background: transparent; color: var(--dim); text-align: center; }

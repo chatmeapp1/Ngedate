@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, errorMessage } from '@/lib/api';
+import { onBlockChange } from '@/lib/blockEvents';
 import type { Host } from '@/lib/types';
 
 const PAGE_SIZE = 30;
@@ -82,6 +83,9 @@ export function useHosts<T extends { id: number } = Host>(params: {
     if (enabled) reload();
     else setHosts([]);
   }, [reload, enabled]);
+
+  // Setelah memblokir / membuka blokir, daftar dimuat ulang
+  useEffect(() => onBlockChange(() => enabled && reload(true)), [reload, enabled]);
 
   return { hosts, loading, refreshing, error, reload, loadMore };
 }

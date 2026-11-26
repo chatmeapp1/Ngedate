@@ -7,6 +7,7 @@ import { Avatar, Empty, Loading } from '@/components/ui';
 import { Verified } from '@/components/Verified';
 import { useAuth } from '@/context/auth';
 import { api, errorMessage } from '@/lib/api';
+import { onBlockChange } from '@/lib/blockEvents';
 import { onRealtime } from '@/lib/realtime';
 import { colors, gradients } from '@/lib/theme';
 import type { Conversation, Host, Message } from '@/lib/types';
@@ -93,6 +94,8 @@ export default function Messages() {
       load();
     }, [load])
   );
+
+  useEffect(() => onBlockChange(() => load()), [load]);
 
   // Pesan baru: perbarui percakapan itu & pindahkan ke paling atas
   useEffect(

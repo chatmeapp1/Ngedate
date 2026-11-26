@@ -8,6 +8,7 @@ import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowD
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GiftIcon } from '@/components/GiftIcon';
 import { GiftSheet } from '@/components/GiftSheet';
+import { SafetyMenu } from '@/components/SafetyMenu';
 import { Avatar, Coin, Empty, Loading } from '@/components/ui';
 import { Verified } from '@/components/Verified';
 import { useAuth } from '@/context/auth';
@@ -101,6 +102,7 @@ export default function HostProfileScreen() {
             <Pressable onPress={() => router.back()} style={s.roundBtn} hitSlop={8}>
               <Ionicons name="chevron-back" size={24} color="#fff" />
             </Pressable>
+            {!isSelf ? <SafetyMenu light userId={host.id} name={host.displayName} onBlocked={() => router.back()} /> : null}
           </View>
 
           <View style={s.identity}>
@@ -324,7 +326,7 @@ function Stat({ value, label }: { value: number; label: string }) {
 
 const s = StyleSheet.create({
   coverFade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '55%' },
-  topBar: { position: 'absolute', left: 12, right: 12, flexDirection: 'row' },
+  topBar: { position: 'absolute', left: 12, right: 12, flexDirection: 'row', justifyContent: 'space-between' },
   roundBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.35)', alignItems: 'center', justifyContent: 'center' },
   identity: { position: 'absolute', left: 16, right: 16, bottom: 18, flexDirection: 'row', alignItems: 'flex-end', gap: 12 },
   name: { color: '#fff', fontSize: 28, fontWeight: '900' },

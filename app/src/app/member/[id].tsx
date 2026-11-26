@@ -5,6 +5,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafetyMenu } from '@/components/SafetyMenu';
 import { Avatar, Empty, GradientButton, Loading } from '@/components/ui';
 import { Verified } from '@/components/Verified';
 import { api, errorMessage } from '@/lib/api';
@@ -53,6 +54,9 @@ export default function MemberProfile() {
         <Pressable hitSlop={10} onPress={() => router.back()} style={[s.backFloat, { top: insets.top + 8 }]}>
           <Ionicons name="chevron-back" size={24} color="#fff" />
         </Pressable>
+        <View style={[s.menuFloat, { top: insets.top + 8 }]}>
+          <SafetyMenu light userId={member.id} name={member.displayName} onBlocked={() => router.back()} />
+        </View>
         <View style={s.info}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <Text style={s.name} numberOfLines={1}>
@@ -107,6 +111,7 @@ const s = StyleSheet.create({
   cover: { height: 380, backgroundColor: colors.surfaceAlt },
   center: { alignItems: 'center', justifyContent: 'center' },
   fade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '55%' },
+  menuFloat: { position: 'absolute', right: 14 },
   backFloat: { position: 'absolute', left: 14, width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(0,0,0,0.35)', alignItems: 'center', justifyContent: 'center' },
   info: { position: 'absolute', left: 16, right: 16, bottom: 16, gap: 8 },
   name: { color: '#fff', fontSize: 28, fontWeight: '900', flexShrink: 1 },

@@ -414,7 +414,7 @@ async function pageDashboard() {
   const earn = Object.entries(s.platformEarnings);
   const totalEarn = earn.reduce((a, [, v]) => a + v, 0);
   const stat = (n, l, warn) => h('div', { class: 'card stat' + (warn ? ' warn' : '') }, h('div', { class: 'n' }, n), h('div', { class: 'l' }, l));
-  const pend = s.pending.verifications + s.pending.photos + s.pending.avatars;
+  const pend = s.pending.verifications + s.pending.photos + s.pending.avatars + s.pending.reports;
   return [
     pageHead('Dashboard', 'Ringkasan Amora saat ini'),
     pend > 0
@@ -423,7 +423,8 @@ async function pageDashboard() {
             h('b', {}, pend + ' item menunggu tinjauan'),
             h('span', { class: 'sp' }),
             s.pending.verifications ? h('a', { class: 'btn pri sm', href: '#verifikasi' }, 'Verifikasi wajah (' + s.pending.verifications + ')') : null,
-            s.pending.photos + s.pending.avatars ? h('a', { class: 'btn pri sm', href: '#foto' }, 'Foto host (' + (s.pending.photos + s.pending.avatars) + ')') : null))
+            s.pending.photos + s.pending.avatars ? h('a', { class: 'btn pri sm', href: '#foto' }, 'Foto host (' + (s.pending.photos + s.pending.avatars) + ')') : null,
+            s.pending.reports ? h('a', { class: 'btn pri sm', href: '#laporan' }, 'Laporan (' + s.pending.reports + ')') : null))
       : null,
     h('div', { class: 'grid g3' },
       stat(fmt(s.users.user || 0), 'Pengguna'),
@@ -519,7 +520,8 @@ async function pagePhotos() {
 
 // ----- Pengguna -----
 const filt = { q: '', role: '', status: '' };
-async function pageUsers() {
+async function pageUsers(param) {
+  if (param && /^\d+$/.test(param)) Object.assign(filt, { q: param, role: '', status: '' });
   const qs = new URLSearchParams();
   for (const [k, v] of Object.entries(filt)) if (v) qs.set(k, v);
   const list = await get('/api/admin/users?' + qs.toString());
@@ -714,6 +716,71 @@ async function pageTopup(param) {
   return root;
 }
 
+// ----- Laporan pengguna -----
+let rpTab = 'pending';
+async function pageReports() {
+  const list = await get('/api/admin/reports?status=' + rpTab);
+  const root = h('div');
+  root.append(
+    ...pageHead('Laporan pengguna', 'Tinjau laporan dan bukti chat. Tangguhkan akun jika terbukti melanggar.'),
+    h('div', { class: 'tabs' }, [['pending', 'Menunggu'], ['resolved', 'Ditangani'], ['dismissed', 'Diabaikan']].map(([k, l]) =>
+      h('button', { class: 'tab' + (rpTab === k ? ' on' : ''), onclick: () => { rpTab = k; render(); } }, l)))
+  );
+  if (!list.length) root.append(empty('Tidak ada laporan'));
+
+  const person = (u, label) => h('div', { class: 'row', style: 'min-width:0' },
+    avatar(u.avatarUrl, u.displayName, 38),
+    h('div', { style: 'min-width:0' }, h('div', { class: 'dim' }, label), h('b', {}, u.displayName), h('div', { class: 'dim' }, '@' + u.username + ' · ID ' + u.id)));
+
+  const grid = h('div', { class: 'grid', style: 'grid-template-columns:repeat(auto-fill,minmax(340px,1fr))' });
+  for (const r of list) {
+    const t = r.target;
+    const heavy = t.reporters >= 3;
+    const evidence = r.evidence && r.evidence.length
+      ? h('details', { style: 'margin:10px 0' },
+          h('summary', { style: 'cursor:pointer;font-weight:700;color:var(--primary-dark)' }, 'Bukti chat (' + r.evidence.length + ' pesan terakhir)'),
+          h('div', { class: 'chatlog' }, r.evidence.map((m) =>
+            h('div', { class: 'msg ' + m.from },
+              h('b', {}, m.from === 'pelapor' ? 'Pelapor' : m.from === 'terlapor' ? 'Terlapor' : 'Sistem'),
+              ': ', m.type === 'gift' ? '🎁 ' : '', m.body || '', ' ', h('span', { class: 'dim' }, ago(m.at))))))
+      : h('div', { class: 'dim', style: 'margin:8px 0' }, 'Tanpa bukti chat (dilaporkan dari profil).');
+
+    grid.append(h('div', { class: 'card' },
+      h('div', { class: 'row wrap', style: 'gap:6px;margin-bottom:10px' },
+        h('span', { class: 'pill red' }, r.reasonLabel),
+        t.status === 'suspended' ? h('span', { class: 'pill red' }, 'Akun ditangguhkan') : null,
+        heavy ? h('span', { class: 'pill amber' }, '⚠ ' + t.reporters + ' pelapor berbeda') : null,
+        h('span', { class: 'sp' }),
+        h('span', { class: 'dim' }, ago(r.createdAt))),
+      person(t, 'Terlapor (' + t.role + ')'),
+      h('div', { class: 'dim', style: 'margin:6px 0 10px' }, 'Total dilaporkan ' + t.totalReports + 'x oleh ' + t.reporters + ' orang · diblokir ' + t.blockedBy + ' orang'),
+      person(r.reporter, 'Pelapor'),
+      r.details ? h('div', { class: 'quote' }, '“' + r.details + '”') : null,
+      evidence,
+      r.status === 'pending'
+        ? h('div', { class: 'row wrap', style: 'gap:6px;margin-top:6px' },
+            h('button', { class: 'btn sm', onclick: () => review(r, 'dismiss') }, 'Abaikan'),
+            h('button', { class: 'btn sm ok', onclick: () => review(r, 'resolve') }, 'Tandai selesai'),
+            t.status === 'suspended' ? null : h('button', { class: 'btn sm bad', onclick: () => review(r, 'suspend') }, 'Tangguhkan akun'),
+            h('a', { class: 'btn sm', href: '#pengguna/' + t.id, style: 'text-decoration:none' }, 'Lihat pengguna'))
+        : h('div', { class: 'dim' }, (r.action === 'suspend' ? 'Akun ditangguhkan' : r.action === 'resolve' ? 'Ditandai selesai' : 'Diabaikan') + (r.adminNote ? ' · ' + r.adminNote : ''))));
+  }
+  root.append(grid);
+
+  async function review(r, decision) {
+    const labels = { dismiss: 'Abaikan laporan', resolve: 'Tandai selesai', suspend: 'Tangguhkan akun ' + r.target.displayName };
+    const f = await formModal({
+      title: labels[decision],
+      submit: decision === 'suspend' ? 'Tangguhkan' : 'Simpan',
+      danger: decision === 'suspend',
+      fields: [{ name: 'note', label: 'Catatan (opsional, hanya untuk admin)', type: 'textarea',
+        hint: decision === 'suspend' ? 'Akun langsung keluar dan tidak bisa masuk lagi. Laporan lain terhadap akun ini ikut selesai.' : null }],
+    });
+    if (f && await act(() => post('/api/admin/reports/' + r.id + '/review', { decision, note: f.note || undefined }), 'Laporan diperbarui')) render();
+  }
+  return root;
+}
+
 // ----- Gift -----
 function giftIcon(g) {
   return h('div', { class: 'gift-ic' }, g.imageUrl ? h('img', { src: g.imageUrl, alt: '' }) : (g.icon || '🎁'));
@@ -852,6 +919,7 @@ const pages = {
   foto: { title: 'Foto host', icon: '🖼️', fn: pagePhotos, badge: () => stats && stats.pending.photos + stats.pending.avatars },
   pengguna: { title: 'Pengguna', icon: '👥', fn: pageUsers },
   topup: { title: 'Top up koin', icon: '💰', fn: pageTopup },
+  laporan: { title: 'Laporan', icon: '🚩', fn: pageReports, badge: () => stats && stats.pending.reports },
   agency: { title: 'Agency', icon: '🏢', fn: pageAgency },
   gift: { title: 'Gift', icon: '🎁', fn: pageGifts },
   pengaturan: { title: 'Pengaturan', icon: '⚙️', fn: pageSettings },

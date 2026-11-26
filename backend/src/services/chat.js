@@ -1,5 +1,6 @@
 const db = require('../db');
 const wallet = require('./wallet');
+const safety = require('./safety');
 const { getSettings } = require('./settings');
 const { containsContact } = require('../lib/contactFilter');
 const { ApiError, badRequest, forbidden, notFound } = require('../lib/errors');
@@ -104,6 +105,7 @@ async function getOrCreateConversation(userId, hostIdRaw) {
     throw notFound('Host tidak ditemukan');
   }
   if (!me || me.role !== 'user') throw forbidden('Hanya user yang bisa memulai chat dengan host');
+  await safety.assertNotBlocked(db, userId, hostId);
 
   const { rows } = await db.query(
     `INSERT INTO conversations (user_id, host_id) VALUES ($1, $2)
@@ -134,6 +136,7 @@ async function getOrCreateConversationAsHost(hostId, userIdRaw) {
   if (!user || user.role !== 'user' || user.status !== 'active' || user.gender !== 'male' || !user.profile_completed) {
     throw notFound('Pengguna tidak ditemukan');
   }
+  await safety.assertNotBlocked(db, hostId, userId);
 
   const { rows } = await db.query(
     `INSERT INTO conversations (user_id, host_id) VALUES ($1, $2)
@@ -155,6 +158,7 @@ async function getConversation(viewerId, convId) {
     [v.id(convId, 'conversationId'), viewerId]
   );
   if (!rows.length) throw notFound('Percakapan tidak ditemukan');
+  if ((await safety.blockerBetween(db, viewerId, Number(rows[0].peer_id))) !== null) throw notFound('Percakapan tidak ditemukan');
   return mapConversation(rows[0], viewerId);
 }
 
@@ -171,7 +175,7 @@ async function listConversations(viewerId, { before } = {}) {
             p.verified AS peer_verified, p.role AS peer_role
      FROM conversations c
      JOIN users p ON p.id = CASE WHEN c.user_id = $1 THEN c.host_id ELSE c.user_id END
-     WHERE (c.user_id = $1 OR c.host_id = $1) AND c.last_message_at IS NOT NULL ${cursor}
+     WHERE (c.user_id = $1 OR c.host_id = $1) AND c.last_message_at IS NOT NULL AND ${safety.notBlockedSql('p', 1)} ${cursor}
      ORDER BY c.last_message_at DESC
      LIMIT 50`,
     params
@@ -254,6 +258,7 @@ async function sendText(senderId, convIdRaw, bodyRaw) {
     const conv = await lockConversation(client, convId, senderId);
     const settings = await getSettings(client);
     const senderIsUser = Number(conv.user_id) === senderId;
+    await safety.assertNotBlocked(client, senderId, senderIsUser ? Number(conv.host_id) : Number(conv.user_id));
 
     // Host boleh menyapa duluan (gratis), tapi tidak menumpuk pesan tanpa balasan dari user
     if (!senderIsUser) {
@@ -311,6 +316,7 @@ async function sendGift(senderId, convIdRaw, giftIdRaw, countRaw) {
   return db.tx(async (client) => {
     const conv = await lockConversation(client, convId, senderId);
     if (Number(conv.user_id) !== senderId) throw forbidden('Hanya user yang bisa mengirim gift ke host');
+    await safety.assertNotBlocked(client, senderId, Number(conv.host_id));
 
     const { rows: giftRows } = await client.query(`SELECT * FROM gifts WHERE id = $1 AND active`, [giftId]);
     if (!giftRows.length) throw notFound('Gift tidak ditemukan');

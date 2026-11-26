@@ -5,6 +5,7 @@ const realtime = require('../realtime');
 const { wrap, notFound } = require('../lib/errors');
 const { hostCard, publicUser } = require('./serializers');
 const { REGIONS, REGION_KEYS } = require('../lib/regions');
+const safety = require('../services/safety');
 
 const router = express.Router();
 const PAGE_SIZE = 30;
@@ -50,6 +51,8 @@ router.get('/', wrap(async (req, res) => {
     where.push(`u.country_code = ANY($${params.length}::char(2)[])`);
   }
   if (tab === 'online') where.push(`u.id = ANY($1::bigint[])`);
+  params.push(req.user.id);
+  where.push(safety.notBlockedSql('u', params.length));
 
   let order = `(u.id = ANY($1::bigint[])) DESC, u.last_seen_at DESC NULLS LAST, u.id DESC`;
   let popularJoin = '';
@@ -112,6 +115,7 @@ router.get('/:id', wrap(async (req, res) => {
   const viewer = req.user.id;
   const { rows } = await db.query(`SELECT ${HOST_COLUMNS} ${HOST_FROM} AND u.id = $1`, [hostId]);
   if (!rows.length) throw notFound('Host tidak ditemukan');
+  if ((await safety.blockerBetween(db, viewer, hostId)) !== null) throw notFound('Host tidak ditemukan');
 
   const [stats, photos, reply, conv] = await Promise.all([
     db.query(

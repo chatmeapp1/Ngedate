@@ -10,6 +10,7 @@ const storage = require('../lib/storage');
 const { describe } = require('../lib/gestures');
 const { publicUser } = require('./serializers');
 const { mapGift } = require('./gifts');
+const { REPORT_REASONS } = require('../services/safety');
 
 const router = express.Router();
 
@@ -208,6 +209,7 @@ router.get('/stats', wrap(async (req, res) => {
        (SELECT COUNT(*) FROM verifications WHERE status = 'pending')::int AS pending_verifications,
        (SELECT COUNT(*) FROM user_photos WHERE status = 'pending')::int AS pending_photos,
        (SELECT COUNT(*) FROM users WHERE pending_avatar_url IS NOT NULL)::int AS pending_avatars,
+       (SELECT COUNT(*) FROM reports WHERE status = 'pending')::int AS pending_reports,
        (SELECT COUNT(*) FROM users WHERE created_at > now() - interval '24 hours')::int AS new_users_24h,
        (SELECT COUNT(*) FROM messages WHERE type = 'text' AND created_at > now() - interval '24 hours')::int AS messages_24h,
        (SELECT COALESCE(SUM(price), 0) FROM messages WHERE type = 'gift' AND created_at > now() - interval '24 hours')::bigint AS gifts_24h,
@@ -223,6 +225,7 @@ router.get('/stats', wrap(async (req, res) => {
       verifications: x.pending_verifications,
       photos: x.pending_photos,
       avatars: x.pending_avatars,
+      reports: x.pending_reports,
     },
     newUsers24h: x.new_users_24h,
     messages24h: x.messages_24h,
@@ -230,6 +233,72 @@ router.get('/stats', wrap(async (req, res) => {
     coinsInWallets: Number(x.coins_total),
     agencies: x.agencies,
   });
+}));
+
+// ---------------------------------------------------------------------------
+// Laporan pengguna
+// ---------------------------------------------------------------------------
+router.get('/reports', wrap(async (req, res) => {
+  const status = v.str(req.query.status ?? 'pending', 'status', { pattern: /^(pending|resolved|dismissed)$/ });
+  const { rows } = await db.query(
+    `SELECT r.*,
+            rp.username AS reporter_username, rp.display_name AS reporter_name, rp.avatar_url AS reporter_avatar,
+            t.username AS target_username, t.display_name AS target_name, t.avatar_url AS target_avatar,
+            t.role AS target_role, t.status AS target_status,
+            (SELECT COUNT(*) FROM reports x WHERE x.target_id = r.target_id)::int AS target_total,
+            (SELECT COUNT(DISTINCT x.reporter_id) FROM reports x WHERE x.target_id = r.target_id)::int AS target_reporters,
+            (SELECT COUNT(*) FROM blocks b WHERE b.blocked_id = r.target_id)::int AS target_blocks
+     FROM reports r
+     JOIN users rp ON rp.id = r.reporter_id
+     JOIN users t ON t.id = r.target_id
+     WHERE r.status = $1 ORDER BY r.id DESC LIMIT 100`,
+    [status]
+  );
+  res.json(rows.map((r) => ({
+    id: Number(r.id),
+    reason: r.reason,
+    reasonLabel: REPORT_REASONS[r.reason] || r.reason,
+    details: r.details,
+    evidence: r.evidence,
+    status: r.status,
+    action: r.action,
+    adminNote: r.admin_note,
+    createdAt: r.created_at,
+    reporter: { id: Number(r.reporter_id), username: r.reporter_username, displayName: r.reporter_name, avatarUrl: r.reporter_avatar },
+    target: {
+      id: Number(r.target_id), username: r.target_username, displayName: r.target_name, avatarUrl: r.target_avatar,
+      role: r.target_role, status: r.target_status,
+      totalReports: r.target_total, reporters: r.target_reporters, blockedBy: r.target_blocks,
+    },
+  })));
+}));
+
+// decision: dismiss (tidak melanggar) | resolve (sudah ditangani) | suspend (resolve + tangguhkan akun terlapor)
+router.post('/reports/:id/review', wrap(async (req, res) => {
+  const id = v.id(req.params.id);
+  const decision = v.str(req.body.decision, 'Keputusan', { pattern: /^(dismiss|resolve|suspend)$/ });
+  const note = v.str(req.body.note, 'Catatan', { max: 300, optional: true }) ?? null;
+  await db.tx(async (client) => {
+    const { rows } = await client.query(
+      `UPDATE reports SET status = $2, action = $3, admin_note = $4, reviewed_by = $5, reviewed_at = now()
+       WHERE id = $1 AND status = 'pending' RETURNING target_id`,
+      [id, decision === 'dismiss' ? 'dismissed' : 'resolved', decision, note, req.user.id]
+    );
+    if (!rows.length) throw notFound('Laporan tidak ditemukan atau sudah ditinjau');
+    if (decision === 'suspend') {
+      const targetId = rows[0].target_id;
+      await client.query(`UPDATE users SET status = 'suspended', updated_at = now() WHERE id = $1 AND role <> 'admin'`, [targetId]);
+      await client.query(`DELETE FROM refresh_tokens WHERE user_id = $1`, [targetId]);
+      // Laporan lain terhadap akun yang sama ikut dianggap selesai
+      await client.query(
+        `UPDATE reports SET status = 'resolved', action = 'suspend', admin_note = COALESCE(admin_note, 'Akun ditangguhkan'),
+                reviewed_by = $2, reviewed_at = now()
+         WHERE target_id = $1 AND status = 'pending'`,
+        [targetId, req.user.id]
+      );
+    }
+  });
+  res.json({ ok: true });
 }));
 
 // ---------------------------------------------------------------------------

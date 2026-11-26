@@ -47,7 +47,12 @@ function attach(httpServer) {
       const c = rows[0];
       if (!c) return;
       const other = Number(c.user_id) === userId ? Number(c.host_id) : Number(c.host_id) === userId ? Number(c.user_id) : null;
-      if (other) io.to(`user:${other}`).emit('typing', { conversationId: convId, userId });
+      if (!other) return;
+      const blocked = await db
+        .query(`SELECT 1 FROM blocks WHERE (blocker_id = $1 AND blocked_id = $2) OR (blocker_id = $2 AND blocked_id = $1) LIMIT 1`, [userId, other])
+        .catch(() => ({ rows: [{}] }));
+      if (blocked.rows.length) return;
+      io.to(`user:${other}`).emit('typing', { conversationId: convId, userId });
     });
 
     socket.on('disconnect', () => {

@@ -22,6 +22,10 @@ export default function Privacy() {
           body: 'Nomor WhatsApp yang dimasukkan host hanya ditampilkan kepada pengguna yang sudah memenuhi syarat yang ditetapkan host tersebut, dan tidak pernah ditampilkan di profil atau daftar host.',
         },
         {
+          title: 'Laporan & blokir',
+          body: 'Saat Anda melaporkan pengguna dari dalam chat, beberapa pesan terakhir di percakapan itu disalin dan hanya dapat dilihat tim moderasi kami untuk menilai laporan. Laporan bersifat rahasia dan tidak diberitahukan kepada pengguna yang dilaporkan. Pengguna yang Anda blokir tidak dapat melihat atau mengirim pesan kepada Anda.',
+        },
+        {
           title: 'Berbagi data',
           body: 'Kami tidak menjual data pribadi. Data hanya dibagikan kepada penyedia layanan yang membantu menjalankan Amora (misalnya penyimpanan server dan pembayaran) atau bila diwajibkan hukum.',
         },

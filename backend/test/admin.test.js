@@ -81,7 +81,7 @@ test('statistik dashboard menghitung antrean tinjauan dan aktivitas', async () =
   assert.equal(r.status, 200, JSON.stringify(r.body));
   assert.equal(r.body.users.user, 1);
   assert.equal(r.body.users.host, 1);
-  assert.deepEqual(r.body.pending, { verifications: 0, photos: 0, avatars: 0 });
+  assert.deepEqual(r.body.pending, { verifications: 0, photos: 0, avatars: 0, reports: 0 });
   assert.equal(r.body.newUsers24h, 3);
   assert.equal(r.body.messages24h, 0);
 

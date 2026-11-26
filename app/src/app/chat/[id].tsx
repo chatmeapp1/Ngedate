@@ -17,6 +17,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GiftIcon } from '@/components/GiftIcon';
 import { GiftSheet } from '@/components/GiftSheet';
+import { SafetyMenu } from '@/components/SafetyMenu';
 import { Avatar, Coin } from '@/components/ui';
 import { Verified } from '@/components/Verified';
 import { useAuth } from '@/context/auth';
@@ -218,7 +219,7 @@ export default function ChatRoom() {
           { text: 'Nanti', style: 'cancel' },
           { text: 'Top up', onPress: () => router.push('/wallet') },
         ]);
-      } else if (e instanceof ApiError && (e.code === 'CONTACT_BLOCKED' || e.code === 'WAIT_FOR_REPLY')) {
+      } else if (e instanceof ApiError && (e.code === 'CONTACT_BLOCKED' || e.code === 'WAIT_FOR_REPLY' || e.code === 'BLOCKED')) {
         Alert.alert(e.code === 'WAIT_FOR_REPLY' ? 'Tunggu balasan dulu' : 'Pesan tidak terkirim', e.message);
       } else {
         Alert.alert('Gagal mengirim', errorMessage(e));
@@ -284,6 +285,7 @@ export default function ChatRoom() {
             </Text>
           </View>
         </Pressable>
+        {peer ? <SafetyMenu userId={peer.id} name={peer.displayName} conversationId={convId} onBlocked={() => router.back()} /> : null}
       </View>
 
       {/* Bar WhatsApp (user) */}

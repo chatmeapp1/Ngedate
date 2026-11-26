@@ -4,6 +4,7 @@ const v = require('../lib/validate');
 const realtime = require('../realtime');
 const { wrap, notFound } = require('../lib/errors');
 const { publicUser } = require('./serializers');
+const safety = require('../services/safety');
 
 const router = express.Router();
 const PAGE_SIZE = 30;
@@ -37,6 +38,8 @@ router.get('/', wrap(async (req, res) => {
     where.push(`u.country_code = $${params.length}`);
   }
   if (tab === 'online') where.push(`u.id = ANY($1::bigint[])`);
+  params.push(req.user.id);
+  where.push(safety.notBlockedSql('u', params.length));
   const order =
     tab === 'new'
       ? `u.created_at DESC, u.id DESC`
@@ -53,6 +56,7 @@ router.get('/', wrap(async (req, res) => {
 router.get('/:id', wrap(async (req, res) => {
   const { rows } = await db.query(`SELECT u.* FROM users u WHERE ${MEMBER_WHERE} AND u.id = $1`, [v.id(req.params.id)]);
   if (!rows.length) throw notFound('Pengguna tidak ditemukan');
+  if ((await safety.blockerBetween(db, req.user.id, rows[0].id)) !== null) throw notFound('Pengguna tidak ditemukan');
   res.json(publicUser(rows[0]));
 }));
 
