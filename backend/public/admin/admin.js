@@ -144,6 +144,102 @@ function xhrUpload(path, file, onProgress, retry = true) {
   });
 }
 
+// Buat gambar gift (PNG 256x256) dari bingkai video yang paling "berisi".
+// Video latar hitam (mode transparan): hitam dijadikan transparan, lalu dipotong rapat.
+async function makeThumb(src, blend) {
+  const v = document.createElement('video');
+  v.muted = true;
+  v.playsInline = true;
+  v.preload = 'auto';
+  v.crossOrigin = 'anonymous';
+  v.src = src;
+  await new Promise((resolve, reject) => {
+    v.onloadeddata = resolve;
+    v.onerror = () => reject(new Error('Browser tidak bisa membaca video ini. Pakai MP4 H.264.'));
+  });
+  const dur = Number.isFinite(v.duration) && v.duration > 0 ? v.duration : 3;
+  const seek = (t) => new Promise((resolve) => {
+    const done = () => { v.removeEventListener('seeked', done); resolve(); };
+    v.addEventListener('seeked', done);
+    v.currentTime = Math.max(0, Math.min(dur - 0.05, t));
+    setTimeout(done, 3000);
+  });
+  const W = 320;
+  const H = Math.max(1, Math.round((W * (v.videoHeight || 1)) / (v.videoWidth || 1)));
+  const grab = () => {
+    const c = document.createElement('canvas');
+    c.width = W;
+    c.height = H;
+    const ctx = c.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(v, 0, 0, W, H);
+    return { c, ctx, data: ctx.getImageData(0, 0, W, H) };
+  };
+
+  // Pilih bingkai: yang paling banyak bagian terangnya (latar hitam) atau tengah video
+  let best = null;
+  const fractions = blend ? [0.1, 0.2, 0.3, 0.45, 0.6, 0.75] : [0.3];
+  for (const f of fractions) {
+    await seek(dur * f);
+    const g = grab();
+    let score = 0;
+    const d = g.data.data;
+    for (let i = 0; i < d.length; i += 4) score += Math.max(d[i], d[i + 1], d[i + 2]);
+    if (!best || score > best.score) best = { ...g, score };
+  }
+  const { data, ctx } = best;
+  const d = data.data;
+  let x0 = W, y0 = H, x1 = 0, y1 = 0;
+  if (blend) {
+    // Terang -> buram: alpha = kecerahan tertinggi, warna dikembalikan dari pra-kali
+    for (let i = 0; i < d.length; i += 4) {
+      const a = Math.min(255, Math.max(d[i], d[i + 1], d[i + 2]) * 1.35);
+      if (a > 0) {
+        const k = 255 / Math.max(d[i], d[i + 1], d[i + 2], 1);
+        d[i] = Math.min(255, d[i] * k);
+        d[i + 1] = Math.min(255, d[i + 1] * k);
+        d[i + 2] = Math.min(255, d[i + 2] * k);
+      }
+      d[i + 3] = a;
+      if (a > 40) {
+        const px = (i / 4) % W;
+        const py = Math.floor(i / 4 / W);
+        if (px < x0) x0 = px;
+        if (px > x1) x1 = px;
+        if (py < y0) y0 = py;
+        if (py > y1) y1 = py;
+      }
+    }
+    ctx.putImageData(data, 0, 0);
+  }
+  if (!blend || x1 <= x0 || y1 <= y0) {
+    // Potong persegi di tengah
+    const side = Math.min(W, H);
+    x0 = Math.floor((W - side) / 2);
+    y0 = Math.floor((H - side) / 2);
+    x1 = x0 + side;
+    y1 = y0 + side;
+  }
+  const pad = 8;
+  x0 = Math.max(0, x0 - pad);
+  y0 = Math.max(0, y0 - pad);
+  x1 = Math.min(W, x1 + pad);
+  y1 = Math.min(H, y1 + pad);
+  const cw = x1 - x0;
+  const ch = y1 - y0;
+  const OUT = 256;
+  const out = document.createElement('canvas');
+  out.width = OUT;
+  out.height = OUT;
+  const octx = out.getContext('2d');
+  const scale = Math.min(OUT / cw, OUT / ch);
+  const dw = cw * scale;
+  const dh = ch * scale;
+  octx.drawImage(best.c, x0, y0, cw, ch, (OUT - dw) / 2, (OUT - dh) / 2, dw, dh);
+  const blob = await new Promise((resolve) => out.toBlob(resolve, 'image/png'));
+  if (!blob) throw new Error('Gagal membuat gambar dari video');
+  return new File([blob], 'gift.png', { type: 'image/png' });
+}
+
 function lightboxVideo(src) {
   const v = h('video', { src, autoplay: true, loop: true, muted: true, playsinline: true, controls: true, style: 'max-width:100%;max-height:100%;border-radius:12px' });
   v.muted = true;
@@ -638,6 +734,7 @@ async function pageGifts() {
     { name: 'video', label: 'Efek MP4 layar penuh (opsional)', type: 'file', accept: 'video/mp4', maxMB: 15, preview: 'video', current: g && g.animationUrl, hint: 'MP4 maks 15 MB, disarankan portrait (mis. 720x1280) dan H.264. Diputar maksimal 6 detik lalu memudar halus. Suara tidak diputar.' },
     ...(g && g.animationUrl ? [{ name: 'removeVideo', label: 'Hapus efek MP4 yang ada', type: 'checkbox', value: false }] : []),
     { name: 'blend', label: 'Latar video hitam → jadikan transparan', type: 'checkbox', value: g ? g.animationBlend : false },
+    { name: 'autoThumb', label: 'Buat gambar gift otomatis dari video (jika gambar kosong)', type: 'checkbox', value: true },
     { name: 'active', label: 'Aktif (tampil di panel gift)', type: 'checkbox', value: g ? g.active : true },
   ];
 
@@ -653,6 +750,13 @@ async function pageGifts() {
       ui.progress('Mengunggah efek MP4…', 0);
       animationUrl = (await xhrUpload('/api/admin/upload-video', r.video, (p) => ui.progress('Mengunggah efek MP4… ' + Math.round(p * 100) + '%', p))).url;
     } else if (r.removeVideo) animationUrl = '';
+    // Tidak ada gambar tapi ada video: ambil gambar dari video supaya daftar gift & chat tidak hanya emoji
+    const hasImage = r.image || (g && g.imageUrl && !r.removeImage);
+    if (r.video && r.autoThumb && !hasImage && imageUrl === undefined) {
+      ui.progress('Membuat gambar dari video…', 0);
+      const thumb = await makeThumb(URL.createObjectURL(r.video), r.blend);
+      imageUrl = (await xhrUpload('/api/admin/upload', thumb, (p) => ui.progress('Mengunggah gambar… ' + Math.round(p * 100) + '%', p))).url;
+    }
     ui.progress('Menyimpan…', 1);
     const body = { name: r.name, price: r.price, icon: r.icon || undefined, category: r.category, sortOrder: r.sortOrder ?? 0, active: r.active, animationBlend: r.blend };
     if (imageUrl !== undefined) body.imageUrl = imageUrl;
@@ -676,7 +780,7 @@ async function pageGifts() {
         h('div', { class: 'sp' }, h('b', {}, g.name), h('div', { class: 'dim' }, fmt(g.price) + ' koin · urutan ' + g.sortOrder)),
         h('div', { style: 'text-align:right' },
           h('span', { class: 'pill ' + (g.category === 'luxury' ? 'amber' : '') }, g.category === 'luxury' ? 'Mewah' : 'Populer'),
-          h('div', { style: 'margin-top:4px' }, g.active ? null : h('span', { class: 'pill red' }, 'Nonaktif'), g.animationUrl ? h('span', { class: 'pill purple', style: 'margin-left:4px' }, '🎬 MP4') : null))),
+          h('div', { style: 'margin-top:4px' }, g.active ? null : h('span', { class: 'pill red' }, 'Nonaktif'), g.animationUrl ? h('span', { class: 'pill purple', style: 'margin-left:4px' }, '🎬 MP4') : null, g.animationUrl && !g.imageUrl ? h('span', { class: 'pill amber', style: 'margin-left:4px' }, 'tanpa gambar') : null))),
       h('div', { class: 'row wrap', style: 'margin-top:12px;gap:6px' }, h('button', { class: 'btn sm', onclick: async () => {
         const r = await formModal({ title: 'Ubah gift', fields: fields(g), onSubmit: (v, ui) => save(g, v, ui) });
         if (r) {
@@ -684,7 +788,23 @@ async function pageGifts() {
           render();
         }
       } }, 'Ubah'),
-      g.animationUrl ? h('button', { class: 'btn sm', onclick: () => lightboxVideo(g.animationUrl) }, '▶ Putar efek MP4') : null)));
+      g.animationUrl ? h('button', { class: 'btn sm', onclick: () => lightboxVideo(g.animationUrl) }, '▶ Putar efek MP4') : null,
+      g.animationUrl && !g.imageUrl ? h('button', { class: 'btn sm pri', onclick: async (e) => {
+        const btn = e.currentTarget;
+        btn.disabled = true;
+        btn.textContent = 'Membuat gambar…';
+        try {
+          const file = await makeThumb(g.animationUrl, g.animationBlend);
+          const up = await xhrUpload('/api/admin/upload', file, () => {});
+          await patch('/api/admin/gifts/' + g.id, { imageUrl: up.url });
+          toast('Gambar gift dibuat dari video');
+          render();
+        } catch (ex) {
+          toast(ex.message, true);
+          btn.disabled = false;
+          btn.textContent = '🖼 Buat gambar dari video';
+        }
+      } }, '🖼 Buat gambar dari video') : null)));
   }
   root.append(grid);
   return root;
