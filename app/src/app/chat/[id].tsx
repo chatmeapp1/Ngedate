@@ -485,7 +485,7 @@ function WaBar({ wa, onGift }: { wa: WhatsappStatus; onGift: () => void }) {
     <Pressable onPress={onGift} style={s.wa}>
       <Ionicons name="lock-closed" size={18} color="#16A34A" />
       <View style={{ flex: 1, gap: 4 }}>
-        <Text style={s.waText}>
+        <Text style={s.waLabel}>
           Buka WhatsApp · {compact(wa.giftTotal)}/{compact(threshold)} koin gift
         </Text>
         <View style={s.track}>
@@ -630,6 +630,8 @@ const s = StyleSheet.create({
     borderColor: '#DCFCE7',
   },
   waText: { flex: 1, color: '#166534', fontWeight: '700', fontSize: 13 },
+  // Dalam kolom (teks di atas bar progres): jangan pakai flex:1 supaya tinggi teks tidak menyusut dan terpotong
+  waLabel: { color: '#166534', fontWeight: '700', fontSize: 13, lineHeight: 18 },
   waBtn: { backgroundColor: '#16A34A', paddingHorizontal: 14, height: 32, borderRadius: radius.pill, justifyContent: 'center' },
   waBtnText: { color: '#fff', fontWeight: '800' },
   track: { height: 6, borderRadius: 3, backgroundColor: '#DCFCE7', overflow: 'hidden' },
