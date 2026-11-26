@@ -63,8 +63,8 @@ router.post('/:id/messages', wrap(async (req, res) => {
       messageIds: result.settled.messageIds,
     });
   }
-  await pushBalances(result.settled ? [result.userId, result.hostId] : [req.user.id]);
-  res.status(201).json({ message: result.message, settled: result.settled });
+  await pushBalances(result.settled || result.freeCard ? [result.userId, result.hostId] : [req.user.id]);
+  res.status(201).json({ message: result.message, settled: result.settled, freeCard: !!result.freeCard });
 }));
 
 router.post('/:id/gifts', wrap(async (req, res) => {

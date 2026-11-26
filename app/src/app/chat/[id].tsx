@@ -40,7 +40,7 @@ export default function ChatRoom() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const convId = Number(id);
   const insets = useSafeAreaInsets();
-  const { user } = useAuth();
+  const { user, refreshMe } = useAuth();
   const { refreshUnread } = useRealtime();
 
   const [conv, setConv] = useState<Conversation | null>(null);
@@ -210,6 +210,7 @@ export default function ChatRoom() {
         { body }
       );
       addMessage(r.message);
+      if (isUser) refreshMe(); // kartu gratis & saldo
       // Host membalas: pesan user yang ditahan sekarang sudah dibayar
       if (r.settled?.messageIds?.length) setStatus(r.settled.messageIds, 'paid');
       setText('');
@@ -336,13 +337,23 @@ export default function ChatRoom() {
 
       {/* Info tarif (user) */}
       {isUser && price > 0 ? (
-        <View style={s.priceRow}>
-          <Coin size={13} />
-          <Text style={s.priceText}>
-            {number(price)} koin/pesan · dikembalikan jika tidak dibalas dalam 24 jam
-          </Text>
-          <Text style={s.balance}>Saldo {compact(user?.coins ?? 0)}</Text>
-        </View>
+        (user?.membership?.freeCardsLeft ?? 0) > 0 ? (
+          <View style={s.priceRow}>
+            <Ionicons name="ticket-outline" size={14} color="#D9801A" />
+            <Text style={s.priceText}>
+              Kartu pesan gratis VIP: sisa {user?.membership?.freeCardsLeft} hari ini · pesan tidak memotong koin
+            </Text>
+            <Text style={s.balance}>Saldo {compact(user?.coins ?? 0)}</Text>
+          </View>
+        ) : (
+          <View style={s.priceRow}>
+            <Coin size={13} />
+            <Text style={s.priceText}>
+              {number(price)} koin/pesan · dikembalikan jika tidak dibalas dalam 24 jam
+            </Text>
+            <Text style={s.balance}>Saldo {compact(user?.coins ?? 0)}</Text>
+          </View>
+        )
       ) : null}
 
       {/* Kolom tulis */}
@@ -443,12 +454,12 @@ function Bubble({ message: m, mine, showPayment }: { message: Message; mine: boo
   }
 
   const payment =
-    mine && showPayment && m.type === 'text' && m.price > 0
+    mine && showPayment && m.type === 'text' && (m.price > 0 || m.freeCard)
       ? {
           held: { icon: 'time-outline' as const, text: `${number(m.price)} koin ditahan`, color: colors.textDim },
           paid: { icon: 'checkmark-done' as const, text: 'Dibalas', color: colors.primary },
           refunded: { icon: 'arrow-undo' as const, text: 'Tidak dibalas · koin dikembalikan', color: colors.online },
-          free: null,
+          free: m.freeCard ? { icon: 'ticket-outline' as const, text: 'Kartu gratis VIP', color: '#D9801A' } : null,
         }[m.paymentStatus]
       : null;
 

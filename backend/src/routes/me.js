@@ -4,6 +4,7 @@ const v = require('../lib/validate');
 const { wrap, badRequest, conflict } = require('../lib/errors');
 const { publicUser } = require('./serializers');
 const storage = require('../lib/storage');
+const membership = require('../services/membership');
 
 const MAX_PHOTOS = 12;
 const LANGUAGES = ['id', 'en', 'ms', 'th', 'vi', 'tl', 'zh', 'ja', 'ko', 'ar', 'hi', 'es', 'pt'];
@@ -19,7 +20,9 @@ async function loadMe(userId) {
      WHERE u.id = $1`,
     [userId]
   );
-  return publicUser(rows[0], { self: true });
+  const out = publicUser(rows[0], { self: true });
+  out.membership = await membership.summary(db, userId);
+  return out;
 }
 
 function validateBirthDate(value) {

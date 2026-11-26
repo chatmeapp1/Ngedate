@@ -28,6 +28,24 @@ export interface User {
   verificationStatus?: 'none' | 'pending' | 'approved' | 'rejected';
   /** false = akun Login cepat yang belum pernah mengatur password */
   passwordSet?: boolean;
+  membership?: Membership;
+}
+
+/** Level (0-10) dan VIP (1-5) dari total top up koin */
+export interface Membership {
+  topupTotal: number;
+  level: number;
+  maxLevel: number;
+  levelThresholds: number[];
+  nextLevelAt: number | null;
+  levelProgress: number;
+  vip: number;
+  maxVip: number;
+  vipThresholds: number[];
+  nextVipAt: number | null;
+  vipProgress: number;
+  freeCardsPerDay: number;
+  freeCardsLeft: number;
 }
 
 export interface Host extends User {
@@ -111,6 +129,8 @@ export interface Message {
   } | null;
   price: number;
   paymentStatus: 'free' | 'held' | 'paid' | 'refunded';
+  /** pesan memakai kartu gratis VIP */
+  freeCard?: boolean;
   createdAt: string;
   /** hanya di aplikasi: pesan yang sedang dikirim */
   pending?: boolean;

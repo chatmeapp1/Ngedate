@@ -149,6 +149,17 @@ agency tertinggi, dan **menolak** (`NEGATIVE_MARGIN`) pengaturan, harga paket, a
 memperburuk kerugian. Kartu margin tampil di panel admin (Pengaturan dan Paket koin). Migrasi 011/012 mengembalikan
 `withdraw_diamonds_per_usd` dan `coin_price_idr` ke nilai awal ini.
 
+## Level, VIP, dan kartu pesan gratis
+
+Level (0-10) dan VIP (1-5) dihitung dari **total top up koin** (`users.topup_total`, bertambah saat admin menambah koin lewat
+**Top up koin**; pengurangan/penyesuaian tidak menurunkan). Batas awal Level: 0, 2.000, 30.000, 80.000, 150.000, 250.000,
+500.000, 1 juta, 2 juta, 5 juta, 10 juta koin. Batas VIP: 300.000, 700.000, 1,4 juta, 2,8 juta, 4 juta koin. Keduanya bisa diubah
+di panel admin > Pengaturan (`level_thresholds`, `vip_thresholds`).
+
+Pengguna VIP mendapat kartu pesan gratis (`free_cards_per_day`, awal 5 per hari, hari WIB): pesan ke host berbayar tidak
+memotong koin, dan host menerima `free_card_host_diamonds` (awal 5 diamond) yang dibayar app. `GET /api/me` mengirim
+`membership` (level, vip, progres, kartu tersisa). Kirim foto/video untuk VIP belum dibuat.
+
 ## Panel admin web
 
 Buka `http://<alamat-server>:<port>/admin` di browser (HP juga bisa) lalu masuk dengan akun admin

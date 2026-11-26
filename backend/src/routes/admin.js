@@ -13,6 +13,7 @@ const { mapGift } = require('./gifts');
 const { REPORT_REASONS } = require('../services/safety');
 const withdraw = require('../services/withdraw');
 const economy = require('../services/economy');
+const membership = require('../services/membership');
 
 const router = express.Router();
 
@@ -92,6 +93,7 @@ router.post('/users/:id/coins', wrap(async (req, res) => {
   const balance = await db.tx(async (client) => {
     const { rows } = await client.query(`SELECT id FROM users WHERE id = $1`, [userId]);
     if (!rows.length) throw notFound('User tidak ditemukan');
+    if (amount > 0) await membership.addTopup(client, userId, amount); // naikkan level/VIP
     return amount > 0
       ? wallet.creditCoins(client, userId, amount, 'admin_topup', { type: 'admin', id: req.user.id, note })
       : wallet.debitCoins(client, userId, -amount, 'admin_adjust', { type: 'admin', id: req.user.id, note });
@@ -207,6 +209,16 @@ router.patch('/settings', wrap(async (req, res) => {
     const share = Number(b.host_share);
     if (!(share >= 0 && share <= 1)) throw badRequest('host_share harus 0 sampai 1');
   }
+  for (const [k, count, label] of [['level_thresholds', 11, 'Batas level (Level 0 sampai 10)'], ['vip_thresholds', 5, 'Batas VIP (VIP 1 sampai 5)']]) {
+    if (b[k] === undefined) continue;
+    const list = membership.parseList(b[k], null);
+    if (!list || list.length !== count) throw badRequest(`${label}: isi ${count} angka dipisah koma`);
+    if (list.some((n, i) => i > 0 && n <= list[i - 1])) throw badRequest(`${label}: angka harus makin besar`);
+    if (k === 'level_thresholds' && list[0] !== 0) throw badRequest('Level 0 harus dimulai dari 0');
+    b[k] = list.map(Math.round);
+  }
+  if (b.free_cards_per_day !== undefined) b.free_cards_per_day = Math.round(Number(b.free_cards_per_day));
+  if (b.free_card_host_diamonds !== undefined) b.free_card_host_diamonds = Math.round(Number(b.free_card_host_diamonds));
   if (b.gift_host_share !== undefined) {
     const share = Number(b.gift_host_share);
     if (!(share >= 0 && share <= 1)) throw badRequest('gift_host_share harus 0 sampai 1');
@@ -220,6 +232,8 @@ router.patch('/settings', wrap(async (req, res) => {
   whole('withdraw_diamonds_per_usd', 'Diamond per 1 USD', 1, 1e7);
   whole('withdraw_usd_idr', 'Kurs Rupiah per 1 USD', 1000, 100000);
   whole('withdraw_min_diamonds', 'Minimal penarikan', 1, 1e9);
+  whole('free_cards_per_day', 'Kartu gratis per hari', 0, 100);
+  whole('free_card_host_diamonds', 'Diamond host per pesan gratis', 0, 1000);
   whole('withdraw_fee_percent', 'Biaya penarikan (%)', 0, 50);
   whole('withdraw_usdt_fee_usd', 'Biaya jaringan USDT (USD)', 0, 50);
   for (const k of ['withdraw_diamonds_per_usd', 'withdraw_usd_idr', 'withdraw_min_diamonds']) {

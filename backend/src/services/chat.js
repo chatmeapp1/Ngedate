@@ -1,6 +1,7 @@
 const db = require('../db');
 const wallet = require('./wallet');
 const safety = require('./safety');
+const membership = require('./membership');
 const { getSettings } = require('./settings');
 const { containsContact } = require('../lib/contactFilter');
 const { ApiError, badRequest, forbidden, notFound } = require('../lib/errors');
@@ -39,6 +40,7 @@ function mapMessage(r) {
       : null,
     price: Number(r.price),
     paymentStatus: r.payment_status,
+    freeCard: !!r.free_card,
     createdAt: r.created_at,
   };
 }
@@ -206,8 +208,8 @@ async function touchConversation(client, conv, senderIsUser, preview) {
 
 async function insertMessage(client, fields) {
   const { rows } = await client.query(
-    `INSERT INTO messages (conversation_id, sender_id, type, body, gift_id, gift_count, price, payment_status, settled_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8::varchar, CASE WHEN $8::varchar IN ('paid', 'refunded') THEN now() END)
+    `INSERT INTO messages (conversation_id, sender_id, type, body, gift_id, gift_count, price, payment_status, settled_at, free_card)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8::varchar, CASE WHEN $8::varchar IN ('paid', 'refunded') THEN now() END, $9)
      RETURNING id`,
     [
       fields.conversationId,
@@ -218,6 +220,7 @@ async function insertMessage(client, fields) {
       fields.giftCount ?? null,
       fields.price ?? 0,
       fields.paymentStatus ?? 'free',
+      !!fields.freeCard,
     ]
   );
   return Number(rows[0].id);
@@ -279,15 +282,27 @@ async function sendText(senderId, convIdRaw, bodyRaw) {
       price = rows.length ? Number(rows[0].chat_price) : 0;
     }
 
+    // Kartu pesan gratis (VIP): pesan ke host berbayar tanpa potong koin, host dibayar app
+    let freeCard = false;
+    if (senderIsUser && price > 0) {
+      await client.query(`SELECT id FROM users WHERE id = $1 FOR UPDATE`, [senderId]); // cegah balapan penghitungan kartu
+      const m = await membership.summary(client, senderId, settings);
+      freeCard = m.freeCardsLeft > 0;
+    }
+
     const messageId = await insertMessage(client, {
       conversationId: conv.id,
       senderId,
       type: 'text',
       body,
-      price,
-      paymentStatus: price > 0 ? 'held' : 'free',
+      price: freeCard ? 0 : price,
+      paymentStatus: price > 0 && !freeCard ? 'held' : 'free',
+      freeCard,
     });
-    if (price > 0) {
+    if (freeCard) {
+      const bonus = Math.max(0, Math.round(Number(settings.free_card_host_diamonds)));
+      if (bonus > 0) await wallet.creditDiamonds(client, Number(conv.host_id), bonus, 'free_card_income', { type: 'message', id: messageId });
+    } else if (price > 0) {
       await wallet.debitCoins(client, senderId, price, 'chat_hold', { type: 'message', id: messageId });
     }
 
@@ -300,6 +315,7 @@ async function sendText(senderId, convIdRaw, bodyRaw) {
       hostId: Number(conv.host_id),
       message: await fetchMessage(client, messageId),
       settled,
+      freeCard,
     };
   });
 }

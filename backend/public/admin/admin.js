@@ -1094,6 +1094,10 @@ async function pageSettings() {
     { k: 'coin_price_idr', label: 'Harga jual 1 koin (Rupiah)', hint: 'Dipakai untuk menghitung harga otomatis paket koin. Tidak mengubah paket yang sudah ada.', min: 0.01 },
     { k: 'withdraw_diamonds_per_usd', label: 'Penarikan: diamond per 1 USD', hint: 'Makin besar angkanya, makin kecil nilai 1 diamond (Rp 17.000 ÷ angka ini). Awal 6.667 = Rp 2,55 per diamond. Server menolak nilai yang membuat app rugi.', min: 1 },
     { k: 'withdraw_usd_idr', label: 'Penarikan: Rupiah per 1 USD (host Indonesia)', hint: 'Host Indonesia dibayar Rupiah memakai kurs ini; host negara lain dibayar USDT.', min: 1000 },
+    { k: 'level_thresholds', list: true, label: 'Batas level (total top up, koin)', hint: '11 angka dipisah koma untuk Level 0 sampai 10 (Level 0 = 0). Level naik dari TOTAL top up koin.' },
+    { k: 'vip_thresholds', list: true, label: 'Batas VIP (total top up, koin)', hint: '5 angka dipisah koma untuk VIP 1 sampai 5. VIP bisa kirim foto/video dan memakai kartu pesan gratis.' },
+    { k: 'free_cards_per_day', label: 'Kartu pesan gratis per hari (VIP)', hint: 'Pengguna VIP mengirim pesan ke host berbayar tanpa dipotong koin sebanyak ini per hari.', min: 0, max: 100 },
+    { k: 'free_card_host_diamonds', label: 'Diamond host per pesan gratis', hint: 'Dibayar oleh app (bukan pengguna). Awal 5 diamond.', min: 0, max: 1000 },
     { k: 'withdraw_min_diamonds', label: 'Penarikan: minimal diamond per pengajuan', min: 1 },
     { k: 'withdraw_fee_percent', label: 'Penarikan: biaya (%)', hint: 'Dipotong dari jumlah penarikan. 0 = tanpa biaya.', min: 0, max: 50 },
     { k: 'withdraw_usdt_fee_usd', label: 'Penarikan USDT: biaya jaringan TRC20 (USD)', hint: 'Dipotong dari tiap penarikan USDT untuk menutup biaya kirim di jaringan Tron.', min: 0, max: 50 },
@@ -1103,6 +1107,7 @@ async function pageSettings() {
     e.preventDefault();
     const body = {};
     for (const d of defs) {
+      if (d.list) { body[d.k] = inputs[d.k].value; continue; }
       const raw = Number(inputs[d.k].value);
       if (!Number.isFinite(raw)) return toast(d.label + ' harus angka', true);
       body[d.k] = d.back ? d.back(raw) : raw;
@@ -1110,7 +1115,9 @@ async function pageSettings() {
     if (await act(() => patch('/api/admin/settings', body), 'Pengaturan disimpan')) render();
   } },
     defs.map((d) => {
-      const input = h('input', { type: 'number', step: 'any', min: d.min, max: d.max, value: d.conv ? d.conv(Number(s[d.k])) : s[d.k] });
+      const input = d.list
+        ? h('input', { type: 'text', value: (s[d.k] || []).join(', ') })
+        : h('input', { type: 'number', step: 'any', min: d.min, max: d.max, value: d.conv ? d.conv(Number(s[d.k])) : s[d.k] });
       inputs[d.k] = input;
       return h('label', { class: 'f' }, h('span', {}, d.label), input, d.hint ? h('small', { class: 'hint' }, d.hint) : null);
     }),

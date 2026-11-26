@@ -20,6 +20,12 @@ const DEFAULTS = {
   withdraw_usdt_fee_usd: 1, // biaya jaringan USDT (TRC20) per penarikan, dalam USD
   // Harga jual 1 koin (Rupiah), dipakai menghitung harga otomatis paket koin. Terpisah dari nilai diamond host.
   coin_price_idr: 2,
+  // Level (0-10) dan VIP (1-5) dari TOTAL top up koin. Level 0 dimulai dari 0.
+  level_thresholds: [0, 2000, 30000, 80000, 150000, 250000, 500000, 1000000, 2000000, 5000000, 10000000],
+  vip_thresholds: [300000, 700000, 1400000, 2800000, 4000000],
+  // Kartu pesan gratis (VIP): jumlah per hari, dan diamond untuk host per pesan gratis (dibayar app)
+  free_cards_per_day: 5,
+  free_card_host_diamonds: 5,
   // Top up koin: pemesanan lewat WhatsApp admin (sampai Google Play Billing dipasang)
   topup_contact: '', // nomor WhatsApp admin, hanya angka dengan kode negara (mis. 6281234567890)
   topup_note: 'Pilih paket, lalu pesan lewat WhatsApp admin. Koin ditambahkan setelah pembayaran dikonfirmasi.',
