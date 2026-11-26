@@ -7,6 +7,8 @@ const v = require('../lib/validate');
 const realtime = require('../realtime');
 
 const MAX_TEXT = 1000;
+// Pesan beruntun dari host yang boleh dikirim sebelum user membalas
+const HOST_UNANSWERED_LIMIT = 3;
 const MAX_GIFT_COUNT = 999;
 
 // ---------------------------------------------------------------------------
@@ -108,6 +110,36 @@ async function getOrCreateConversation(userId, hostIdRaw) {
     [userId, hostId]
   );
   return getConversation(userId, rows[0].id);
+}
+
+/**
+ * Host menyapa pengguna pria lebih dulu. Pesan host selalu gratis; koin user baru
+ * berpindah ke host setelah user membalas dan host membalas lagi.
+ */
+async function getOrCreateConversationAsHost(hostId, userIdRaw) {
+  const userId = v.id(userIdRaw, 'userId');
+  if (userId === hostId) throw badRequest('Tidak bisa chat dengan diri sendiri');
+
+  const { rows: people } = await db.query(
+    `SELECT id, role, status, host_status, gender, profile_completed FROM users WHERE id = ANY($1::bigint[])`,
+    [[userId, hostId]]
+  );
+  const me = people.find((p) => Number(p.id) === hostId);
+  const user = people.find((p) => Number(p.id) === userId);
+  if (!me || me.role !== 'host' || me.status !== 'active' || me.host_status !== 'approved') {
+    throw forbidden('Hanya host yang sudah disetujui yang bisa menyapa pengguna');
+  }
+  if (!user || user.role !== 'user' || user.status !== 'active' || user.gender !== 'male' || !user.profile_completed) {
+    throw notFound('Pengguna tidak ditemukan');
+  }
+
+  const { rows } = await db.query(
+    `INSERT INTO conversations (user_id, host_id) VALUES ($1, $2)
+     ON CONFLICT (user_id, host_id) DO UPDATE SET user_id = EXCLUDED.user_id
+     RETURNING *`,
+    [userId, hostId]
+  );
+  return getConversation(hostId, rows[0].id);
 }
 
 async function getConversation(viewerId, convId) {
@@ -220,6 +252,19 @@ async function sendText(senderId, convIdRaw, bodyRaw) {
     const conv = await lockConversation(client, convId, senderId);
     const settings = await getSettings(client);
     const senderIsUser = Number(conv.user_id) === senderId;
+
+    // Host boleh menyapa duluan (gratis), tapi tidak menumpuk pesan tanpa balasan dari user
+    if (!senderIsUser) {
+      const { rows: tail } = await client.query(
+        `SELECT COUNT(*)::int AS n FROM messages
+         WHERE conversation_id = $1 AND type = 'text' AND sender_id = $2
+           AND id > COALESCE((SELECT MAX(id) FROM messages WHERE conversation_id = $1 AND sender_id = $3), 0)`,
+        [conv.id, senderId, conv.user_id]
+      );
+      if (tail[0].n >= HOST_UNANSWERED_LIMIT) {
+        throw new ApiError(429, 'WAIT_FOR_REPLY', `Tunggu balasan dulu — kamu sudah mengirim ${HOST_UNANSWERED_LIMIT} pesan tanpa balasan`);
+      }
+    }
 
     let price = 0;
     if (senderIsUser) {
@@ -440,6 +485,7 @@ async function refundExpired() {
 
 module.exports = {
   getOrCreateConversation,
+  getOrCreateConversationAsHost,
   getConversation,
   listConversations,
   sendText,

@@ -201,8 +201,13 @@ export default function ChatRoom() {
     if (!body || sending) return;
     setSending(true);
     try {
-      const r = await api.post<{ message: Message }>(`/api/conversations/${convId}/messages`, { body });
+      const r = await api.post<{ message: Message; settled?: { messageIds: number[] } | null }>(
+        `/api/conversations/${convId}/messages`,
+        { body }
+      );
       addMessage(r.message);
+      // Host membalas: pesan user yang ditahan sekarang sudah dibayar
+      if (r.settled?.messageIds?.length) setStatus(r.settled.messageIds, 'paid');
       setText('');
     } catch (e) {
       if (e instanceof ApiError && e.code === 'INSUFFICIENT_COINS') {
@@ -210,8 +215,8 @@ export default function ChatRoom() {
           { text: 'Nanti', style: 'cancel' },
           { text: 'Top up', onPress: () => router.push('/wallet') },
         ]);
-      } else if (e instanceof ApiError && e.code === 'CONTACT_BLOCKED') {
-        Alert.alert('Pesan tidak terkirim', e.message);
+      } else if (e instanceof ApiError && (e.code === 'CONTACT_BLOCKED' || e.code === 'WAIT_FOR_REPLY')) {
+        Alert.alert(e.code === 'WAIT_FOR_REPLY' ? 'Tunggu balasan dulu' : 'Pesan tidak terkirim', e.message);
       } else {
         Alert.alert('Gagal mengirim', errorMessage(e));
       }
@@ -286,6 +291,12 @@ export default function ChatRoom() {
         <View style={s.hostHint}>
           <Ionicons name="diamond" size={16} color={colors.primary} />
           <Text style={s.hostHintText}>Balas sekarang untuk menerima bagian dari {number(heldForHost)} koin</Text>
+        </View>
+      ) : null}
+      {!isUser && heldForHost === 0 ? (
+        <View style={s.hostHint}>
+          <Ionicons name="gift-outline" size={16} color={colors.primary} />
+          <Text style={s.hostHintText}>Pesanmu gratis. Koin masuk saat kamu membalas pesan dari pengguna.</Text>
         </View>
       ) : null}
 

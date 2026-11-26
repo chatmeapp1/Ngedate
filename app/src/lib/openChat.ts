@@ -12,3 +12,13 @@ export async function openChat(hostId: number) {
     Alert.alert('Tidak bisa membuka chat', errorMessage(e));
   }
 }
+
+// Host menyapa pengguna pria lebih dulu (pesan host gratis)
+export async function openChatWithMember(userId: number) {
+  try {
+    const conv = await api.post<Conversation>('/api/conversations', { userId });
+    router.push({ pathname: '/chat/[id]', params: { id: String(conv.id) } });
+  } catch (e) {
+    Alert.alert('Tidak bisa membuka chat', errorMessage(e));
+  }
+}

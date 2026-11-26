@@ -3,9 +3,11 @@ import { memo, type ReactElement } from 'react';
 import { StyleSheet, Text, View, Pressable, FlatList, RefreshControl, ActivityIndicator } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import { Avatar, Empty } from '@/components/ui';
 import { Verified } from '@/components/Verified';
 import { countryName, flag } from '@/lib/countries';
+import { openChatWithMember } from '@/lib/openChat';
 import { colors, gradients, radius } from '@/lib/theme';
 import type { User } from '@/lib/types';
 
@@ -42,13 +44,18 @@ const MemberCard = memo(function MemberCard({ member, onPress }: { member: User;
       </View>
 
       <View style={s.bottom}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
           <Text style={[s.name, { flexShrink: 1 }]} numberOfLines={1}>
             {member.displayName}
             {member.age ? <Text style={s.age}>  {member.age}</Text> : null}
           </Text>
           {member.verified ? <Verified size={15} /> : null}
         </View>
+        <Pressable onPress={() => openChatWithMember(member.id)} hitSlop={8}>
+          <LinearGradient colors={gradients.brand} style={s.msgBtn}>
+            <Ionicons name="chatbubble-ellipses" size={20} color="#fff" />
+          </LinearGradient>
+        </Pressable>
       </View>
     </Pressable>
   );
@@ -133,7 +140,8 @@ const s = StyleSheet.create({
     maxWidth: '62%',
   },
   countryText: { color: '#fff', fontSize: 11, fontWeight: '700', flexShrink: 1 },
-  bottom: { position: 'absolute', left: 12, right: 10, bottom: 12 },
+  bottom: { position: 'absolute', left: 12, right: 10, bottom: 12, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  msgBtn: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' },
   name: { color: '#fff', fontSize: 16, fontWeight: '800' },
   age: { fontSize: 13, fontWeight: '600', color: 'rgba(255,255,255,0.85)' },
 });

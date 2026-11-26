@@ -5,15 +5,16 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Avatar, Empty, Loading } from '@/components/ui';
+import { Avatar, Empty, GradientButton, Loading } from '@/components/ui';
 import { Verified } from '@/components/Verified';
 import { api, errorMessage } from '@/lib/api';
 import { countryName, flag } from '@/lib/countries';
 import { lastSeen } from '@/lib/format';
+import { openChatWithMember } from '@/lib/openChat';
 import { colors, gradients, radius } from '@/lib/theme';
 import type { User } from '@/lib/types';
 
-// Profil pengguna pria — hanya dilihat oleh akun host (tanpa tombol chat: host membalas saat user menulis)
+// Profil pengguna pria — hanya dilihat oleh akun host. Host boleh menyapa duluan (gratis).
 export default function MemberProfile() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
@@ -91,8 +92,11 @@ export default function MemberProfile() {
         ) : null}
         <View style={s.note}>
           <Ionicons name="information-circle-outline" size={18} color={colors.primary} />
-          <Text style={s.noteText}>Pengguna memulai obrolan sendiri. Pesannya akan muncul di tab Pesan, dan koin dibayarkan saat kamu membalas.</Text>
+          <Text style={s.noteText}>Sapaanmu gratis. Kalau pengguna membalas, koin mereka ditahan dan masuk ke kamu setelah kamu membalas lagi.</Text>
         </View>
+      </View>
+      <View style={[s.cta, { paddingBottom: insets.bottom + 12 }]}>
+        <GradientButton title="Sapa sekarang · Gratis" icon="chatbubble-ellipses" onPress={() => openChatWithMember(member.id)} />
       </View>
     </View>
   );
@@ -117,6 +121,7 @@ const s = StyleSheet.create({
   tags: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   tag: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.pill, backgroundColor: colors.surfaceAlt },
   tagText: { color: colors.primaryDark, fontWeight: '700', fontSize: 13 },
+  cta: { position: 'absolute', left: 16, right: 16, bottom: 0 },
   note: { flexDirection: 'row', gap: 8, padding: 12, borderRadius: radius.md, backgroundColor: '#F3E8FF', alignItems: 'flex-start' },
   noteText: { flex: 1, color: colors.textSub, fontSize: 13, lineHeight: 18 },
 });

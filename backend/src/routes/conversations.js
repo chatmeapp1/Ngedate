@@ -37,8 +37,11 @@ router.get('/unread-count', wrap(async (req, res) => {
   res.json({ total: rows[0].total });
 }));
 
-// Buka (atau buat) percakapan dengan host
+// Buka (atau buat) percakapan. User memakai { hostId }, host memakai { userId } (menyapa duluan, gratis)
 router.post('/', wrap(async (req, res) => {
+  if (req.body.userId !== undefined) {
+    return res.json(await chat.getOrCreateConversationAsHost(req.user.id, req.body.userId));
+  }
   res.json(await chat.getOrCreateConversation(req.user.id, req.body.hostId));
 }));
 
