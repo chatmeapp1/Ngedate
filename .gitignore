@@ -5,3 +5,8 @@ android/
 ios/
 .expo/
 backend/uploads/
+
+# Kunci rahasia (jangan pernah di-commit)
+backend/fcm-key.json
+*-firebase-adminsdk-*.json
+app/google-services.json

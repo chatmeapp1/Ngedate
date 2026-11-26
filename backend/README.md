@@ -169,8 +169,8 @@ per hari. File disimpan di `UPLOAD_DIR` (di hosting tanpa disk permanen, pindahk
 **Suara gift:** panel admin > Gift > Ubah gift > "Suara gift" (MP3/M4A/AAC/OGG/WAV, maks 2 MB). Diputar sekali di HP pengirim dan
 penerima saat gift datang.
 
-**Notifikasi push (Android, Firebase Cloud Messaging):** dikirim saat ada pesan, foto/video, atau gift untuk pengguna yang
-sedang tidak membuka aplikasi. Ketuk notifikasi membuka chatnya. Langkah pasang (sekali saja):
+**Notifikasi push (Android, Firebase Cloud Messaging):** dikirim hanya untuk **gift** ke pengguna yang
+sedang tidak membuka aplikasi (pesan teks/foto/video tidak, supaya tidak ramai). Ketuk notifikasi membuka chatnya. Langkah pasang (sekali saja):
 
 1. Firebase Console > buat project > tambah aplikasi Android dengan nama paket `app.amora.chat` > unduh `google-services.json`.
 2. Isi file itu ke GitHub: Settings > Secrets > Actions > `GOOGLE_SERVICES_JSON` (tempel isi file), lalu bangun APK 1.1.0.

@@ -173,3 +173,53 @@ test('pengiriman FCM (server tiruan): token OAuth, isi pesan, hanya jika offline
     fake.close();
   }
 });
+
+test('push hanya untuk gift: pesan teks tidak memicu notifikasi, gift memicu', async () => {
+  const crypto = require('crypto');
+  const { privateKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
+  const sent = [];
+  const fake = http.createServer((req, res) => {
+    let raw = '';
+    req.on('data', (c) => (raw += c));
+    req.on('end', () => {
+      res.setHeader('content-type', 'application/json');
+      if (req.url === '/token') return res.end(JSON.stringify({ access_token: 't', expires_in: 3600 }));
+      sent.push(JSON.parse(raw).message);
+      res.end('{}');
+    });
+  });
+  await new Promise((r) => fake.listen(0, r));
+  const port = fake.address().port;
+  process.env.FCM_BASE_URL = `http://127.0.0.1:${port}`;
+  process.env.FCM_TOKEN_URL = `http://127.0.0.1:${port}/token`;
+  process.env.FCM_RELOAD = '1';
+  process.env.FCM_SERVICE_ACCOUNT_JSON = JSON.stringify({ client_email: 'x@p.iam.gserviceaccount.com', private_key: privateKey.export({ type: 'pkcs8', format: 'pem' }), project_id: 'p' });
+  try {
+    const host = await register('hostgift');
+    await api('PATCH', `/api/admin/users/${host.id}/role`, { token: admin, body: { role: 'host' } });
+    await db.query(`INSERT INTO push_tokens (token, user_id) VALUES ($1, $2)`, ['gift-token-' + 'z'.repeat(30), host.id]);
+    const user = await register('pengirimgift');
+    await api('POST', `/api/admin/users/${user.id}/coins`, { token: admin, body: { amount: 5000 } });
+    const { rows } = await db.query(`INSERT INTO gifts (name, price) VALUES ('Mawar', 100) RETURNING id`);
+    const conv = (await api('POST', '/api/conversations', { token: user.token, body: { hostId: host.id } })).body;
+
+    await api('POST', `/api/conversations/${conv.id}/messages`, { token: user.token, body: { body: 'halo' } });
+    await new Promise((r) => setTimeout(r, 300));
+    assert.equal(sent.length, 0, 'pesan teks tidak mengirim push');
+
+    const g = await api('POST', `/api/conversations/${conv.id}/gifts`, { token: user.token, body: { giftId: rows[0].id, count: 2 } });
+    assert.equal(g.status, 201, JSON.stringify(g.body));
+    await new Promise((r) => setTimeout(r, 500));
+    assert.equal(sent.length, 1, 'gift mengirim push');
+    assert.match(sent[0].notification.body, /Mawar x2/);
+    assert.equal(sent[0].data.conversationId, String(conv.id));
+  } finally {
+    delete process.env.FCM_SERVICE_ACCOUNT_JSON;
+    delete process.env.FCM_BASE_URL;
+    delete process.env.FCM_TOKEN_URL;
+    process.env.FCM_RELOAD = '1';
+    push.enabled();
+    delete process.env.FCM_RELOAD;
+    fake.close();
+  }
+});

@@ -18,16 +18,13 @@ async function pushBalances(userIds) {
 }
 
 // Kirim pesan baru ke kedua pihak, masing-masing dengan ringkasan percakapan versinya sendiri
-// Notifikasi push untuk lawan bicara yang sedang tidak online
+// Notifikasi push untuk lawan bicara yang sedang tidak online. Hanya GIFT yang dikirim sebagai push;
+// pesan teks/foto/video tidak (supaya tidak ramai), pengguna melihatnya saat membuka aplikasi.
 async function pushNotify(result, message) {
-  if (!['text', 'image', 'video', 'gift'].includes(message.type) || message.senderId == null) return;
+  if (message.type !== 'gift' || message.senderId == null) return;
   const to = message.senderId === result.userId ? result.hostId : result.userId;
   const { rows } = await db.query(`SELECT display_name FROM users WHERE id = $1`, [message.senderId]);
-  const body =
-    message.type === 'text' ? message.body :
-    message.type === 'image' ? '📷 Foto' :
-    message.type === 'video' ? '🎥 Video' :
-    `🎁 ${message.gift ? message.gift.name : 'Gift'}${message.gift && message.gift.count > 1 ? ` x${message.gift.count}` : ''}`;
+  const body = `🎁 ${message.gift ? message.gift.name : 'Gift'}${message.gift && message.gift.count > 1 ? ` x${message.gift.count}` : ''}`;
   push.notifyLater(to, { title: rows[0] ? rows[0].display_name : 'Amora', body, data: { type: 'chat', conversationId: result.conversationId } });
 }
 
