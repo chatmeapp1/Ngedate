@@ -42,12 +42,18 @@ async function freeCardsUsed(client, userId) {
 }
 
 /** Ringkasan keanggotaan satu pengguna (level, VIP, kartu gratis). */
+// Penghasilan diamond host 7 hari terakhir (chat, gift, kartu gratis)
+const WEEK_INCOME_SQL = `(SELECT COALESCE(SUM(l.amount), 0) FROM ledger l
+  WHERE l.user_id = {id} AND l.currency = 'diamond' AND l.amount > 0
+    AND l.reason IN ('chat_income', 'gift_income', 'free_card_income') AND l.created_at > now() - interval '7 days')`;
+const weekIncomeSql = (idExpr) => WEEK_INCOME_SQL.replace('{id}', idExpr);
+
 async function summary(client, userId, settings) {
   const s = settings || (await getSettings(client));
-  const { rows } = await client.query(`SELECT role, topup_total, income_total FROM users WHERE id = $1`, [userId]);
+  const { rows } = await client.query(`SELECT role, topup_total, ${weekIncomeSql('users.id')} AS week_income FROM users WHERE id = $1`, [userId]);
   const isHost = rows.length && rows[0].role === 'host';
   // Host: level dari total pendapatan diamond; pengguna: level & VIP dari total top up koin
-  const total = rows.length ? Number(isHost ? rows[0].income_total : rows[0].topup_total) : 0;
+  const total = rows.length ? Number(isHost ? rows[0].week_income : rows[0].topup_total) : 0;
   const levels = isHost ? s.host_level_thresholds : s.level_thresholds;
   const vips = isHost ? [] : s.vip_thresholds;
   const level = levelOf(total, levels);
@@ -58,7 +64,7 @@ async function summary(client, userId, settings) {
   const used = vip > 0 ? await freeCardsUsed(client, userId) : 0;
   return {
     kind: isHost ? 'host' : 'user',
-    topupTotal: total, // untuk host: total pendapatan diamond
+    topupTotal: total, // untuk host: penghasilan diamond 7 hari terakhir
     level,
     maxLevel: levels.length - 1,
     levelThresholds: levels,
@@ -79,4 +85,4 @@ async function addTopup(client, userId, amount) {
   if (amount > 0) await client.query(`UPDATE users SET topup_total = topup_total + $2 WHERE id = $1`, [userId, amount]);
 }
 
-module.exports = { DAY_START_SQL, summary, addTopup, levelOf, vipOf, parseList, freeCardsUsed };
+module.exports = { weekIncomeSql, DAY_START_SQL, summary, addTopup, levelOf, vipOf, parseList, freeCardsUsed };

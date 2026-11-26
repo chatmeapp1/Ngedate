@@ -212,47 +212,49 @@ test('foto & video di chat: khusus VIP, isi file diperiksa, batas harian, tidak 
   await A('PATCH', '/api/admin/settings', { vip_media_per_day: 30 });
 });
 
-test('level host dari total pendapatan diamond; terlihat di daftar & profil host, ringkasan sendiri', async () => {
+test('level host dari penghasilan diamond 7 hari terakhir (bergulir); terlihat di daftar & profil host', async () => {
   const h2 = await register('hostlevel');
   await A('PATCH', `/api/admin/users/${h2.id}/role`, { role: 'host' });
   await db.query(`UPDATE users SET host_status = 'approved', profile_completed = true, gender = 'female' WHERE id = $1`, [h2.id]);
   await api('PATCH', '/api/host/settings', { token: h2.token, body: { chatPrice: 100 } });
 
-  // baru: level 0, ringkasan host berbasis pendapatan
+  // baru: level 0, ringkasan host berbasis penghasilan
   let own = (await me(h2)).membership;
   assert.equal(own.kind, 'host');
   assert.equal(own.level, 0);
-  assert.equal(own.nextLevelAt, 2000);
+  assert.equal(own.nextLevelAt, 300);
   assert.equal(own.vip, 0);
 
-  // pendapatan 2.000 diamond (dari gift 20.000 koin x 10%) -> Level 1
-  await db.query(`INSERT INTO gifts (name, price) VALUES ('Besar', 20000)`);
-  const gid = (await db.query(`SELECT id FROM gifts WHERE name = 'Besar'`)).rows[0].id;
+  // gift 20.000 koin -> host 2.000 diamond -> Level 2 (batas 300 dan 3.000: 2.000 masih Level 1)
+  const gid = (await db.query(`INSERT INTO gifts (name, price) VALUES ('Besar', 20000) RETURNING id`)).rows[0].id;
   const payer = await register('pembayarlevel');
   await A('POST', `/api/admin/users/${payer.id}/coins`, { amount: 200000 });
   const conv = (await api('POST', '/api/conversations', { token: payer.token, body: { hostId: h2.id } })).body;
   const g = await api('POST', `/api/conversations/${conv.id}/gifts`, { token: payer.token, body: { giftId: gid } });
   assert.equal(g.status, 201, JSON.stringify(g.body));
   own = (await me(h2)).membership;
-  assert.equal(own.topupTotal, 2000, 'pendapatan 10% dari 20.000');
+  assert.equal(own.topupTotal, 2000, 'penghasilan 7 hari = 10% dari 20.000');
   assert.equal(own.level, 1);
 
-  // pengguna melihat level host (bukan jumlah pendapatannya)
+  // pengguna melihat level host (bukan jumlah penghasilannya)
   const list = (await api('GET', '/api/hosts', { token: payer.token })).body;
-  const card = list.find((x) => x.id === h2.id);
-  assert.equal(card.level, 1);
+  assert.equal(list.find((x) => x.id === h2.id).level, 1);
   const prof = (await api('GET', `/api/hosts/${h2.id}`, { token: payer.token })).body;
   assert.equal(prof.level, 1);
-  assert.ok(!JSON.stringify(prof).includes('income'), 'pendapatan host tidak dibuka ke pengguna');
+  assert.ok(!/income|week/.test(JSON.stringify(prof)), 'penghasilan host tidak dibuka ke pengguna');
 
-  // penarikan tidak menurunkan level
+  // menarik diamond tidak menurunkan level
   await db.query(`UPDATE users SET diamonds = 0 WHERE id = $1`, [h2.id]);
   assert.equal((await me(h2)).membership.level, 1);
+
+  // bergulir: penghasilan yang lebih dari 7 hari lalu tidak dihitung lagi
+  await db.query(`UPDATE ledger SET created_at = now() - interval '8 days' WHERE user_id = $1 AND reason = 'gift_income'`, [h2.id]);
+  assert.equal((await me(h2)).membership.level, 0);
+  assert.equal((await api('GET', `/api/hosts/${h2.id}`, { token: payer.token })).body.level, 0);
 
   // batas level host dapat diatur admin
   const ok = await A('PATCH', '/api/admin/settings', { host_level_thresholds: '0, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000' });
   assert.equal(ok.status, 200, JSON.stringify(ok.body));
-  assert.equal((await me(h2)).membership.level, 10);
   assert.equal((await A('PATCH', '/api/admin/settings', { host_level_thresholds: '1,2,3' })).status, 400);
-  await A('PATCH', '/api/admin/settings', { host_level_thresholds: '0, 2000, 30000, 80000, 150000, 250000, 500000, 1000000, 2000000, 5000000, 10000000' });
+  await A('PATCH', '/api/admin/settings', { host_level_thresholds: '0, 300, 3000, 5000, 10000, 70000, 150000, 300000, 500000, 1000000, 5000000' });
 });

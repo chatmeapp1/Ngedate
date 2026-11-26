@@ -1,4 +1,4 @@
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import type { ComponentProps } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
@@ -46,6 +46,37 @@ export function LevelBadge({ level, size = 26 }: { level: number; size?: number 
         </LinearGradient>
       </View>
     </View>
+  );
+}
+
+/** Warna level host (0-10): lembut dan bertingkat, mengikuti urutan abu, hijau, biru, pink, ungu, oranye, merah, emas. */
+const HOST_LEVEL_COLORS: readonly (readonly [string, string])[] = [
+  ['#B6BAC4', '#979CA8'], // 0
+  ['#3DDC97', '#12B981'], // 1
+  ['#45C4FA', '#2AA5F0'], // 2
+  ['#F77FBA', '#EC4899'], // 3
+  ['#B15CF7', '#9333EA'], // 4
+  ['#7A97FF', '#5B7BF5'], // 5
+  ['#FFAA55', '#F28A2E'], // 6
+  ['#FF8556', '#F4592E'], // 7
+  ['#E057F2', '#C026D3'], // 8
+  ['#FF6A55', '#E5391F'], // 9
+  ['#FFD04A', '#F5A524'], // 10
+];
+
+/** Lencana level host: pil kecil dengan bintang dan angka level. */
+export function HostLevelBadge({ level, size = 18 }: { level: number; size?: number }) {
+  const c = HOST_LEVEL_COLORS[Math.max(0, Math.min(HOST_LEVEL_COLORS.length - 1, level))];
+  return (
+    <LinearGradient
+      colors={c}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={{ height: size, borderRadius: size / 2, paddingLeft: size * 0.32, paddingRight: size * 0.42, flexDirection: 'row', alignItems: 'center', gap: size * 0.14, alignSelf: 'flex-start' }}
+    >
+      <Ionicons name="star" size={size * 0.62} color="rgba(255,255,255,0.95)" />
+      <Text style={{ color: '#fff', fontWeight: '800', fontSize: size * 0.62, lineHeight: size * 0.8, minWidth: size * 0.4, textAlign: 'center' }}>{level}</Text>
+    </LinearGradient>
   );
 }
 

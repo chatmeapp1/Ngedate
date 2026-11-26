@@ -4,7 +4,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { useCallback } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { LevelBadge, levelStyle } from '@/components/Badges';
+import { HostLevelBadge, LevelBadge, levelStyle } from '@/components/Badges';
 import { Loading } from '@/components/ui';
 import { useAuth } from '@/context/auth';
 import { number } from '@/lib/format';
@@ -33,13 +33,13 @@ export default function LevelScreen() {
         <Pressable onPress={() => router.back()} hitSlop={12} style={s.back}>
           <Ionicons name="chevron-back" size={26} color="#fff" />
         </Pressable>
-        <Text style={s.title}>Tingkat saya</Text>
+        <Text style={s.title}>{isHost ? 'Level host' : 'Tingkat saya'}</Text>
         <View style={s.back} />
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 130, gap: 10 }}>
         <LinearGradient colors={['#4B3575', '#2B2040']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.hero}>
-          <LevelBadge level={m.level} size={34} />
+          {isHost ? <HostLevelBadge level={m.level} size={26} /> : <LevelBadge level={m.level} size={34} />}
           <Text style={s.heroText}>
             {next === null
               ? 'Kamu sudah di tingkat tertinggi 👑'
@@ -50,10 +50,10 @@ export default function LevelScreen() {
           <View style={s.track}>
             <View style={[s.fill, { width: `${Math.round(m.levelProgress * 100)}%` }]} />
           </View>
-          <Text style={s.heroSub}>{isHost ? `Total pendapatan: ${number(m.topupTotal)} 💎` : `Total top up: ${number(m.topupTotal)} koin`}</Text>
+          <Text style={s.heroSub}>{isHost ? `Penghasilan 7 hari terakhir: ${number(m.topupTotal)} 💎` : `Total top up: ${number(m.topupTotal)} koin`}</Text>
         </LinearGradient>
 
-        <Text style={s.hint}>{isHost ? 'Level host naik otomatis dari total pendapatan diamond dan tidak turun saat kamu menarik diamond.' : 'Level naik otomatis dari total koin yang kamu top up dan tidak turun.'}</Text>
+        <Text style={s.hint}>{isHost ? 'Level host dibagi berdasarkan total penghasilan diamond dalam 7 hari terakhir (bergulir). Menarik diamond tidak menurunkan level.' : 'Level naik otomatis dari total koin yang kamu top up dan tidak turun.'}</Text>
 
         {m.levelThresholds.map((need, level) => {
           const reached = m.level >= level;
@@ -62,7 +62,7 @@ export default function LevelScreen() {
           return (
             <View key={level} style={[s.row, current && { borderColor: st.ring, borderWidth: 1.5 }, !reached && { opacity: 0.55 }]}>
               <View style={{ width: 96 }}>
-                <LevelBadge level={level} size={28} />
+                {isHost ? <HostLevelBadge level={level} size={22} /> : <LevelBadge level={level} size={28} />}
               </View>
               <Text style={s.need}>
                 {number(need)} <Text style={{ fontSize: 13, color: GOLD }}>{unit}</Text>

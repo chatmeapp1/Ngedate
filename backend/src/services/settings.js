@@ -23,8 +23,8 @@ const DEFAULTS = {
   // Level (0-10) dan VIP (1-5) dari TOTAL top up koin. Level 0 dimulai dari 0.
   level_thresholds: [0, 2000, 30000, 80000, 150000, 250000, 500000, 1000000, 2000000, 5000000, 10000000],
   vip_thresholds: [300000, 700000, 1400000, 2800000, 4000000],
-  // Level host (0-10) dari total PENDAPATAN diamond seumur hidup (angka awal sama dengan level pengguna)
-  host_level_thresholds: [0, 2000, 30000, 80000, 150000, 250000, 500000, 1000000, 2000000, 5000000, 10000000],
+  // Level host (0-10) dari total PENGHASILAN diamond 7 hari terakhir (bergulir)
+  host_level_thresholds: [0, 300, 3000, 5000, 10000, 70000, 150000, 300000, 500000, 1000000, 5000000],
   // Kartu pesan gratis (VIP): jumlah per hari, dan diamond untuk host per pesan gratis (dibayar app)
   free_cards_per_day: 5,
   free_card_host_diamonds: 5,

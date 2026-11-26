@@ -11,7 +11,8 @@ const { getSettings } = require('../services/settings');
 const router = express.Router();
 const PAGE_SIZE = 30;
 
-const HOST_COLUMNS = `u.*, hp.chat_price, hp.wa_enabled, hp.wa_number, hp.wa_unlock_threshold`;
+const { weekIncomeSql } = require('../services/membership');
+const HOST_COLUMNS = `u.*, hp.chat_price, hp.wa_enabled, hp.wa_number, hp.wa_unlock_threshold, ${weekIncomeSql('u.id')} AS week_income`;
 const HOST_FROM = `FROM users u LEFT JOIN host_profiles hp ON hp.user_id = u.id
                    WHERE u.role = 'host' AND u.status = 'active' AND u.host_status = 'approved'
                    AND u.gender IS DISTINCT FROM 'male'`;

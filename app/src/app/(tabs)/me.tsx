@@ -5,7 +5,7 @@ import { useCallback } from 'react';
 import type { ComponentProps } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { LevelBadge, VipBadge } from '@/components/Badges';
+import { HostLevelBadge, LevelBadge, VipBadge } from '@/components/Badges';
 import { Avatar, Coin } from '@/components/ui';
 import { Verified } from '@/components/Verified';
 import { versionLabel } from '@/components/UpdateWatcher';
@@ -48,7 +48,7 @@ export default function Me() {
                 {user.displayName}
               </Text>
               {user.verified ? <Verified size={20} /> : null}
-              {m ? <LevelBadge level={m.level} size={22} /> : null}
+              {m ? (isHost ? <HostLevelBadge level={m.level} size={18} /> : <LevelBadge level={m.level} size={22} />) : null}
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <View style={s.idChip}>
@@ -78,14 +78,14 @@ export default function Me() {
                   {m.nextLevelAt === null
                     ? 'Tingkat tertinggi 👑'
                     : isHost
-                      ? `Dapatkan ${number(m.nextLevelAt - m.topupTotal)} 💎 lagi untuk Lv ${m.level + 1}`
+                      ? `Dapatkan ${number(m.nextLevelAt - m.topupTotal)} 💎 lagi (7 hari terakhir) untuk Lv ${m.level + 1}`
                       : `Top up ${number(m.nextLevelAt - m.topupTotal)} koin lagi untuk Lv ${m.level + 1}`}
                 </Text>
                 <View style={s.track}>
                   <View style={[s.fill, { width: `${Math.max(3, Math.round(m.levelProgress * 100))}%` }]} />
                 </View>
               </View>
-              <LevelBadge level={m.level} size={40} />
+              {isHost ? <HostLevelBadge level={m.level} size={26} /> : <LevelBadge level={m.level} size={40} />}
               <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.7)" />
             </LinearGradient>
           </Pressable>

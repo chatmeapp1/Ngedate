@@ -194,10 +194,10 @@ daftar host + komisi tiap host, riwayat komisi, penarikan, dan ganti password.
   bertanda "AGENCY").
 - Tabel: `agency_payout_accounts`, `agency_withdrawals` (migrasi 017). API agency di `/api/agency/*`.
 
-**Level host:** host juga punya Level 0-10, dari **total pendapatan diamond seumur hidup** (`users.income_total`, bertambah dari
-chat, gift, dan kartu gratis; tidak turun saat menarik). Angka awal sama dengan level pengguna dan dapat diubah di panel admin >
-Pengaturan (`host_level_thresholds`, dalam diamond). Pengguna melihat badge level di profil host (hanya levelnya, bukan jumlah
-pendapatan); host melihat kemajuannya di Profil > kartu Lv.
+**Level host:** host juga punya Level 0-10, dari **total penghasilan diamond 7 hari terakhir** (bergulir: chat, gift, kartu gratis;
+bisa naik dan turun, menarik diamond tidak berpengaruh). Batas awal: 0, 300, 3.000, 5.000, 10.000, 70.000, 150.000, 300.000, 500.000,
+1.000.000, 5.000.000 diamond; dapat diubah di panel admin > Pengaturan (`host_level_thresholds`). Pengguna melihat badge level host di profil
+host (hanya levelnya, bukan jumlah penghasilan); host melihat kemajuannya di Profil > kartu Lv.
 
 ## Panel admin web
 
