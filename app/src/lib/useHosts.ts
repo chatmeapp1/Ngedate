@@ -1,13 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, errorMessage } from '@/lib/api';
-import type { Host, HostTab } from '@/lib/types';
+import type { Host } from '@/lib/types';
 
 const PAGE_SIZE = 30;
 
 // Daftar host dengan halaman berikutnya (scroll tanpa batas) & tarik untuk muat ulang
-export function useHosts(params: { tab?: HostTab; country?: string; region?: string; q?: string; enabled?: boolean }) {
-  const { tab = 'all', country, region, q, enabled = true } = params;
-  const [hosts, setHosts] = useState<Host[]>([]);
+// path: '/api/hosts' (untuk user) atau '/api/members' (untuk host)
+export function useHosts<T extends { id: number } = Host>(params: {
+  tab?: string;
+  country?: string;
+  region?: string;
+  q?: string;
+  enabled?: boolean;
+  path?: string;
+}) {
+  const { tab = 'all', country, region, q, enabled = true, path = '/api/hosts' } = params;
+  const [hosts, setHosts] = useState<T[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -21,9 +29,9 @@ export function useHosts(params: { tab?: HostTab; country?: string; region?: str
       if (country) sp.set('country', country);
       if (region) sp.set('region', region);
       if (q) sp.set('q', q);
-      return api.get<Host[]>(`/api/hosts?${sp.toString()}`);
+      return api.get<T[]>(`${path}?${sp.toString()}`);
     },
-    [tab, country, region, q]
+    [tab, country, region, q, path]
   );
 
   const reload = useCallback(

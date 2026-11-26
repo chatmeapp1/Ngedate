@@ -1,0 +1,139 @@
+import { router } from 'expo-router';
+import { memo, type ReactElement } from 'react';
+import { StyleSheet, Text, View, Pressable, FlatList, RefreshControl, ActivityIndicator } from 'react-native';
+import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Avatar, Empty } from '@/components/ui';
+import { Verified } from '@/components/Verified';
+import { countryName, flag } from '@/lib/countries';
+import { colors, gradients, radius } from '@/lib/theme';
+import type { User } from '@/lib/types';
+
+// Kartu pengguna pria (dilihat oleh host): foto, nama, usia, negara, status online
+const MemberCard = memo(function MemberCard({ member, onPress }: { member: User; onPress: () => void }) {
+  return (
+    <Pressable onPress={onPress} style={({ pressed }) => [s.card, pressed && { transform: [{ scale: 0.98 }] }]}>
+      {member.avatarUrl ? (
+        <Image source={{ uri: member.avatarUrl }} style={StyleSheet.absoluteFill} contentFit="cover" transition={150} />
+      ) : (
+        <LinearGradient colors={gradients.soft} style={[StyleSheet.absoluteFill, s.placeholder]}>
+          <Avatar name={member.displayName} size={72} />
+        </LinearGradient>
+      )}
+      <LinearGradient colors={gradients.photoFade} style={s.fade} />
+
+      <View style={s.top}>
+        {member.online ? (
+          <View style={s.online}>
+            <View style={s.dot} />
+            <Text style={s.onlineText}>Online</Text>
+          </View>
+        ) : (
+          <View />
+        )}
+        {member.countryCode ? (
+          <View style={s.country}>
+            <Text style={{ fontSize: 13 }}>{flag(member.countryCode)}</Text>
+            <Text style={s.countryText} numberOfLines={1}>
+              {countryName(member.countryCode)}
+            </Text>
+          </View>
+        ) : null}
+      </View>
+
+      <View style={s.bottom}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          <Text style={[s.name, { flexShrink: 1 }]} numberOfLines={1}>
+            {member.displayName}
+            {member.age ? <Text style={s.age}>  {member.age}</Text> : null}
+          </Text>
+          {member.verified ? <Verified size={15} /> : null}
+        </View>
+      </View>
+    </Pressable>
+  );
+});
+
+// Grid 2 kolom pengguna pria, dipakai di Beranda & pencarian akun host
+export function MemberGrid({
+  members,
+  loading,
+  refreshing,
+  error,
+  onRefresh,
+  onEndReached,
+  header,
+  emptyText = 'Belum ada pengguna',
+}: {
+  members: User[];
+  loading: boolean;
+  refreshing: boolean;
+  error?: string | null;
+  onRefresh: () => void;
+  onEndReached: () => void;
+  header?: ReactElement;
+  emptyText?: string;
+}) {
+  return (
+    <FlatList
+      data={members}
+      keyExtractor={(m) => String(m.id)}
+      numColumns={2}
+      columnWrapperStyle={{ gap: 12, paddingHorizontal: 16 }}
+      contentContainerStyle={{ gap: 12, paddingBottom: 16 }}
+      ListHeaderComponent={header}
+      onEndReached={onEndReached}
+      onEndReachedThreshold={0.6}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />}
+      renderItem={({ item }) => (
+        <MemberCard member={item} onPress={() => router.push({ pathname: '/member/[id]', params: { id: String(item.id) } })} />
+      )}
+      ListEmptyComponent={
+        loading ? null : error ? (
+          <Empty icon="cloud-offline-outline" title={error} subtitle="Tarik ke bawah untuk mencoba lagi" />
+        ) : (
+          <Empty icon="people-outline" title={emptyText} />
+        )
+      }
+      ListFooterComponent={
+        loading ? (
+          <View style={{ paddingVertical: 20 }}>
+            <ActivityIndicator color={colors.primary} />
+          </View>
+        ) : null
+      }
+    />
+  );
+}
+
+const s = StyleSheet.create({
+  card: { flex: 1, aspectRatio: 0.78, borderRadius: radius.lg, overflow: 'hidden', backgroundColor: colors.surfaceAlt },
+  placeholder: { alignItems: 'center', justifyContent: 'center' },
+  fade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '40%' },
+  top: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 10, gap: 6 },
+  online: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    paddingHorizontal: 8,
+    height: 24,
+    borderRadius: radius.pill,
+  },
+  dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.online },
+  onlineText: { color: '#fff', fontSize: 11, fontWeight: '700' },
+  country: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    paddingHorizontal: 8,
+    height: 24,
+    borderRadius: radius.pill,
+    maxWidth: '62%',
+  },
+  countryText: { color: '#fff', fontSize: 11, fontWeight: '700', flexShrink: 1 },
+  bottom: { position: 'absolute', left: 12, right: 10, bottom: 12 },
+  name: { color: '#fff', fontSize: 16, fontWeight: '800' },
+  age: { fontSize: 13, fontWeight: '600', color: 'rgba(255,255,255,0.85)' },
+});

@@ -5,13 +5,14 @@ import { useCallback, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HostGrid } from '@/components/HostGrid';
+import { MemberGrid } from '@/components/MemberGrid';
 import { RegionCard } from '@/components/RegionCard';
 import { Chip, Coin } from '@/components/ui';
 import { useAuth } from '@/context/auth';
 import { api } from '@/lib/api';
 import { compact } from '@/lib/format';
 import { colors, gradients, radius } from '@/lib/theme';
-import type { HostTab, RegionCount, RegionKey } from '@/lib/types';
+import type { HostTab, RegionCount, RegionKey, User } from '@/lib/types';
 import { useHosts } from '@/lib/useHosts';
 
 const TABS: { key: HostTab; label: string; icon: 'globe-outline' | 'flame-outline' | 'flash-outline' | 'radio-button-on' }[] = [
@@ -33,11 +34,15 @@ export default function Home() {
   const { user, refreshMe } = useAuth();
   const [tab, setTab] = useState<HostTab>('all');
   const [regions, setRegions] = useState<RegionCount[]>(EMPTY_REGIONS);
-  const list = useHosts({ tab });
+  // Akun host melihat pengguna pria; akun pria melihat host wanita
+  const isHost = user?.role === 'host';
+  const list = useHosts({ tab, enabled: !isHost });
+  const members = useHosts<User>({ tab: tab === 'popular' ? 'all' : tab, path: '/api/members', enabled: isHost });
 
   const loadRegions = useCallback(() => {
+    if (isHost) return;
     api.get<RegionCount[]>('/api/hosts/regions').then(setRegions).catch(() => {});
-  }, []);
+  }, [isHost]);
 
   useFocusEffect(
     useCallback(() => {
@@ -63,7 +68,7 @@ export default function Home() {
         </View>
 
         <View style={s.regionGrid}>
-          {regions.map((r) => (
+          {(isHost ? [] : regions).map((r) => (
             <View key={r.key} style={s.regionCell}>
               <RegionCard region={r} onPress={() => router.push({ pathname: '/region/[key]', params: { key: r.key } })} />
             </View>
@@ -72,12 +77,29 @@ export default function Home() {
       </LinearGradient>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.tabs}>
-        {TABS.map((t) => (
+        {TABS.filter((t) => !isHost || t.key !== 'popular').map((t) => (
           <Chip key={t.key} label={t.label} icon={t.icon} active={tab === t.key} onPress={() => setTab(t.key)} />
         ))}
       </ScrollView>
     </View>
   );
+
+  if (isHost) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.bg }}>
+        <MemberGrid
+          members={members.hosts}
+          loading={members.loading}
+          refreshing={members.refreshing}
+          error={members.error}
+          onRefresh={() => members.reload(true)}
+          onEndReached={members.loadMore}
+          header={header}
+          emptyText={tab === 'online' ? 'Belum ada pengguna yang online' : 'Belum ada pengguna'}
+        />
+      </View>
+    );
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>

@@ -4,8 +4,11 @@ import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HostGrid } from '@/components/HostGrid';
+import { MemberGrid } from '@/components/MemberGrid';
+import { useAuth } from '@/context/auth';
 import { Empty } from '@/components/ui';
 import { colors, radius } from '@/lib/theme';
+import type { User } from '@/lib/types';
 import { useHosts } from '@/lib/useHosts';
 
 export default function Search() {
@@ -19,7 +22,11 @@ export default function Search() {
     return () => clearTimeout(t);
   }, [text]);
 
-  const list = useHosts({ q, enabled: q.length > 0 });
+  const { user } = useAuth();
+  const isHost = user?.role === 'host';
+  const list = useHosts({ q, enabled: q.length > 0 && !isHost });
+  const members = useHosts<User>({ q, path: '/api/members', enabled: q.length > 0 && isHost });
+  const who = isHost ? 'pengguna' : 'host';
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -33,7 +40,7 @@ export default function Search() {
             autoFocus
             value={text}
             onChangeText={setText}
-            placeholder="Cari nama atau ID host"
+            placeholder={`Cari nama atau ID ${who}`}
             placeholderTextColor={colors.textDim}
             style={s.text}
             returnKeyType="search"
@@ -47,7 +54,18 @@ export default function Search() {
         </View>
       </View>
 
-      {q ? (
+      {q && isHost ? (
+        <MemberGrid
+          members={members.hosts}
+          loading={members.loading}
+          refreshing={members.refreshing}
+          error={members.error}
+          onRefresh={() => members.reload(true)}
+          onEndReached={members.loadMore}
+          emptyText={`Tidak ada pengguna "${q}"`}
+          header={<View style={{ height: 8 }} />}
+        />
+      ) : q ? (
         <HostGrid
           hosts={list.hosts}
           loading={list.loading}
@@ -59,7 +77,7 @@ export default function Search() {
           header={<View style={{ height: 8 }} />}
         />
       ) : (
-        <Empty icon="search-outline" title="Cari host" subtitle="Ketik nama tampilan, username, atau ID host" />
+        <Empty icon="search-outline" title={`Cari ${who}`} subtitle={`Ketik nama tampilan, username, atau ID ${who}`} />
       )}
     </View>
   );

@@ -11,7 +11,8 @@ const PAGE_SIZE = 30;
 
 const HOST_COLUMNS = `u.*, hp.chat_price, hp.wa_enabled, hp.wa_number, hp.wa_unlock_threshold`;
 const HOST_FROM = `FROM users u LEFT JOIN host_profiles hp ON hp.user_id = u.id
-                   WHERE u.role = 'host' AND u.status = 'active' AND u.host_status = 'approved'`;
+                   WHERE u.role = 'host' AND u.status = 'active' AND u.host_status = 'approved'
+                   AND u.gender IS DISTINCT FROM 'male'`;
 
 /**
  * Daftar host.
@@ -66,7 +67,7 @@ router.get('/', wrap(async (req, res) => {
   params.push((page - 1) * PAGE_SIZE);
   const sql = `SELECT ${HOST_COLUMNS}
     FROM users u LEFT JOIN host_profiles hp ON hp.user_id = u.id ${popularJoin}
-    WHERE u.role = 'host' AND u.status = 'active' AND u.host_status = 'approved' ${where.length ? 'AND ' + where.join(' AND ') : ''}
+    WHERE u.role = 'host' AND u.status = 'active' AND u.host_status = 'approved' AND u.gender IS DISTINCT FROM 'male' ${where.length ? 'AND ' + where.join(' AND ') : ''}
     ORDER BY ${order}
     LIMIT ${PAGE_SIZE} OFFSET $${params.length}`;
   const { rows } = await db.query(sql, params);
@@ -94,7 +95,7 @@ router.get('/regions', wrap(async (req, res) => {
          JOIN messages m ON m.conversation_id = c.id AND m.type = 'gift'
          WHERE c.host_id = u.id AND m.created_at > now() - interval '30 days'
        ) pop ON true
-       WHERE u.role = 'host' AND u.status = 'active' AND u.host_status = 'approved'
+       WHERE u.role = 'host' AND u.status = 'active' AND u.host_status = 'approved' AND u.gender IS DISTINCT FROM 'male'
          AND u.country_code = ANY($1::char(2)[])
        ORDER BY (u.avatar_url IS NOT NULL) DESC, pop.score DESC, u.last_seen_at DESC NULLS LAST, u.id
        LIMIT 1`,

@@ -41,6 +41,7 @@ async function register(username, countryCode) {
   return { id: r.body.user.id, token: r.body.accessToken };
 }
 
+// (tes pemisahan gender ada di akhir file)
 async function makeHost(username, country) {
   const h = await register(username, country);
   await db.query(`UPDATE users SET role = 'host', host_status = 'approved', profile_completed = true WHERE id = $1`, [h.id]);
@@ -240,4 +241,38 @@ test('wilayah: selalu 6 kartu, jumlah host & filter wilayah', async () => {
   assert.equal(none.body.length, 0);
   const bad = await api('GET', '/api/hosts?region=mars', { token: user.token });
   assert.equal(bad.status, 400);
+});
+
+test('beranda dipisah gender: host melihat pria, user tidak melihat host pria', async () => {
+  const male = await register('cowok1', 'ID');
+  await db.query(`UPDATE users SET gender = 'male', profile_completed = true WHERE id = $1`, [male.id]);
+  const female = await register('cewek1', 'ID');
+  await db.query(`UPDATE users SET gender = 'female', profile_completed = true WHERE id = $1`, [female.id]);
+  const hostF = await makeHost('hostcewek', 'ID');
+  await db.query(`UPDATE users SET gender = 'female' WHERE id = $1`, [hostF.id]);
+  const hostM = await makeHost('hostcowok', 'ID');
+  await db.query(`UPDATE users SET gender = 'male' WHERE id = $1`, [hostM.id]);
+
+  // Pria melihat host wanita saja
+  const hosts = await api('GET', '/api/hosts', { token: male.token });
+  assert.equal(hosts.status, 200);
+  const names = hosts.body.map((h) => h.username);
+  assert.ok(names.includes('hostcewek'));
+  assert.ok(!names.includes('hostcowok'), 'host pria tidak tampil');
+
+  // Host melihat pengguna pria saja
+  const members = await api('GET', '/api/members', { token: hostF.token });
+  assert.equal(members.status, 200);
+  const mn = members.body.map((m) => m.username);
+  assert.ok(mn.includes('cowok1'));
+  assert.ok(!mn.includes('cewek1'), 'wanita tidak tampil');
+  assert.ok(!mn.includes('hostcowok'), 'host tidak tampil sebagai member');
+
+  const one = await api('GET', `/api/members/${male.id}`, { token: hostF.token });
+  assert.equal(one.status, 200);
+  assert.equal(one.body.username, 'cowok1');
+  assert.equal((await api('GET', `/api/members/${female.id}`, { token: hostF.token })).status, 404);
+
+  // User biasa tidak boleh memakai endpoint member
+  assert.equal((await api('GET', '/api/members', { token: male.token })).status, 403);
 });

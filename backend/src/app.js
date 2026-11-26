@@ -18,6 +18,7 @@ function createApp() {
   app.use('/api/me', authenticate, require('./routes/me'));
   app.use('/api/onboarding', authenticate, require('./routes/onboarding'));
   app.use('/api/hosts', authenticate, require('./routes/hosts'));
+  app.use('/api/members', authenticate, requireRole('host'), require('./routes/members'));
   app.use('/api/users', authenticate, require('./routes/social'));
   app.use('/api/host/settings', authenticate, requireRole('host'), require('./routes/hostSettings'));
   app.use('/api/wallet', authenticate, require('./routes/wallet'));
