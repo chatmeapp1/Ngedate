@@ -41,6 +41,8 @@ function mapMessage(r) {
       : null,
     price: Number(r.price),
     paymentStatus: r.payment_status,
+    // gift: diamond yang diterima host (host melihat ini, bukan harga gift)
+    hostIncome: r.host_income == null ? null : Number(r.host_income),
     mediaUrl: r.media_url || null,
     freeCard: !!r.free_card,
     createdAt: r.created_at,
@@ -414,6 +416,7 @@ async function sendGift(senderId, convIdRaw, giftIdRaw, countRaw) {
       { type: 'message', id: messageId },
       { share: Number(settings.gift_host_share), multiplier: Number(gift.host_multiplier) || 1 }
     );
+    await client.query(`UPDATE messages SET host_income = $2 WHERE id = $1`, [messageId, host]);
 
     const { rows: upd } = await client.query(
       `UPDATE conversations SET gift_total = gift_total + $2 WHERE id = $1 RETURNING gift_total`,

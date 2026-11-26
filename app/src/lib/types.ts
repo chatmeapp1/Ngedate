@@ -129,6 +129,8 @@ export interface Message {
   } | null;
   price: number;
   paymentStatus: 'free' | 'held' | 'paid' | 'refunded';
+  /** gift: diamond yang diterima host (host melihat ini, bukan harga gift) */
+  hostIncome?: number | null;
   /** foto/video di chat (VIP) */
   mediaUrl?: string | null;
   /** pesan memakai kartu gratis VIP */

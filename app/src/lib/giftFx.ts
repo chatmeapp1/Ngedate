@@ -16,6 +16,8 @@ export type GiftFx =
       imageUrl: string | null;
       /** efek MP4 layar penuh (dari admin), diputar maksimal 6 detik */
       videoUrl: string | null;
+      /** diamond yang diterima host (tampil di layar host sebagai pengganti harga) */
+      hostIncome: number | null;
       /** suara gift (dari admin), diputar sekali saat gift tiba */
       soundUrl: string | null;
       /** video berlatar hitam: diputar dengan mode screen supaya tampak transparan */
@@ -52,6 +54,7 @@ export function playGift(args: {
   imageUrl?: string | null;
   videoUrl?: string | null;
   soundUrl?: string | null;
+  hostIncome?: number | null;
   blend?: boolean;
   count: number;
   price?: number | null;
@@ -69,6 +72,7 @@ export function playGift(args: {
     imageUrl: args.imageUrl ?? null,
     videoUrl: args.videoUrl ?? null,
     soundUrl: args.soundUrl ?? null,
+    hostIncome: args.hostIncome ?? null,
     blend: !!args.blend,
     count: args.count,
     price: unit,

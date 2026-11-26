@@ -63,6 +63,8 @@ export default function ChatRoom() {
   const peerName = useRef<string | undefined>(undefined);
   peerName.current = conv?.peer?.displayName;
   const isUser = conv?.role === 'user';
+  const isUserRef = useRef(isUser);
+  isUserRef.current = isUser;
   const price = isUser ? host?.chatPrice ?? 0 : 0;
 
   // ---------- Memuat data ----------
@@ -180,6 +182,8 @@ export default function ChatRoom() {
             imageUrl: g.imageUrl,
             videoUrl: g.animationUrl,
             soundUrl: g.soundUrl,
+            // Host melihat diamond yang ia terima, bukan harga gift
+            hostIncome: isUserRef.current ? null : e.message.hostIncome,
             blend: g.animationBlend,
             count: g.count,
             price: g.price,
@@ -387,7 +391,7 @@ export default function ChatRoom() {
           return (
             <View>
               {showDate ? <DateLabel iso={item.createdAt} /> : null}
-              <Bubble message={item} mine={item.senderId === myId} showPayment={isUser} />
+              <Bubble message={item} mine={item.senderId === myId} showPayment={isUser} hostView={!isUser} />
             </View>
           );
         }}
@@ -507,7 +511,7 @@ function DateLabel({ iso }: { iso: string }) {
   return <Text style={s.date}>{label}</Text>;
 }
 
-function Bubble({ message: m, mine, showPayment }: { message: Message; mine: boolean; showPayment: boolean }) {
+function Bubble({ message: m, mine, showPayment, hostView }: { message: Message; mine: boolean; showPayment: boolean; hostView: boolean }) {
   if (m.type === 'system') {
     return (
       <View style={s.system}>
@@ -535,10 +539,19 @@ function Bubble({ message: m, mine, showPayment }: { message: Message; mine: boo
             <Text style={s.giftName}>
               {m.gift?.name ?? 'Gift'} x{m.gift?.count ?? 1}
             </Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <Coin size={12} />
-              <Text style={s.giftPrice}>{number(m.price)}</Text>
-            </View>
+            {hostView ? (
+              m.hostIncome != null ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <Text style={{ fontSize: 12 }}>💎</Text>
+                  <Text style={s.giftPrice}>{number(m.hostIncome)}</Text>
+                </View>
+              ) : null
+            ) : (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <Coin size={12} />
+                <Text style={s.giftPrice}>{number(m.price)}</Text>
+              </View>
+            )}
           </View>
         </LinearGradient>
         <Text style={[s.meta, mine && { textAlign: 'right' }]}>{time(m.createdAt)}</Text>

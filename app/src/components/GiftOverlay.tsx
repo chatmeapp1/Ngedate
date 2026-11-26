@@ -221,7 +221,7 @@ function LuxuryGift({ fx, onDone }: { fx: GiftItem; onDone: (key: string) => voi
             </Text>
             <Text style={s.luxSub}>
               {fx.from ? `dari ${fx.from} · ` : ''}
-              {number(fx.price * fx.count)} koin
+              {fx.hostIncome != null ? `+${number(fx.hostIncome)} 💎` : `${number(fx.price * fx.count)} koin`}
             </Text>
           </LinearGradient>
         </Animated.View>

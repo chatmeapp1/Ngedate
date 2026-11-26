@@ -213,6 +213,7 @@ test('gift: koin dipotong, host dapat 10%, WA terbuka setelah total gift >= syar
   assert.equal(g1.body.message.gift.icon, '🍫');
   assert.equal(g1.body.message.gift.price, 500);
   assert.equal(g1.body.message.gift.count, 10);
+  assert.equal(g1.body.message.hostIncome, 500, 'host melihat diamond yang diterima (10% dari 5.000), bukan harga gift');
   assert.equal(g1.body.waUnlocked, false);
   assert.equal((await balance(user.id)).coins, 19800 - 5000);
   assert.equal((await balance(host.id)).diamonds, hostBefore + 500);
