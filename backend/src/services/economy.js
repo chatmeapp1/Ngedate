@@ -39,13 +39,21 @@ async function currentMargin(client = db, overrides = {}) {
 
   const { rows: ag } = await client.query(`SELECT COALESCE(MAX(commission_rate), 0) AS m FROM agencies WHERE active`);
   const agencyRate = Math.max(DEFAULT_AGENCY_RATE, Number(ag[0].m), Number(overrides.agencyRate || 0));
-  const hostShare = Number(s.host_share);
+  const chatShare = Number(s.host_share);
+  const giftShare = Number(s.gift_host_share);
+  const { rows: gm } = await client.query(`SELECT COALESCE(MAX(host_multiplier), 1) AS m FROM gifts WHERE active`);
+  const giftMultiplier = Number(gm[0].m);
+  // Bagian host terbesar dari semua jalur: chat berbayar, gift biasa, gift dengan pengali
+  const hostShare = Math.max(chatShare, giftShare * giftMultiplier);
   const diamondRp = usdIdr / Number(s.withdraw_diamonds_per_usd);
 
   const input = { pricePerCoin: price, hostShare, agencyRate, diamondRp };
   return {
     pricePerCoin: price,
     hostShare,
+    chatShare,
+    giftShare,
+    giftMultiplier,
     agencyRate,
     diamondRp,
     worst: { playFee: PLAY_FEE_WORST, ...compute(input, PLAY_FEE_WORST) },

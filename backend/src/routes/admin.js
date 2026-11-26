@@ -156,16 +156,23 @@ function giftFields(b, optional) {
     sort_order: v.int(b.sortOrder, 'Urutan', { optional: true }),
     active: v.bool(b.active, 'Aktif', { optional: true }),
     animation_blend: v.bool(b.animationBlend, 'Mode transparan', { optional: true }),
+    host_multiplier: v.int(b.hostMultiplier, 'Pengali host', { min: 1, max: 5, optional: true }),
   };
 }
 
 router.post('/gifts', wrap(async (req, res) => {
   const f = giftFields(req.body || {}, false);
-  const { rows } = await db.query(
-    `INSERT INTO gifts (name, price, image_url, animation_url, sound_url, category, sort_order, active, icon, animation_blend)
-     VALUES ($1, $2, $3, $4, $5, COALESCE($6, 'normal'), COALESCE($7, 0), COALESCE($8, true), $9, COALESCE($10, false)) RETURNING *`,
-    [f.name, f.price, f.image_url, f.animation_url, f.sound_url, f.category, f.sort_order, f.active, f.icon, f.animation_blend]
-  );
+  const rows = await db.tx(async (client) => {
+    let out;
+    await economy.guard(client, {}, async () => {
+      out = (await client.query(
+    `INSERT INTO gifts (name, price, image_url, animation_url, sound_url, category, sort_order, active, icon, animation_blend, host_multiplier)
+     VALUES ($1, $2, $3, $4, $5, COALESCE($6, 'normal'), COALESCE($7, 0), COALESCE($8, true), $9, COALESCE($10, false), COALESCE($11, 1)) RETURNING *`,
+    [f.name, f.price, f.image_url, f.animation_url, f.sound_url, f.category, f.sort_order, f.active, f.icon, f.animation_blend, f.host_multiplier]
+      )).rows;
+    });
+    return out;
+  });
   res.status(201).json(mapGift(rows[0]));
 }));
 
@@ -179,7 +186,13 @@ router.patch('/gifts/:id', wrap(async (req, res) => {
     sets.push(col + ' = $' + params.length);
   }
   if (!sets.length) throw badRequest('Tidak ada yang diubah');
-  const { rows } = await db.query(`UPDATE gifts SET ${sets.join(', ')} WHERE id = $1 RETURNING *`, params);
+  const rows = await db.tx(async (client) => {
+    let out;
+    await economy.guard(client, {}, async () => {
+      out = (await client.query(`UPDATE gifts SET ${sets.join(', ')} WHERE id = $1 RETURNING *`, params)).rows;
+    });
+    return out;
+  });
   if (!rows.length) throw notFound('Gift tidak ditemukan');
   res.json(mapGift(rows[0]));
 }));
@@ -193,6 +206,10 @@ router.patch('/settings', wrap(async (req, res) => {
   if (b.host_share !== undefined) {
     const share = Number(b.host_share);
     if (!(share >= 0 && share <= 1)) throw badRequest('host_share harus 0 sampai 1');
+  }
+  if (b.gift_host_share !== undefined) {
+    const share = Number(b.gift_host_share);
+    if (!(share >= 0 && share <= 1)) throw badRequest('gift_host_share harus 0 sampai 1');
   }
   const whole = (k, label, min, max) => {
     if (b[k] === undefined) return;

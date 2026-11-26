@@ -204,7 +204,7 @@ test('nomor WA tersembunyi sebelum syarat gift terpenuhi', async () => {
   assert.equal(r.body.threshold, 10000);
 });
 
-test('gift: koin dipotong, host dapat 30%, WA terbuka setelah total gift >= syarat', async () => {
+test('gift: koin dipotong, host dapat 10%, WA terbuka setelah total gift >= syarat', async () => {
   const hostBefore = (await balance(host.id)).diamonds;
 
   const g1 = await api('POST', `/api/conversations/${convId}/gifts`, { token: user.token, body: { giftId, count: 10 } });
@@ -215,7 +215,7 @@ test('gift: koin dipotong, host dapat 30%, WA terbuka setelah total gift >= syar
   assert.equal(g1.body.message.gift.count, 10);
   assert.equal(g1.body.waUnlocked, false);
   assert.equal((await balance(user.id)).coins, 19800 - 5000);
-  assert.equal((await balance(host.id)).diamonds, hostBefore + 1500);
+  assert.equal((await balance(host.id)).diamonds, hostBefore + 500);
 
   const hostGift = await api('POST', `/api/conversations/${convId}/gifts`, { token: host.token, body: { giftId } });
   assert.equal(hostGift.status, 403, 'host tidak bisa kirim gift');

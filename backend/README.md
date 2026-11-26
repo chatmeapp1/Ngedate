@@ -141,10 +141,12 @@ pembayaran diatur di halaman Paket koin. Pembelian otomatis lewat Google Play Bi
 
 ### Pengaman anti-rugi
 
-Nilai awal: 1 diamond = Rp 1,55 (`withdraw_diamonds_per_usd` 10.968, kurs Rp 17.000/USD), host 30% + agency 10%.
+Nilai awal: 1 diamond = Rp 2,55 (`withdraw_diamonds_per_usd` 6.667, kurs Rp 17.000/USD). Host menerima 10% dari harga gift
+(`gift_host_share`); gift bertanda **x2** (diatur per gift di panel admin) memberi host 20%. Pesan chat berbayar tetap 30% (`host_share`).
+Agency 10% dari total. Pengaman margin selalu memakai jalur host terbesar (termasuk pengali gift).
 Server menghitung untung per koin pada skenario terburuk (PPN 11% + potongan Google Play 30%) memakai paket termurah dan komisi
 agency tertinggi, dan **menolak** (`NEGATIVE_MARGIN`) pengaturan, harga paket, atau komisi agency yang membuat rugi atau
-memperburuk kerugian. Kartu margin tampil di panel admin (Pengaturan dan Paket koin). Migrasi 011 mengembalikan
+memperburuk kerugian. Kartu margin tampil di panel admin (Pengaturan dan Paket koin). Migrasi 011/012 mengembalikan
 `withdraw_diamonds_per_usd` dan `coin_price_idr` ke nilai awal ini.
 
 ## Panel admin web

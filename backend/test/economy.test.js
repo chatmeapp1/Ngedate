@@ -52,21 +52,21 @@ after(async () => {
   await db.pool.end();
 });
 
-test('nilai awal: 1 diamond = Rp 1,55, harga jual Rp 2 per koin, untung positif bahkan potongan Play 30%', async () => {
-  assert.equal(await setting('withdraw_diamonds_per_usd'), 10968);
+test('nilai awal: 1 diamond = Rp 2,55, harga jual Rp 2 per koin, untung positif bahkan potongan Play 30%', async () => {
+  assert.equal(await setting('withdraw_diamonds_per_usd'), 6667);
   assert.equal(await setting('withdraw_usd_idr'), 17000);
   assert.equal(await setting('host_share'), 0.3);
 
   const m = (await A('GET', '/api/admin/margin')).body;
   assert.ok(Math.abs(m.pricePerCoin - 2) < 0.001, 'harga jual terendah ~ Rp 2');
-  assert.ok(Math.abs(m.diamondRp - 1.55) < 0.001, '1 diamond ~ Rp 1,55');
+  assert.ok(Math.abs(m.diamondRp - 2.55) < 0.001, '1 diamond ~ Rp 2,55');
   assert.equal(m.hostShare, 0.3);
   assert.equal(m.agencyRate, 0.1);
   // bayar host+agency = 0,4 x 1,55 = Rp 0,62 per koin
-  assert.ok(Math.abs(m.worst.payout - 0.62) < 0.001);
+  assert.ok(Math.abs(m.worst.payout - 1.02) < 0.001);
   // bersih terburuk = 2 / 1,11 x 0,7 = Rp 1,26
   assert.ok(Math.abs(m.worst.net - 1.2613) < 0.001);
-  assert.ok(m.worst.profit > 0.64 && m.worst.profit < 0.65, `untung terburuk ${m.worst.profit}`);
+  assert.ok(m.worst.profit > 0.23 && m.worst.profit < 0.25, `untung terburuk ${m.worst.profit}`);
   assert.ok(m.best.profit > m.worst.profit, 'potongan 15% lebih untung');
   assert.equal((await api('GET', '/api/admin/margin', { token: 'x' })).status, 401);
 });
@@ -78,12 +78,12 @@ test('pengaturan yang membuat rugi ditolak dan tidak tersimpan', async () => {
   assert.equal(bad.body.error.code, 'NEGATIVE_MARGIN');
   assert.match(bad.body.error.message, /rugi/);
   assert.match(bad.body.error.message, /potongan Google Play 30%/);
-  assert.equal(await setting('withdraw_diamonds_per_usd'), 10968, 'tidak berubah');
+  assert.equal(await setting('withdraw_diamonds_per_usd'), 6667, 'tidak berubah');
 
-  // bagian host 90% juga rugi; 50% masih aman
+  // bagian host 90% juga rugi; 35% masih aman
   assert.equal((await A('PATCH', '/api/admin/settings', { host_share: 0.9 })).body.error.code, 'NEGATIVE_MARGIN');
-  assert.equal((await A('PATCH', '/api/admin/settings', { host_share: 0.5 })).status, 200);
-  assert.ok((await A('GET', '/api/admin/margin')).body.worst.profit > 0.3);
+  assert.equal((await A('PATCH', '/api/admin/settings', { host_share: 0.35 })).status, 200);
+  assert.ok((await A('GET', '/api/admin/margin')).body.worst.profit > 0.1);
   await A('PATCH', '/api/admin/settings', { host_share: 0.3 });
 
   // kurs rupiah per USD yang jauh lebih tinggi berarti diamond jauh lebih mahal
@@ -130,7 +130,26 @@ test('kondisi yang sudah rugi: perbaikan & pengaturan lain boleh, memperburuk ti
 
   assert.equal((await A('PATCH', '/api/admin/settings', { chat_price_max: 9000 })).status, 200, 'pengaturan lain tidak diblokir');
   assert.equal((await A('PATCH', '/api/admin/settings', { withdraw_diamonds_per_usd: 2000 })).body.error.code, 'NEGATIVE_MARGIN', 'memperburuk ditolak');
-  const fix = await A('PATCH', '/api/admin/settings', { withdraw_diamonds_per_usd: 10968 });
+  const fix = await A('PATCH', '/api/admin/settings', { withdraw_diamonds_per_usd: 6667 });
   assert.equal(fix.status, 200, 'memperbaiki boleh');
   assert.ok((await A('GET', '/api/admin/margin')).body.worst.profit > 0);
+});
+
+test('gift pengali x2: bagian host 10% -> 20%, diamond host sesuai, dan pengali terlalu besar ditolak', async () => {
+  const gifts = (await A('GET', '/api/admin/gifts')).body;
+  const mk = await A('POST', '/api/admin/gifts', { name: 'Mahkota', price: 1000000, hostMultiplier: 2 });
+  assert.equal(mk.status, 201, JSON.stringify(mk.body));
+  assert.equal(mk.body.hostMultiplier, 2);
+  assert.equal((await A('POST', '/api/admin/gifts', { name: 'Biasa', price: 1000 })).body.hostMultiplier, 1);
+  assert.equal((await A('POST', '/api/admin/gifts', { name: 'X9', price: 1000, hostMultiplier: 9 })).status, 400);
+  void gifts;
+
+  // gift host 10% x 2 = 20% masih di bawah jalur chat 30%, jadi margin tidak berubah
+  assert.equal((await A('GET', '/api/admin/margin')).body.giftMultiplier, 2);
+  // bagian gift 40% x2 = 80% -> rugi, ditolak
+  assert.equal((await A('PATCH', '/api/admin/settings', { gift_host_share: 0.4 })).body.error.code, 'NEGATIVE_MARGIN');
+  // pengali x5 pada gift 10% = 50% -> rugi, ditolak dan tidak tersimpan
+  const up = await A('PATCH', `/api/admin/gifts/${mk.body.id}`, { hostMultiplier: 5 });
+  assert.equal(up.body.error.code, 'NEGATIVE_MARGIN');
+  assert.equal((await A('GET', '/api/admin/gifts')).body.find((g) => g.id === mk.body.id).hostMultiplier, 2);
 });

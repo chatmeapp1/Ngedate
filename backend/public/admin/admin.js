@@ -421,7 +421,7 @@ function marginCard(m) {
       h('b', { class: 'sp' }, 'Cek untung/rugi per koin'),
       h('span', { class: 'pill ' + (ok ? 'green' : 'red') }, ok ? '✔ Aman, tidak rugi' : '⚠ RUGI')),
     row('Harga jual terendah', rp2(m.pricePerCoin) + ' per koin'),
-    row('Bagian host + komisi agency (tertinggi)', Math.round(m.hostShare * 100) + '% + ' + Math.round(m.agencyRate * 100) + '% = ' + Math.round((m.hostShare + m.agencyRate) * 100) + '%'),
+    row('Bagian host terbesar + komisi agency', Math.round(m.hostShare * 100) + '% + ' + Math.round(m.agencyRate * 100) + '% = ' + Math.round((m.hostShare + m.agencyRate) * 100) + '%' + (m.giftMultiplier > 1 ? ' (gift x' + m.giftMultiplier + ')' : '')),
     row('Nilai 1 diamond (Penarikan)', rp2(m.diamondRp)),
     row('Bayar host + agency per koin', rp2(m.worst.payout), true),
     scenario('Potongan Google Play 30% (terburuk)', m.worst),
@@ -995,6 +995,7 @@ async function pageGifts() {
     { name: 'price', label: 'Harga (koin)', type: 'number', value: g ? g.price : '' },
     { name: 'icon', label: 'Ikon emoji', value: g ? g.icon : '🎁', hint: 'Dipakai jika tidak ada gambar' },
     { name: 'category', label: 'Kategori', type: 'select', value: g ? g.category : 'normal', options: [{ value: 'normal', label: 'Populer' }, { value: 'luxury', label: 'Mewah (animasi layar penuh)' }] },
+    { name: 'hostMultiplier', label: 'Pengali bagian host', type: 'select', value: g ? String(g.hostMultiplier) : '1', options: [{ value: '1', label: 'x1 (normal, host 10%)' }, { value: '2', label: 'x2 (host 20%)' }, { value: '3', label: 'x3 (host 30%)' }], hint: 'Gift bertanda x2: host menerima dua kali bagian normal. Server menolak jika membuat app rugi.' },
     { name: 'sortOrder', label: 'Urutan', type: 'number', value: g ? g.sortOrder : 0, hint: 'Angka kecil tampil lebih dulu' },
     { name: 'image', label: 'Gambar gift (opsional)', type: 'file', maxMB: 5, preview: 'image', current: g && g.imageUrl, hint: 'PNG/WEBP transparan, maks 5 MB. Menggantikan emoji.' },
     ...(g && g.imageUrl ? [{ name: 'removeImage', label: 'Hapus gambar yang ada', type: 'checkbox', value: false }] : []),
@@ -1025,7 +1026,7 @@ async function pageGifts() {
       imageUrl = (await xhrUpload('/api/admin/upload', thumb, (p) => ui.progress('Mengunggah gambar… ' + Math.round(p * 100) + '%', p))).url;
     }
     ui.progress('Menyimpan…', 1);
-    const body = { name: r.name, price: r.price, icon: r.icon || undefined, category: r.category, sortOrder: r.sortOrder ?? 0, active: r.active, animationBlend: r.blend };
+    const body = { name: r.name, price: r.price, icon: r.icon || undefined, hostMultiplier: Number(r.hostMultiplier) || 1, category: r.category, sortOrder: r.sortOrder ?? 0, active: r.active, animationBlend: r.blend };
     if (imageUrl !== undefined) body.imageUrl = imageUrl;
     if (animationUrl !== undefined) body.animationUrl = animationUrl;
     return g ? patch('/api/admin/gifts/' + g.id, body) : post('/api/admin/gifts', body);
@@ -1046,7 +1047,7 @@ async function pageGifts() {
         giftIcon(g),
         h('div', { class: 'sp' }, h('b', {}, g.name), h('div', { class: 'dim' }, fmt(g.price) + ' koin · urutan ' + g.sortOrder)),
         h('div', { style: 'text-align:right' },
-          h('span', { class: 'pill ' + (g.category === 'luxury' ? 'amber' : '') }, g.category === 'luxury' ? 'Mewah' : 'Populer'),
+          h('span', { class: 'pill ' + (g.category === 'luxury' ? 'amber' : '') }, g.category === 'luxury' ? 'Mewah' : 'Populer'), g.hostMultiplier > 1 ? h('span', { class: 'pill green', style: 'margin-left:4px' }, 'host x' + g.hostMultiplier) : null,
           h('div', { style: 'margin-top:4px' }, g.active ? null : h('span', { class: 'pill red' }, 'Nonaktif'), g.animationUrl ? h('span', { class: 'pill purple', style: 'margin-left:4px' }, '🎬 MP4') : null, g.animationUrl && !g.imageUrl ? h('span', { class: 'pill amber', style: 'margin-left:4px' }, 'tanpa gambar') : null))),
       h('div', { class: 'row wrap', style: 'margin-top:12px;gap:6px' }, h('button', { class: 'btn sm', onclick: async () => {
         const r = await formModal({ title: 'Ubah gift', fields: fields(g), onSubmit: (v, ui) => save(g, v, ui) });
@@ -1083,14 +1084,15 @@ async function pageSettings() {
   const root = h('div', {}, pageHead('Pengaturan', 'Berlaku langsung untuk semua pengguna.'));
   root.append(marginCard(margin));
   const defs = [
-    { k: 'host_share', label: 'Bagian host bersih (%)', hint: 'Host menerima persen ini dari tiap koin gift/pesan. Komisi agency (per agency) dibayar dari bagian app, bukan dari host.', conv: (v) => v * 100, back: (v) => v / 100, min: 0, max: 100 },
+    { k: 'gift_host_share', label: 'Bagian host dari gift (%)', hint: 'Host menerima persen ini dari harga gift (gift bertanda x2 = dua kalinya, diatur di halaman Gift). 10 = harga 1 juta koin → 100 ribu koin ke host.', conv: (v) => v * 100, back: (v) => v / 100, min: 0, max: 100 },
+    { k: 'host_share', label: 'Bagian host dari pesan chat (%)', hint: 'Host menerima persen ini dari tiap koin pesan berbayar. Komisi agency (per agency) dibayar dari bagian app, bukan dari host.', conv: (v) => v * 100, back: (v) => v / 100, min: 0, max: 100 },
     { k: 'chat_price_min', label: 'Harga pesan minimum (koin)', min: 0 },
     { k: 'chat_price_max', label: 'Harga pesan maksimum (koin)', min: 0 },
     { k: 'wa_threshold_min', label: 'Syarat total gift untuk buka WA — minimum (koin)', min: 0 },
     { k: 'wa_threshold_max', label: 'Syarat total gift untuk buka WA — maksimum (koin)', min: 0 },
     { k: 'reply_window_hours', label: 'Batas balas sebelum koin dikembalikan (jam)', min: 1 },
     { k: 'coin_price_idr', label: 'Harga jual 1 koin (Rupiah)', hint: 'Dipakai untuk menghitung harga otomatis paket koin. Tidak mengubah paket yang sudah ada.', min: 0.01 },
-    { k: 'withdraw_diamonds_per_usd', label: 'Penarikan: diamond per 1 USD', hint: 'Makin besar angkanya, makin kecil nilai 1 diamond (Rp 17.000 ÷ angka ini). Awal 10.968 = Rp 1,55 per diamond. Server menolak nilai yang membuat app rugi.', min: 1 },
+    { k: 'withdraw_diamonds_per_usd', label: 'Penarikan: diamond per 1 USD', hint: 'Makin besar angkanya, makin kecil nilai 1 diamond (Rp 17.000 ÷ angka ini). Awal 6.667 = Rp 2,55 per diamond. Server menolak nilai yang membuat app rugi.', min: 1 },
     { k: 'withdraw_usd_idr', label: 'Penarikan: Rupiah per 1 USD (host Indonesia)', hint: 'Host Indonesia dibayar Rupiah memakai kurs ini; host negara lain dibayar USDT.', min: 1000 },
     { k: 'withdraw_min_diamonds', label: 'Penarikan: minimal diamond per pengajuan', min: 1 },
     { k: 'withdraw_fee_percent', label: 'Penarikan: biaya (%)', hint: 'Dipotong dari jumlah penarikan. 0 = tanpa biaya.', min: 0, max: 50 },

@@ -336,10 +336,15 @@ async function sendGift(senderId, convIdRaw, giftIdRaw, countRaw) {
       paymentStatus: 'paid',
     });
     await wallet.debitCoins(client, senderId, total, 'gift_send', { type: 'message', id: messageId });
-    const { host } = await wallet.payHost(client, Number(conv.host_id), total, settings, 'gift', {
-      type: 'message',
-      id: messageId,
-    });
+    const { host } = await wallet.payHost(
+      client,
+      Number(conv.host_id),
+      total,
+      settings,
+      'gift',
+      { type: 'message', id: messageId },
+      { share: Number(settings.gift_host_share), multiplier: Number(gift.host_multiplier) || 1 }
+    );
 
     const { rows: upd } = await client.query(
       `UPDATE conversations SET gift_total = gift_total + $2 WHERE id = $1 RETURNING gift_total`,

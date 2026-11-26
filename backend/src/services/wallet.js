@@ -64,8 +64,10 @@ function split(amount, hostShare) {
  *   -> host 30%, agency 10%, platform 60%
  * Host tanpa agency: host 30%, platform 70%.
  */
-async function payHost(client, hostId, total, settings, source, ref) {
-  const host = Math.floor(total * Number(settings.host_share));
+async function payHost(client, hostId, total, settings, source, ref, opts = {}) {
+  // opts.share / opts.multiplier: gift memakai gift_host_share x pengali gift (mis. 0,1 x 2)
+  const share = opts.share ?? Number(settings.host_share);
+  const host = Math.min(total, Math.floor(total * share * (opts.multiplier || 1)));
   const { rows } = await client.query(
     `SELECT a.id, a.commission_rate FROM users u JOIN agencies a ON a.id = u.agency_id
      WHERE u.id = $1 AND a.active`,

@@ -3,15 +3,17 @@ const db = require('../db');
 const DEFAULTS = {
   // Pembagian hasil: host 30% BERSIH; komisi agency (default 10%, per agency) dibayar dari bagian app
   // -> host 30%, agency 10%, platform 60%.
-  host_share: 0.3,
+  host_share: 0.3, // pesan chat berbayar
+  // Gift: host menerima 10% dari harga gift; gift bertanda x2 menjadi 20% (pengali diatur per gift di panel admin)
+  gift_host_share: 0.1,
   chat_price_min: 0,
   chat_price_max: 10000,
   wa_threshold_min: 10000,
   wa_threshold_max: 100000000,
   reply_window_hours: 24,
-  // Penarikan diamond host. 10.968 diamond = 1 USD, yaitu 1 diamond = Rp 1,55 pada Rp 17.000/USD
-  // (harga jual koin Rp 2, host 30% + agency 10%: aman dari rugi bahkan dengan potongan Google Play 30%)
-  withdraw_diamonds_per_usd: 10968,
+  // Penarikan diamond host. 6.667 diamond = 1 USD, yaitu 1 diamond = Rp 2,55 pada Rp 17.000/USD
+  // (aman dari rugi: lihat services/economy.js)
+  withdraw_diamonds_per_usd: 6667,
   withdraw_usd_idr: 17000, // kurs pembayaran untuk host Indonesia
   withdraw_min_diamonds: 70000, // minimal diamond per penarikan (= sekitar US$ 10,50)
   withdraw_fee_percent: 0, // biaya penarikan (% dari jumlah)

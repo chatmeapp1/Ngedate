@@ -17,6 +17,7 @@ function mapGift(g) {
     category: g.category,
     sortOrder: g.sort_order,
     active: g.active,
+    hostMultiplier: Number(g.host_multiplier) || 1,
   };
 }
 

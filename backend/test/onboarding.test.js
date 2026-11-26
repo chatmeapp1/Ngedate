@@ -252,15 +252,15 @@ test('bagi hasil: host 30% bersih, agency 10% dari bagian app, platform 60%', as
   assert.equal(gift.status, 201);
 
   const { rows: u } = await db.query(`SELECT diamonds FROM users WHERE id = $1`, [host.id]);
-  assert.equal(Number(u[0].diamonds), 30 + 300);
+  assert.equal(Number(u[0].diamonds), 30 + 100);
   const { rows: a } = await db.query(`SELECT earnings_total FROM agencies WHERE id = $1`, [agency.id]);
   assert.equal(Number(a[0].earnings_total), 10 + 100, 'agency 10% dari total, bukan dari bagian host');
   const { rows: p } = await db.query(`SELECT SUM(amount)::int AS s FROM platform_earnings`);
-  assert.equal(p[0].s, 60 + 600);
+  assert.equal(p[0].s, 60 + 800);
 
-  // Agency nonaktif: host tetap 30%, sisanya ke platform (komisi tidak pindah ke host)
+  // Agency nonaktif: host tetap 10%, sisanya ke platform (komisi tidak pindah ke host)
   await api('PATCH', `/api/admin/agencies/${agency.id}`, { token: admin, body: { active: false } });
   await api('POST', `/api/conversations/${conv.body.id}/gifts`, { token: buyer.token, body: { giftId: g[0].id } });
   const { rows: u2 } = await db.query(`SELECT diamonds FROM users WHERE id = $1`, [host.id]);
-  assert.equal(Number(u2[0].diamonds), 330 + 300);
+  assert.equal(Number(u2[0].diamonds), 30 + 100 + 100);
 });
