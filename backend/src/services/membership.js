@@ -76,4 +76,4 @@ async function addTopup(client, userId, amount) {
   if (amount > 0) await client.query(`UPDATE users SET topup_total = topup_total + $2 WHERE id = $1`, [userId, amount]);
 }
 
-module.exports = { summary, addTopup, levelOf, vipOf, parseList, freeCardsUsed };
+module.exports = { DAY_START_SQL, summary, addTopup, levelOf, vipOf, parseList, freeCardsUsed };

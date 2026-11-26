@@ -113,7 +113,7 @@ export interface Message {
   id: number;
   conversationId: number;
   senderId: number | null;
-  type: 'text' | 'gift' | 'system';
+  type: 'text' | 'gift' | 'system' | 'image' | 'video';
   body: string | null;
   gift: {
     id: number;
@@ -129,6 +129,8 @@ export interface Message {
   } | null;
   price: number;
   paymentStatus: 'free' | 'held' | 'paid' | 'refunded';
+  /** foto/video di chat (VIP) */
+  mediaUrl?: string | null;
   /** pesan memakai kartu gratis VIP */
   freeCard?: boolean;
   createdAt: string;

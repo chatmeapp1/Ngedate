@@ -1097,6 +1097,7 @@ async function pageSettings() {
     { k: 'level_thresholds', list: true, label: 'Batas level (total top up, koin)', hint: '11 angka dipisah koma untuk Level 0 sampai 10 (Level 0 = 0). Level naik dari TOTAL top up koin.' },
     { k: 'vip_thresholds', list: true, label: 'Batas VIP (total top up, koin)', hint: '5 angka dipisah koma untuk VIP 1 sampai 5. VIP bisa kirim foto/video dan memakai kartu pesan gratis.' },
     { k: 'free_cards_per_day', label: 'Kartu pesan gratis per hari (VIP)', hint: 'Pengguna VIP mengirim pesan ke host berbayar tanpa dipotong koin sebanyak ini per hari.', min: 0, max: 100 },
+    { k: 'vip_media_per_day', label: 'Foto/video VIP per hari', hint: 'Batas kiriman foto + video di chat per pengguna VIP per hari.', min: 0, max: 1000 },
     { k: 'free_card_host_diamonds', label: 'Diamond host per pesan gratis', hint: 'Dibayar oleh app (bukan pengguna). Awal 5 diamond.', min: 0, max: 1000 },
     { k: 'withdraw_min_diamonds', label: 'Penarikan: minimal diamond per pengajuan', min: 1 },
     { k: 'withdraw_fee_percent', label: 'Penarikan: biaya (%)', hint: 'Dipotong dari jumlah penarikan. 0 = tanpa biaya.', min: 0, max: 50 },

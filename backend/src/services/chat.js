@@ -2,6 +2,7 @@ const db = require('../db');
 const wallet = require('./wallet');
 const safety = require('./safety');
 const membership = require('./membership');
+const storage = require('../lib/storage');
 const { getSettings } = require('./settings');
 const { containsContact } = require('../lib/contactFilter');
 const { ApiError, badRequest, forbidden, notFound } = require('../lib/errors');
@@ -40,6 +41,7 @@ function mapMessage(r) {
       : null,
     price: Number(r.price),
     paymentStatus: r.payment_status,
+    mediaUrl: r.media_url || null,
     freeCard: !!r.free_card,
     createdAt: r.created_at,
   };
@@ -208,8 +210,8 @@ async function touchConversation(client, conv, senderIsUser, preview) {
 
 async function insertMessage(client, fields) {
   const { rows } = await client.query(
-    `INSERT INTO messages (conversation_id, sender_id, type, body, gift_id, gift_count, price, payment_status, settled_at, free_card)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8::varchar, CASE WHEN $8::varchar IN ('paid', 'refunded') THEN now() END, $9)
+    `INSERT INTO messages (conversation_id, sender_id, type, body, gift_id, gift_count, price, payment_status, settled_at, free_card, media_url)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8::varchar, CASE WHEN $8::varchar IN ('paid', 'refunded') THEN now() END, $9, $10)
      RETURNING id`,
     [
       fields.conversationId,
@@ -221,6 +223,7 @@ async function insertMessage(client, fields) {
       fields.price ?? 0,
       fields.paymentStatus ?? 'free',
       !!fields.freeCard,
+      fields.mediaUrl ?? null,
     ]
   );
   return Number(rows[0].id);
@@ -318,6 +321,56 @@ async function sendText(senderId, convIdRaw, bodyRaw) {
       freeCard,
     };
   });
+}
+
+// ---------------------------------------------------------------------------
+// Foto & video (fitur VIP)
+// ---------------------------------------------------------------------------
+
+async function sendMedia(senderId, convIdRaw, req) {
+  const convId = v.id(convIdRaw, 'conversationId');
+  // Cek hak akses dulu sebelum file disimpan ke disk
+  const check = await db.tx(async (client) => {
+    const conv = await lockConversation(client, convId, senderId);
+    if (Number(conv.user_id) !== senderId) throw forbidden('Hanya pengguna VIP yang bisa mengirim foto/video');
+    await safety.assertNotBlocked(client, senderId, Number(conv.host_id));
+    const settings = await getSettings(client);
+    const m = await membership.summary(client, senderId, settings);
+    if (m.vip < 1) throw new ApiError(403, 'VIP_REQUIRED', 'Kirim foto dan video khusus pengguna VIP');
+    const { rows } = await client.query(
+      `SELECT COUNT(*)::int AS n FROM messages
+       WHERE sender_id = $1 AND type IN ('image', 'video') AND created_at >= ${membership.DAY_START_SQL}`,
+      [senderId]
+    );
+    const limit = Number(settings.vip_media_per_day);
+    if (rows[0].n >= limit) throw new ApiError(429, 'MEDIA_LIMIT', `Batas kirim foto/video hari ini (${limit}) sudah tercapai`);
+    return { hostId: Number(conv.host_id) };
+  });
+  const saved = await storage.saveChatMedia(req);
+
+  try {
+    return await db.tx(async (client) => {
+      const conv = await lockConversation(client, convId, senderId);
+      const messageId = await insertMessage(client, {
+        conversationId: conv.id,
+        senderId,
+        type: saved.kind,
+        body: saved.kind === 'image' ? 'Foto' : 'Video',
+        mediaUrl: saved.url,
+        paymentStatus: 'free',
+      });
+      await touchConversation(client, conv, true, saved.kind === 'image' ? '📷 Foto' : '🎥 Video');
+      return {
+        conversationId: Number(conv.id),
+        userId: Number(conv.user_id),
+        hostId: check.hostId,
+        message: await fetchMessage(client, messageId),
+      };
+    });
+  } catch (e) {
+    await storage.remove(saved.url);
+    throw e;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -518,6 +571,7 @@ module.exports = {
   getConversation,
   listConversations,
   sendText,
+  sendMedia,
   sendGift,
   whatsappStatus,
   listMessages,

@@ -158,3 +158,56 @@ test('batas level & VIP: validasi dan simpan dari panel admin', async () => {
   assert.equal((await A('PATCH', '/api/admin/settings', { vip_thresholds: '500,400,300,200,100' })).status, 400, 'harus menaik');
   await A('PATCH', '/api/admin/settings', { vip_thresholds: '300000, 700000, 1400000, 2800000, 4000000' });
 });
+
+test('foto & video di chat: khusus VIP, isi file diperiksa, batas harian, tidak memotong koin', async () => {
+  const sendFile = async (user, convId, bytes, type, name) => {
+    const form = new FormData();
+    form.append('file', new Blob([bytes], { type }), name);
+    const res = await fetch(`${base}/api/conversations/${convId}/media`, { method: 'POST', headers: { authorization: `Bearer ${user.token}` }, body: form });
+    return { status: res.status, body: await res.json().catch(() => null) };
+  };
+  const jpg = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(200)]);
+  const mp4 = Buffer.concat([Buffer.from([0, 0, 0, 24]), Buffer.from('ftypmp42'), Buffer.alloc(200)]);
+
+  // bukan VIP ditolak
+  const reg = await register('biasa');
+  await A('POST', `/api/admin/users/${reg.id}/coins`, { amount: 1000 });
+  const c0 = (await api('POST', '/api/conversations', { token: reg.token, body: { hostId: host.id } })).body;
+  const no = await sendFile(reg, c0.id, jpg, 'image/jpeg', 'a.jpg');
+  assert.equal(no.status, 403);
+  assert.equal(no.body.error.code, 'VIP_REQUIRED');
+
+  const vip = await register('vipmedia');
+  await A('POST', `/api/admin/users/${vip.id}/coins`, { amount: 300000 });
+  const conv = (await api('POST', '/api/conversations', { token: vip.token, body: { hostId: host.id } })).body;
+  const coinsBefore = await coins(vip.id);
+
+  const img = await sendFile(vip, conv.id, jpg, 'image/jpeg', 'a.jpg');
+  assert.equal(img.status, 201, JSON.stringify(img.body));
+  assert.equal(img.body.message.type, 'image');
+  assert.match(img.body.message.mediaUrl, /\/uploads\/.+\.jpg$/);
+  assert.equal(img.body.message.price, 0);
+  const vid = await sendFile(vip, conv.id, mp4, 'video/mp4', 'v.mp4');
+  assert.equal(vid.status, 201, JSON.stringify(vid.body));
+  assert.equal(vid.body.message.type, 'video');
+  assert.equal(await coins(vip.id), coinsBefore, 'tidak memotong koin');
+
+  // file palsu (tipe gambar tapi isi bukan gambar) ditolak
+  const fake = await sendFile(vip, conv.id, Buffer.from('<?php echo 1; ?>'), 'image/jpeg', 'x.jpg');
+  assert.equal(fake.status, 400);
+  assert.equal(fake.body.error.code, 'INVALID_FILE');
+  assert.equal((await sendFile(vip, conv.id, jpg, 'application/pdf', 'x.pdf')).status, 400);
+
+  // host melihat pesan media, dan host tidak bisa mengirim lewat endpoint ini
+  const msgs = (await api('GET', `/api/conversations/${conv.id}/messages`, { token: host.token })).body;
+  const list = Array.isArray(msgs) ? msgs : msgs.messages;
+  assert.ok(list.some((m) => m.type === 'image' && m.mediaUrl));
+  assert.equal((await sendFile(host, conv.id, jpg, 'image/jpeg', 'h.jpg')).status, 403);
+
+  // batas per hari
+  await A('PATCH', '/api/admin/settings', { vip_media_per_day: 2 });
+  const lim = await sendFile(vip, conv.id, jpg, 'image/jpeg', 'b.jpg');
+  assert.equal(lim.status, 429);
+  assert.equal(lim.body.error.code, 'MEDIA_LIMIT');
+  await A('PATCH', '/api/admin/settings', { vip_media_per_day: 30 });
+});

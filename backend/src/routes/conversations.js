@@ -2,6 +2,7 @@ const express = require('express');
 const db = require('../db');
 const chat = require('../services/chat');
 const wallet = require('../services/wallet');
+const storage = require('../lib/storage');
 const realtime = require('../realtime');
 const { wrap } = require('../lib/errors');
 
@@ -65,6 +66,12 @@ router.post('/:id/messages', wrap(async (req, res) => {
   }
   await pushBalances(result.settled || result.freeCard ? [result.userId, result.hostId] : [req.user.id]);
   res.status(201).json({ message: result.message, settled: result.settled, freeCard: !!result.freeCard });
+}));
+
+router.post('/:id/media', storage.chatMedia, wrap(async (req, res) => {
+  const result = await chat.sendMedia(req.user.id, req.params.id, req);
+  await pushMessage(result, result.message);
+  res.status(201).json({ message: result.message });
 }));
 
 router.post('/:id/gifts', wrap(async (req, res) => {

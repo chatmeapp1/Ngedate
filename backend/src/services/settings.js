@@ -26,6 +26,8 @@ const DEFAULTS = {
   // Kartu pesan gratis (VIP): jumlah per hari, dan diamond untuk host per pesan gratis (dibayar app)
   free_cards_per_day: 5,
   free_card_host_diamonds: 5,
+  // Foto & video di chat untuk VIP: batas kiriman per hari (cegah penyalahgunaan penyimpanan)
+  vip_media_per_day: 30,
   // Top up koin: pemesanan lewat WhatsApp admin (sampai Google Play Billing dipasang)
   topup_contact: '', // nomor WhatsApp admin, hanya angka dengan kode negara (mis. 6281234567890)
   topup_note: 'Pilih paket, lalu pesan lewat WhatsApp admin. Koin ditambahkan setelah pembayaran dikonfirmasi.',

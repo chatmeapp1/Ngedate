@@ -25,8 +25,8 @@ export default function VipScreen() {
   if (!user || !m) return <Loading />;
   const perks: { icon: string; text: string; soon?: boolean }[] = [
     { icon: 'message-fast-outline', text: `${m.freeCardsPerDay} kartu pesan gratis per hari (host tetap dibayar)` },
-    { icon: 'image-multiple-outline', text: 'Kirim foto di chat', soon: true },
-    { icon: 'video-outline', text: 'Kirim video di chat', soon: true },
+    { icon: 'image-multiple-outline', text: 'Kirim foto di chat' },
+    { icon: 'video-outline', text: 'Kirim video di chat (maks 15 MB)' },
     { icon: 'crown-outline', text: 'Lencana VIP di profil' },
   ];
 

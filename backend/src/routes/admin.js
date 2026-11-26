@@ -217,6 +217,7 @@ router.patch('/settings', wrap(async (req, res) => {
     if (k === 'level_thresholds' && list[0] !== 0) throw badRequest('Level 0 harus dimulai dari 0');
     b[k] = list.map(Math.round);
   }
+  if (b.vip_media_per_day !== undefined) b.vip_media_per_day = Math.round(Number(b.vip_media_per_day));
   if (b.free_cards_per_day !== undefined) b.free_cards_per_day = Math.round(Number(b.free_cards_per_day));
   if (b.free_card_host_diamonds !== undefined) b.free_card_host_diamonds = Math.round(Number(b.free_card_host_diamonds));
   if (b.gift_host_share !== undefined) {
@@ -233,6 +234,7 @@ router.patch('/settings', wrap(async (req, res) => {
   whole('withdraw_usd_idr', 'Kurs Rupiah per 1 USD', 1000, 100000);
   whole('withdraw_min_diamonds', 'Minimal penarikan', 1, 1e9);
   whole('free_cards_per_day', 'Kartu gratis per hari', 0, 100);
+  whole('vip_media_per_day', 'Foto/video per hari', 0, 1000);
   whole('free_card_host_diamonds', 'Diamond host per pesan gratis', 0, 1000);
   whole('withdraw_fee_percent', 'Biaya penarikan (%)', 0, 50);
   whole('withdraw_usdt_fee_usd', 'Biaya jaringan USDT (USD)', 0, 50);

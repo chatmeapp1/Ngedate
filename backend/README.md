@@ -158,7 +158,11 @@ di panel admin > Pengaturan (`level_thresholds`, `vip_thresholds`).
 
 Pengguna VIP mendapat kartu pesan gratis (`free_cards_per_day`, awal 5 per hari, hari WIB): pesan ke host berbayar tidak
 memotong koin, dan host menerima `free_card_host_diamonds` (awal 5 diamond) yang dibayar app. `GET /api/me` mengirim
-`membership` (level, vip, progres, kartu tersisa). Kirim foto/video untuk VIP belum dibuat.
+`membership` (level, vip, progres, kartu tersisa).
+
+**Foto & video di chat (VIP):** `POST /api/conversations/:id/media` (multipart, field `file`; foto JPG/PNG/WEBP maks 5 MB,
+video MP4 maks 15 MB, isi file diperiksa). Khusus pengguna VIP ke host, tidak memotong koin, batas `vip_media_per_day` (awal 30)
+per hari. File disimpan di `UPLOAD_DIR` (di hosting tanpa disk permanen, pindahkan ke S3/R2).
 
 ## Panel admin web
 

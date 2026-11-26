@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -16,6 +17,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GiftIcon } from '@/components/GiftIcon';
+import { MediaBubble } from '@/components/ChatMedia';
 import { GiftSheet } from '@/components/GiftSheet';
 import { SafetyMenu } from '@/components/SafetyMenu';
 import { Avatar, Coin } from '@/components/ui';
@@ -200,6 +202,39 @@ export default function ChatRoom() {
     }
   };
 
+  // Kirim foto/video (khusus VIP)
+  const pickMedia = async () => {
+    if ((user?.membership?.vip ?? 0) < 1) {
+      Alert.alert('Khusus VIP', 'Kirim foto dan video tersedia untuk pengguna VIP. Top up untuk jadi VIP.', [
+        { text: 'Nanti', style: 'cancel' },
+        { text: 'Lihat VIP', onPress: () => router.push('/vip') },
+      ]);
+      return;
+    }
+    if (sending) return;
+    const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images', 'videos'], quality: 0.7, videoMaxDuration: 60 });
+    if (res.canceled) return;
+    const a = res.assets[0];
+    const isVideo = a.type === 'video';
+    if (a.fileSize && a.fileSize > 15 * 1024 * 1024) {
+      Alert.alert('File terlalu besar', 'Ukuran maksimal 15 MB. Pilih file yang lebih kecil.');
+      return;
+    }
+    setSending(true);
+    try {
+      const mime = a.mimeType ?? (isVideo ? 'video/mp4' : 'image/jpeg');
+      const form = new FormData();
+      form.append('file', { uri: a.uri, name: `${isVideo ? 'video' : 'foto'}.${mime.split('/')[1] ?? 'jpg'}`, type: mime } as unknown as Blob);
+      const r = await api.post<{ message: Message }>(`/api/conversations/${convId}/media`, form);
+      addMessage(r.message);
+    } catch (e) {
+      if (e instanceof ApiError && e.code === 'VIP_REQUIRED') router.push('/vip');
+      else Alert.alert('Gagal mengirim', errorMessage(e));
+    } finally {
+      setSending(false);
+    }
+  };
+
   const send = async () => {
     const body = text.trim();
     if (!body || sending) return;
@@ -363,6 +398,11 @@ export default function ChatRoom() {
             <Ionicons name="gift" size={22} color="#F59E0B" />
           </Pressable>
         ) : null}
+        {isUser ? (
+          <Pressable onPress={pickMedia} style={s.giftBtn} hitSlop={6}>
+            <Ionicons name="image" size={22} color={(user?.membership?.vip ?? 0) > 0 ? colors.primary : colors.textDim} />
+          </Pressable>
+        ) : null}
         <TextInput
           value={text}
           onChangeText={onChangeText}
@@ -478,6 +518,15 @@ function Bubble({ message: m, mine, showPayment }: { message: Message; mine: boo
             </View>
           </View>
         </LinearGradient>
+        <Text style={[s.meta, mine && { textAlign: 'right' }]}>{time(m.createdAt)}</Text>
+      </View>
+    );
+  }
+
+  if ((m.type === 'image' || m.type === 'video') && m.mediaUrl) {
+    return (
+      <View style={[s.row, mine ? s.rowMine : s.rowTheirs]}>
+        <MediaBubble type={m.type} url={m.mediaUrl} />
         <Text style={[s.meta, mine && { textAlign: 'right' }]}>{time(m.createdAt)}</Text>
       </View>
     );

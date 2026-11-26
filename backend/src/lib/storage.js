@@ -95,6 +95,43 @@ async function saveVideo(req) {
   return { name, url: `${publicBase(req)}/uploads/${name}` };
 }
 
+// ---- Foto / video di chat (VIP): gambar maks 5 MB, video MP4/MOV maks 15 MB ----
+const CHAT_MIME = { ...TYPES, 'video/mp4': '.mp4', 'video/quicktime': '.mov' };
+const chatUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 15 * 1024 * 1024, files: 1 },
+  fileFilter: (req, file, cb) => {
+    if (CHAT_MIME[file.mimetype]) cb(null, true);
+    else cb(badRequest('Hanya foto (JPG, PNG, WEBP) atau video MP4', 'INVALID_FILE'));
+  },
+}).single('file');
+
+function chatMedia(req, res, next) {
+  chatUpload(req, res, (err) => {
+    if (!err) return next();
+    if (err.code === 'LIMIT_FILE_SIZE') return next(badRequest('Ukuran file maksimal 15 MB (foto 5 MB)', 'FILE_TOO_LARGE'));
+    next(err);
+  });
+}
+
+// Periksa isi file (jangan percaya tipe dari klien saja), lalu simpan. Mengembalikan { url, kind }
+async function saveChatMedia(req) {
+  const file = req.file;
+  if (!file) throw badRequest('File wajib diisi', 'FILE_REQUIRED');
+  const b = file.buffer;
+  const isVideo = file.mimetype.startsWith('video/');
+  let ok;
+  if (isVideo) ok = b.length > 12 && b.subarray(4, 8).toString('latin1') === 'ftyp';
+  else if (file.mimetype === 'image/jpeg') ok = b.length > 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff;
+  else if (file.mimetype === 'image/png') ok = b.length > 8 && b.subarray(1, 4).toString('latin1') === 'PNG';
+  else ok = b.length > 12 && b.subarray(0, 4).toString('latin1') === 'RIFF' && b.subarray(8, 12).toString('latin1') === 'WEBP';
+  if (!ok) throw badRequest('File rusak atau bukan foto/video yang valid', 'INVALID_FILE');
+  if (!isVideo && b.length > 5 * 1024 * 1024) throw badRequest('Ukuran foto maksimal 5 MB', 'FILE_TOO_LARGE');
+  const name = `${Date.now()}-${crypto.randomBytes(8).toString('hex')}${CHAT_MIME[file.mimetype]}`;
+  await fs.promises.writeFile(path.join(UPLOAD_DIR, name), b);
+  return { name, url: `${publicBase(req)}/uploads/${name}`, kind: isVideo ? 'video' : 'image' };
+}
+
 async function save(req) {
   if (!req.file) throw badRequest('File gambar wajib diisi', 'FILE_REQUIRED');
   return saveFile(req, req.file);
@@ -106,4 +143,4 @@ async function remove(url) {
   await fs.promises.unlink(path.join(UPLOAD_DIR, name)).catch(() => {});
 }
 
-module.exports = { UPLOAD_DIR, single, many, save, saveFile, remove, singleVideo, saveVideo };
+module.exports = { UPLOAD_DIR, chatMedia, saveChatMedia, single, many, save, saveFile, remove, singleVideo, saveVideo };
