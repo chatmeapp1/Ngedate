@@ -98,6 +98,20 @@ Access token berlaku 15 menit, refresh token 30 hari.
 | GET | `/api/conversations/:id/whatsapp` | | `{ enabled, threshold, giftTotal, unlocked, number, link }` |
 | POST | `/api/conversations/:id/read` | | Tandai sudah dibaca |
 
+## ID pengguna & mengosongkan database
+
+ID akun berupa angka 6 digit yang naik berurutan mulai dari **100001** (migrasi `009`). Pengguna masuk lewat
+"Login via Akun" dengan **ID + password**.
+
+Untuk memulai dari nol (menghapus **semua** data, termasuk file unggahan, lalu membuat ulang admin & gift contoh):
+
+```bash
+CONFIRM_RESET=HAPUS-SEMUA-DATA ADMIN_USERNAME=amora ADMIN_PASSWORD=ganti-ini npm run reset-db
+```
+
+Tanpa `CONFIRM_RESET=HAPUS-SEMUA-DATA` perintah ini dibatalkan. Hanya file unggahan buatan aplikasi yang dihapus,
+file lain di folder yang sama tidak disentuh. Admin mendapat ID 100001, akun pertama pengguna 100002.
+
 ## Panel admin web
 
 Buka `http://<alamat-server>:<port>/admin` di browser (HP juga bisa) lalu masuk dengan akun admin
