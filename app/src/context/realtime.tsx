@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { AppState } from 'react-native';
 import { useAuth } from '@/context/auth';
 import { api } from '@/lib/api';
-import { connectRealtime, disconnectRealtime, onRealtime } from '@/lib/realtime';
+import { connectRealtime, disconnectRealtime, onRealtime, onRealtimeConnect } from '@/lib/realtime';
 import type { Message } from '@/lib/types';
 
 interface RealtimeState {
@@ -39,6 +39,7 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
       onRealtime<{ message: Message }>('message:new', (e) => {
         if (e.message.senderId !== userId) refreshUnread();
       }),
+      onRealtimeConnect(() => refreshUnread()),
       onRealtime<{ coins: number; diamonds: number }>('wallet:update', (b) => {
         setUser((u) => (u ? { ...u, coins: b.coins, diamonds: b.diamonds } : u));
       }),

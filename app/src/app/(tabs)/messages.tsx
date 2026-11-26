@@ -8,7 +8,7 @@ import { Verified } from '@/components/Verified';
 import { useAuth } from '@/context/auth';
 import { api, errorMessage } from '@/lib/api';
 import { onBlockChange } from '@/lib/blockEvents';
-import { onRealtime } from '@/lib/realtime';
+import { onRealtime, onRealtimeConnect } from '@/lib/realtime';
 import { colors, gradients } from '@/lib/theme';
 import type { Conversation, Host, Message } from '@/lib/types';
 
@@ -96,6 +96,9 @@ export default function Messages() {
   );
 
   useEffect(() => onBlockChange(() => load()), [load]);
+
+  // Socket tersambung ulang (mis. kembali dari latar belakang): muat ulang daftar supaya tidak ada pesan yang terlewat
+  useEffect(() => onRealtimeConnect(() => load()), [load]);
 
   // Pesan baru: perbarui percakapan itu & pindahkan ke paling atas
   useEffect(

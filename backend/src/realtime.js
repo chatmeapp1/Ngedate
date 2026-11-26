@@ -18,7 +18,8 @@ let io = null;
  *   typing           { conversationId }
  */
 function attach(httpServer) {
-  io = new Server(httpServer, { cors: { origin: '*' } });
+  // Ping lebih sering supaya koneksi mati (pindah jaringan, HP tidur) cepat terdeteksi dan menyambung ulang
+  io = new Server(httpServer, { cors: { origin: '*' }, pingInterval: 10_000, pingTimeout: 8_000 });
 
   io.use(async (socket, next) => {
     try {

@@ -27,7 +27,7 @@ import { useRealtime } from '@/context/realtime';
 import { ApiError, api, errorMessage } from '@/lib/api';
 import { compact, lastSeen, number } from '@/lib/format';
 import { playGift, playWaUnlocked } from '@/lib/giftFx';
-import { emitRealtime, onRealtime } from '@/lib/realtime';
+import { emitRealtime, onRealtime, onRealtimeConnect } from '@/lib/realtime';
 import { colors, gradients, radius } from '@/lib/theme';
 import type { Conversation, Host, Message, WhatsappStatus } from '@/lib/types';
 
@@ -133,6 +133,25 @@ export default function ChatRoom() {
     setMessages((cur) => (cur.some((x) => x.id === m.id) ? cur : [m, ...cur]));
   }, []);
 
+  // Muat ulang pesan terbaru dan gabungkan (dipakai saat socket tersambung ulang)
+  const syncLatest = useCallback(async () => {
+    try {
+      const [c, msgs] = await Promise.all([
+        api.get<Conversation>(`/api/conversations/${convId}`),
+        api.get<Message[]>(`/api/conversations/${convId}/messages?limit=${PAGE}`),
+      ]);
+      setConv(c);
+      setMessages((cur) => {
+        const byId = new Map(cur.map((m) => [m.id, m]));
+        for (const m of msgs) byId.set(m.id, { ...byId.get(m.id), ...m });
+        return [...byId.values()].sort((a, b) => b.id - a.id);
+      });
+      markRead();
+    } catch {
+      // coba lagi pada sambungan berikutnya
+    }
+  }, [convId, markRead]);
+
   const setStatus = useCallback((ids: number[], status: Message['paymentStatus']) => {
     const set = new Set(ids);
     setMessages((cur) => cur.map((m) => (set.has(m.id) ? { ...m, paymentStatus: status } : m)));
@@ -140,6 +159,9 @@ export default function ChatRoom() {
 
   useEffect(() => {
     const offs = [
+      onRealtimeConnect(() => {
+        syncLatest();
+      }),
       onRealtime<{ conversationId: number; message: Message; conversation: Conversation }>('message:new', (e) => {
         if (e.conversationId !== convId) return;
         addMessage(e.message);
@@ -192,7 +214,7 @@ export default function ChatRoom() {
       }),
     ];
     return () => offs.forEach((off) => off());
-  }, [convId, myId, addMessage, setStatus, markRead, loadWa]);
+  }, [convId, myId, addMessage, setStatus, markRead, loadWa, syncLatest]);
 
   // ---------- Kirim ----------
   const onChangeText = (v: string) => {
