@@ -15,14 +15,35 @@ const router = express.Router();
 
 router.get('/users', wrap(async (req, res) => {
   const q = v.str(req.query.q, 'q', { max: 50, optional: true });
+  const role = v.str(req.query.role, 'role', { optional: true, pattern: /^(user|host|admin)$/ });
+  const status = v.str(req.query.status, 'status', { optional: true, pattern: /^(active|suspended)$/ });
   const params = [];
-  let where = '';
+  const where = [];
   if (q) {
     params.push(`%${q.toLowerCase()}%`);
-    where = `WHERE username LIKE $1 OR lower(display_name) LIKE $1 OR email LIKE $1 OR id::text = $1`;
+    const i = params.length;
+    where.push(`(u.username LIKE $${i} OR lower(u.display_name) LIKE $${i} OR u.email LIKE $${i} OR u.id::text = $${i})`);
   }
-  const { rows } = await db.query(`SELECT * FROM users ${where} ORDER BY id DESC LIMIT 100`, params);
+  if (role) {
+    params.push(role);
+    where.push(`u.role = $${params.length}`);
+  }
+  if (status) {
+    params.push(status);
+    where.push(`u.status = $${params.length}`);
+  }
+  const { rows } = await db.query(
+    `SELECT u.*, a.name AS agency_name FROM users u LEFT JOIN agencies a ON a.id = u.agency_id
+     ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY u.id DESC LIMIT 100`,
+    params
+  );
   res.json(rows.map((u) => publicUser(u, { self: true })));
+}));
+
+// Unggah gambar (mis. gambar gift) -> URL
+router.post('/upload', storage.single, wrap(async (req, res) => {
+  const { url } = await storage.save(req);
+  res.status(201).json({ url });
 }));
 
 // Jadikan user sebagai host (atau kembalikan ke user)
@@ -84,9 +105,10 @@ function giftFields(b, optional) {
     name: v.str(b.name, 'Nama gift', { max: 50, optional }),
     price: v.int(b.price, 'Harga', { min: 1, max: 1e9, optional }),
     icon: v.str(b.icon, 'Ikon', { max: 16, optional: true }),
-    image_url: v.str(b.imageUrl, 'Gambar', { max: 500, optional: true }),
-    animation_url: v.str(b.animationUrl, 'Animasi', { max: 500, optional: true }),
-    sound_url: v.str(b.soundUrl, 'Suara', { max: 500, optional: true }),
+    // String kosong = hapus (null); tidak dikirim = tidak diubah
+    image_url: b.imageUrl === '' ? null : v.str(b.imageUrl, 'Gambar', { max: 500, optional: true }),
+    animation_url: b.animationUrl === '' ? null : v.str(b.animationUrl, 'Animasi', { max: 500, optional: true }),
+    sound_url: b.soundUrl === '' ? null : v.str(b.soundUrl, 'Suara', { max: 500, optional: true }),
     category: v.str(b.category, 'Kategori', { max: 20, optional: true }),
     sort_order: v.int(b.sortOrder, 'Urutan', { optional: true }),
     active: v.bool(b.active, 'Aktif', { optional: true }),
@@ -131,7 +153,7 @@ router.patch('/settings', wrap(async (req, res) => {
   res.json(await updateSettings(b));
 }));
 
-// Ringkasan: pendapatan platform & jumlah pengguna
+// Ringkasan untuk dashboard admin
 router.get('/stats', wrap(async (req, res) => {
   const { rows: earnings } = await db.query(
     `SELECT source, COALESCE(SUM(amount), 0) AS total FROM platform_earnings GROUP BY source`
@@ -140,10 +162,32 @@ router.get('/stats', wrap(async (req, res) => {
   const { rows: held } = await db.query(
     `SELECT COALESCE(SUM(price), 0) AS held FROM messages WHERE payment_status = 'held'`
   );
+  const { rows: extra } = await db.query(
+    `SELECT
+       (SELECT COUNT(*) FROM verifications WHERE status = 'pending')::int AS pending_verifications,
+       (SELECT COUNT(*) FROM user_photos WHERE status = 'pending')::int AS pending_photos,
+       (SELECT COUNT(*) FROM users WHERE pending_avatar_url IS NOT NULL)::int AS pending_avatars,
+       (SELECT COUNT(*) FROM users WHERE created_at > now() - interval '24 hours')::int AS new_users_24h,
+       (SELECT COUNT(*) FROM messages WHERE type = 'text' AND created_at > now() - interval '24 hours')::int AS messages_24h,
+       (SELECT COALESCE(SUM(price), 0) FROM messages WHERE type = 'gift' AND created_at > now() - interval '24 hours')::bigint AS gifts_24h,
+       (SELECT COALESCE(SUM(coins), 0) FROM users)::bigint AS coins_total,
+       (SELECT COUNT(*) FROM agencies WHERE active)::int AS agencies`
+  );
+  const x = extra[0];
   res.json({
     platformEarnings: Object.fromEntries(earnings.map((r) => [r.source, Number(r.total)])),
     users: Object.fromEntries(users.map((r) => [r.role, Number(r.n)])),
     heldCoins: Number(held[0].held),
+    pending: {
+      verifications: x.pending_verifications,
+      photos: x.pending_photos,
+      avatars: x.pending_avatars,
+    },
+    newUsers24h: x.new_users_24h,
+    messages24h: x.messages_24h,
+    gifts24h: Number(x.gifts_24h),
+    coinsInWallets: Number(x.coins_total),
+    agencies: x.agencies,
   });
 }));
 

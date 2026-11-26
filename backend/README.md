@@ -98,17 +98,25 @@ Access token berlaku 15 menit, refresh token 30 hari.
 | GET | `/api/conversations/:id/whatsapp` | | `{ enabled, threshold, giftTotal, unlocked, number, link }` |
 | POST | `/api/conversations/:id/read` | | Tandai sudah dibaca |
 
+## Panel admin web
+
+Buka `http://<alamat-server>:<port>/admin` di browser (HP juga bisa) lalu masuk dengan akun admin
+(`ADMIN_USERNAME` / `ADMIN_PASSWORD` yang dipakai saat `npm run seed`). Isinya: dashboard, verifikasi wajah,
+foto host, pengguna (koin, jadikan host, tangguhkan), agency + kode, gift (termasuk unggah gambar), dan pengaturan.
+Halaman ini statis (folder `public/admin`), tanpa build; semua data lewat API di bawah.
+
 ### Admin (role `admin`)
 | Method | Path | Body |
 |---|---|---|
-| GET | `/api/admin/users?q=` | |
+| GET | `/api/admin/users?q=&role=&status=` | |
+| POST | `/api/admin/upload` | multipart `file` (gambar) → `{ url }` |
 | PATCH | `/api/admin/users/:id/role` | `{ role: "host" \| "user" }` |
 | PATCH | `/api/admin/users/:id/status` | `{ status: "active" \| "suspended" }` |
 | POST | `/api/admin/users/:id/coins` | `{ amount, note }` — top up manual (sementara, sebelum Google Play Billing) |
 | GET / POST | `/api/admin/gifts` | `{ name, price, imageUrl, animationUrl, soundUrl, category, sortOrder, active }` |
 | PATCH | `/api/admin/gifts/:id` | |
 | GET / PATCH | `/api/admin/settings` | `host_share, chat_price_min/max, wa_threshold_min/max, reply_window_hours` |
-| GET | `/api/admin/stats` | Pendapatan platform, jumlah user, koin yang sedang ditahan |
+| GET | `/api/admin/stats` | Pendapatan platform, jumlah user, koin ditahan, antrean tinjauan, aktivitas 24 jam |
 
 ### Onboarding & verifikasi wajah
 | Method | Path | Keterangan |

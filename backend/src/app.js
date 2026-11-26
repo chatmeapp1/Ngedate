@@ -13,6 +13,13 @@ function createApp() {
 
   app.get('/health', (req, res) => res.json({ ok: true }));
   app.use('/uploads', express.static(storage.UPLOAD_DIR, { maxAge: '30d', immutable: true }));
+  // Panel admin web (halaman statis; semua data lewat /api/admin dengan login admin)
+  app.use(
+    '/admin',
+    express.static(require('path').join(__dirname, '..', 'public', 'admin'), {
+      setHeaders: (res) => res.setHeader('Cache-Control', 'no-store'),
+    })
+  );
 
   app.use('/api/auth', require('./routes/auth'));
   app.use('/api/me', authenticate, require('./routes/me'));
