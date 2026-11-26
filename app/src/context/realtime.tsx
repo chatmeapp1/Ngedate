@@ -47,6 +47,9 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
       if (s === 'active') {
         connectRealtime();
         refreshUnread();
+      } else if (s === 'background') {
+        // Putus saat di latar belakang supaya server mengirim notifikasi push
+        disconnectRealtime();
       }
     });
     return () => {

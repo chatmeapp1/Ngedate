@@ -157,6 +157,7 @@ export default function ChatRoom() {
             icon: g.icon,
             imageUrl: g.imageUrl,
             videoUrl: g.animationUrl,
+            soundUrl: g.soundUrl,
             blend: g.animationBlend,
             count: g.count,
             price: g.price,

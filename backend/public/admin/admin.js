@@ -262,7 +262,9 @@ function fmtSize(bytes) {
 function wireFile(f, input, box) {
   const types = (f.accept || 'image/png,image/jpeg,image/webp').split(',');
   const note = (text, cls) => h('div', { class: cls || 'dim', style: 'margin-top:6px' }, text);
-  if (f.current && f.preview === 'video') {
+  if (f.current && f.preview === 'audio') {
+    box.append(h('div', { class: 'dim', style: 'margin-top:6px' }, 'Suara saat ini:'), h('audio', { src: f.current, controls: true, style: 'width:100%' }));
+  } else if (f.current && f.preview === 'video') {
     box.append(h('div', { class: 'dim', style: 'margin-top:6px' }, 'Efek saat ini:'),
       h('video', { class: 'pv', src: f.current, controls: true, muted: true, loop: true, playsinline: true }));
   } else if (f.current && f.preview === 'image') {
@@ -286,7 +288,9 @@ function wireFile(f, input, box) {
     const info = note(file.name + ' · ' + fmtSize(file.size));
     const warn = h('div', { class: 'warn-text' });
     let media;
-    if (f.preview === 'video') {
+    if (f.preview === 'audio') {
+      media = h('audio', { src: url, controls: true, style: 'width:100%' });
+    } else if (f.preview === 'video') {
       media = h('video', { class: 'pv', src: url, controls: true, muted: true, loop: true, playsinline: true });
       media.muted = true;
       media.addEventListener('loadedmetadata', () => {
@@ -1001,6 +1005,8 @@ async function pageGifts() {
     ...(g && g.imageUrl ? [{ name: 'removeImage', label: 'Hapus gambar yang ada', type: 'checkbox', value: false }] : []),
     { name: 'video', label: 'Efek MP4 layar penuh (opsional)', type: 'file', accept: 'video/mp4', maxMB: 15, preview: 'video', current: g && g.animationUrl, hint: 'MP4 maks 15 MB, disarankan portrait (mis. 720x1280) dan H.264. Diputar maksimal 6 detik lalu memudar halus. Suara tidak diputar.' },
     ...(g && g.animationUrl ? [{ name: 'removeVideo', label: 'Hapus efek MP4 yang ada', type: 'checkbox', value: false }] : []),
+    { name: 'sound', label: 'Suara gift (opsional)', type: 'file', accept: 'audio/mpeg,audio/mp4,audio/aac,audio/ogg,audio/wav', maxMB: 2, preview: 'audio', current: g && g.soundUrl, hint: 'MP3/M4A/AAC/OGG/WAV maks 2 MB, sebaiknya 1–4 detik. Diputar di HP penerima dan pengirim saat gift datang.' },
+    ...(g && g.soundUrl ? [{ name: 'removeSound', label: 'Hapus suara yang ada', type: 'checkbox', value: false }] : []),
     { name: 'blend', label: 'Latar video hitam → jadikan transparan', type: 'checkbox', value: g ? g.animationBlend : false },
     { name: 'autoThumb', label: 'Buat gambar gift otomatis dari video (jika gambar kosong)', type: 'checkbox', value: true },
     { name: 'active', label: 'Aktif (tampil di panel gift)', type: 'checkbox', value: g ? g.active : true },
@@ -1018,6 +1024,11 @@ async function pageGifts() {
       ui.progress('Mengunggah efek MP4…', 0);
       animationUrl = (await xhrUpload('/api/admin/upload-video', r.video, (p) => ui.progress('Mengunggah efek MP4… ' + Math.round(p * 100) + '%', p))).url;
     } else if (r.removeVideo) animationUrl = '';
+    let soundUrl;
+    if (r.sound) {
+      ui.progress('Mengunggah suara…', 0);
+      soundUrl = (await xhrUpload('/api/admin/upload-audio', r.sound, (p) => ui.progress('Mengunggah suara… ' + Math.round(p * 100) + '%', p))).url;
+    } else if (r.removeSound) soundUrl = '';
     // Tidak ada gambar tapi ada video: ambil gambar dari video supaya daftar gift & chat tidak hanya emoji
     const hasImage = r.image || (g && g.imageUrl && !r.removeImage);
     if (r.video && r.autoThumb && !hasImage && imageUrl === undefined) {
@@ -1029,6 +1040,7 @@ async function pageGifts() {
     const body = { name: r.name, price: r.price, icon: r.icon || undefined, hostMultiplier: Number(r.hostMultiplier) || 1, category: r.category, sortOrder: r.sortOrder ?? 0, active: r.active, animationBlend: r.blend };
     if (imageUrl !== undefined) body.imageUrl = imageUrl;
     if (animationUrl !== undefined) body.animationUrl = animationUrl;
+    if (soundUrl !== undefined) body.soundUrl = soundUrl;
     return g ? patch('/api/admin/gifts/' + g.id, body) : post('/api/admin/gifts', body);
   };
 
@@ -1048,7 +1060,7 @@ async function pageGifts() {
         h('div', { class: 'sp' }, h('b', {}, g.name), h('div', { class: 'dim' }, fmt(g.price) + ' koin · urutan ' + g.sortOrder)),
         h('div', { style: 'text-align:right' },
           h('span', { class: 'pill ' + (g.category === 'luxury' ? 'amber' : '') }, g.category === 'luxury' ? 'Mewah' : 'Populer'), g.hostMultiplier > 1 ? h('span', { class: 'pill green', style: 'margin-left:4px' }, 'host x' + g.hostMultiplier) : null,
-          h('div', { style: 'margin-top:4px' }, g.active ? null : h('span', { class: 'pill red' }, 'Nonaktif'), g.animationUrl ? h('span', { class: 'pill purple', style: 'margin-left:4px' }, '🎬 MP4') : null, g.animationUrl && !g.imageUrl ? h('span', { class: 'pill amber', style: 'margin-left:4px' }, 'tanpa gambar') : null))),
+          h('div', { style: 'margin-top:4px' }, g.active ? null : h('span', { class: 'pill red' }, 'Nonaktif'), g.animationUrl ? h('span', { class: 'pill purple', style: 'margin-left:4px' }, '🎬 MP4') : null, g.soundUrl ? h('span', { class: 'pill', style: 'margin-left:4px' }, '🔊') : null, g.animationUrl && !g.imageUrl ? h('span', { class: 'pill amber', style: 'margin-left:4px' }, 'tanpa gambar') : null))),
       h('div', { class: 'row wrap', style: 'margin-top:12px;gap:6px' }, h('button', { class: 'btn sm', onclick: async () => {
         const r = await formModal({ title: 'Ubah gift', fields: fields(g), onSubmit: (v, ui) => save(g, v, ui) });
         if (r) {

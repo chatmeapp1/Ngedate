@@ -1,3 +1,4 @@
+import { unregisterPush } from '@/lib/push';
 import {
   createContext,
   useCallback,
@@ -87,6 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await startSession(await api.post<SessionResponse>('/api/auth/quick', { deviceKey: await deviceKey() }));
       },
       logout: async () => {
+        await unregisterPush();
         await setSession(null);
         setUser(null);
       },

@@ -39,6 +39,23 @@ function parseTags(raw) {
   return [...new Set(raw.map((t) => v.str(t, 'Tag', { min: 1, max: 20 }).toLowerCase()))];
 }
 
+// Token notifikasi push perangkat ini (satu token hanya milik satu akun)
+router.post('/push-token', wrap(async (req, res) => {
+  const token = v.str(req.body.token, 'token', { min: 20, max: 400 });
+  await db.query(
+    `INSERT INTO push_tokens (token, user_id, platform) VALUES ($1, $2, 'android')
+     ON CONFLICT (token) DO UPDATE SET user_id = EXCLUDED.user_id, updated_at = now()`,
+    [token, req.user.id]
+  );
+  res.json({ ok: true });
+}));
+
+router.delete('/push-token', wrap(async (req, res) => {
+  const token = v.str(req.query.token, 'token', { min: 20, max: 400 });
+  await db.query(`DELETE FROM push_tokens WHERE token = $1 AND user_id = $2`, [token, req.user.id]);
+  res.json({ ok: true });
+}));
+
 router.get('/', wrap(async (req, res) => {
   res.json(await loadMe(req.user.id));
 }));

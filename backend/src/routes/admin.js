@@ -110,6 +110,12 @@ router.post('/upload-video', storage.singleVideo, wrap(async (req, res) => {
   res.status(201).json({ url });
 }));
 
+// Unggah suara gift (maks 2 MB) -> URL
+router.post('/upload-audio', storage.singleAudio, wrap(async (req, res) => {
+  const { url } = await storage.saveAudio(req);
+  res.status(201).json({ url });
+}));
+
 router.get('/coin-log', wrap(async (req, res) => {
   const userId = v.int(req.query.userId, 'userId', { min: 1, optional: true });
   const params = [];

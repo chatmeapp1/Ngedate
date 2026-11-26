@@ -164,6 +164,22 @@ memotong koin, dan host menerima `free_card_host_diamonds` (awal 5 diamond) yang
 video MP4 maks 15 MB, isi file diperiksa). Khusus pengguna VIP ke host, tidak memotong koin, batas `vip_media_per_day` (awal 30)
 per hari. File disimpan di `UPLOAD_DIR` (di hosting tanpa disk permanen, pindahkan ke S3/R2).
 
+## Notifikasi push & suara gift
+
+**Suara gift:** panel admin > Gift > Ubah gift > "Suara gift" (MP3/M4A/AAC/OGG/WAV, maks 2 MB). Diputar sekali di HP pengirim dan
+penerima saat gift datang.
+
+**Notifikasi push (Android, Firebase Cloud Messaging):** dikirim saat ada pesan, foto/video, atau gift untuk pengguna yang
+sedang tidak membuka aplikasi. Ketuk notifikasi membuka chatnya. Langkah pasang (sekali saja):
+
+1. Firebase Console > buat project > tambah aplikasi Android dengan nama paket `app.amora.chat` > unduh `google-services.json`.
+2. Isi file itu ke GitHub: Settings > Secrets > Actions > `GOOGLE_SERVICES_JSON` (tempel isi file), lalu bangun APK 1.1.0.
+3. Firebase > Project settings > Service accounts > Generate new private key. Simpan file JSON-nya di HP server (jangan di GitHub).
+4. Di server isi variabel `FCM_SERVICE_ACCOUNT=/path/ke/file-kunci.json` (atau `FCM_SERVICE_ACCOUNT_JSON` berisi JSON-nya), restart.
+
+Tanpa langkah 3-4 backend tidak mengirim apa pun (aman). Token perangkat disimpan di tabel `push_tokens`
+(`POST/DELETE /api/me/push-token`).
+
 ## Panel admin web
 
 Buka `http://<alamat-server>:<port>/admin` di browser (HP juga bisa) lalu masuk dengan akun admin

@@ -25,6 +25,22 @@ jobs:
           java-version: 17
       - run: npm ci
       - run: npx tsc --noEmit
+      # Notifikasi push: isi secret GOOGLE_SERVICES_JSON (isi file google-services.json dari Firebase,
+      # boleh polos atau base64). Tanpa secret, APK tetap jadi tapi tanpa notifikasi push.
+      - name: Siapkan google-services.json
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -n "$GOOGLE_SERVICES_JSON" ] && [ ! -f google-services.json ]; then
+            if echo "$GOOGLE_SERVICES_JSON" | head -c1 | grep -q '{'; then
+              echo "$GOOGLE_SERVICES_JSON" > google-services.json
+            else
+              echo "$GOOGLE_SERVICES_JSON" | base64 -d > google-services.json
+            fi
+            echo "google-services.json dipasang dari secret"
+          else
+            echo "::notice::GOOGLE_SERVICES_JSON tidak diisi / file sudah ada: lanjut tanpa mengganti"
+          fi
       - run: npx expo prebuild -p android --clean --no-install
       - run: ./gradlew assembleRelease --no-daemon
         working-directory: app/android

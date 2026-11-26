@@ -3,6 +3,7 @@ const db = require('../db');
 const chat = require('../services/chat');
 const wallet = require('../services/wallet');
 const storage = require('../lib/storage');
+const push = require('../services/push');
 const realtime = require('../realtime');
 const { wrap } = require('../lib/errors');
 
@@ -17,7 +18,21 @@ async function pushBalances(userIds) {
 }
 
 // Kirim pesan baru ke kedua pihak, masing-masing dengan ringkasan percakapan versinya sendiri
+// Notifikasi push untuk lawan bicara yang sedang tidak online
+async function pushNotify(result, message) {
+  if (!['text', 'image', 'video', 'gift'].includes(message.type) || message.senderId == null) return;
+  const to = message.senderId === result.userId ? result.hostId : result.userId;
+  const { rows } = await db.query(`SELECT display_name FROM users WHERE id = $1`, [message.senderId]);
+  const body =
+    message.type === 'text' ? message.body :
+    message.type === 'image' ? '📷 Foto' :
+    message.type === 'video' ? '🎥 Video' :
+    `🎁 ${message.gift ? message.gift.name : 'Gift'}${message.gift && message.gift.count > 1 ? ` x${message.gift.count}` : ''}`;
+  push.notifyLater(to, { title: rows[0] ? rows[0].display_name : 'Amora', body, data: { type: 'chat', conversationId: result.conversationId } });
+}
+
 async function pushMessage(result, message) {
+  pushNotify(result, message).catch(() => {});
   for (const id of [result.userId, result.hostId]) {
     const conversation = await chat.getConversation(id, result.conversationId);
     realtime.emitTo(id, 'message:new', { conversationId: result.conversationId, message, conversation });

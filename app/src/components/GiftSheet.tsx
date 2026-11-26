@@ -81,6 +81,7 @@ export function GiftSheet({
         icon: selected.icon,
         imageUrl: selected.imageUrl,
         videoUrl: selected.animationUrl,
+        soundUrl: selected.soundUrl,
         blend: selected.animationBlend,
         count,
         price: selected.price,

@@ -132,6 +132,42 @@ async function saveChatMedia(req) {
   return { name, url: `${publicBase(req)}/uploads/${name}`, kind: isVideo ? 'video' : 'image' };
 }
 
+// ---- Suara gift (MP3 / M4A / AAC / OGG / WAV, maks 2 MB) ----
+const AUDIO = { 'audio/mpeg': '.mp3', 'audio/mp3': '.mp3', 'audio/mp4': '.m4a', 'audio/x-m4a': '.m4a', 'audio/aac': '.aac', 'audio/ogg': '.ogg', 'audio/wav': '.wav', 'audio/x-wav': '.wav' };
+const audioUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 2 * 1024 * 1024, files: 1 },
+  fileFilter: (req, file, cb) => {
+    if (AUDIO[file.mimetype]) cb(null, true);
+    else cb(badRequest('Hanya audio MP3, M4A, AAC, OGG, atau WAV', 'INVALID_FILE'));
+  },
+}).single('file');
+
+function singleAudio(req, res, next) {
+  audioUpload(req, res, (err) => {
+    if (!err) return next();
+    if (err.code === 'LIMIT_FILE_SIZE') return next(badRequest('Ukuran suara maksimal 2 MB', 'FILE_TOO_LARGE'));
+    next(err);
+  });
+}
+
+async function saveAudio(req) {
+  const file = req.file;
+  if (!file) throw badRequest('File suara wajib diisi', 'FILE_REQUIRED');
+  const b = file.buffer;
+  const head4 = b.subarray(0, 4).toString('latin1');
+  const ok =
+    b.length > 12 &&
+    (head4.startsWith('ID3') || (b[0] === 0xff && (b[1] & 0xe0) === 0xe0) || // MP3 / AAC (ADTS)
+      b.subarray(4, 8).toString('latin1') === 'ftyp' || // M4A
+      head4 === 'OggS' ||
+      head4 === 'RIFF');
+  if (!ok) throw badRequest('File bukan audio yang valid', 'INVALID_FILE');
+  const name = `${Date.now()}-${crypto.randomBytes(8).toString('hex')}${AUDIO[file.mimetype]}`;
+  await fs.promises.writeFile(path.join(UPLOAD_DIR, name), b);
+  return { name, url: `${publicBase(req)}/uploads/${name}` };
+}
+
 async function save(req) {
   if (!req.file) throw badRequest('File gambar wajib diisi', 'FILE_REQUIRED');
   return saveFile(req, req.file);
@@ -143,4 +179,4 @@ async function remove(url) {
   await fs.promises.unlink(path.join(UPLOAD_DIR, name)).catch(() => {});
 }
 
-module.exports = { UPLOAD_DIR, chatMedia, saveChatMedia, single, many, save, saveFile, remove, singleVideo, saveVideo };
+module.exports = { singleAudio, saveAudio, UPLOAD_DIR, chatMedia, saveChatMedia, single, many, save, saveFile, remove, singleVideo, saveVideo };
