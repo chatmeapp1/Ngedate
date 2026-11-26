@@ -132,8 +132,9 @@ saat ada penarikan berjalan.
 
 ## Paket koin & Top up
 
-Layar **Top up** di aplikasi menampilkan paket koin dari panel admin > **Paket koin**. Harga awal: Rp 2,55 per koin
-(= US$ 0,00015 per koin, 6.667 koin = 1 USD): 18.000 / 36.000 / 54.000 / 90.000 / 180.000 / 450.000 / 900.000 / 1.800.000 koin.
+Layar **Top up** di aplikasi menampilkan paket koin dari panel admin > **Paket koin**. Harga awal: Rp 2 per koin
+(18.000 koin = Rp 36.000): 18.000 / 36.000 / 54.000 / 90.000 / 180.000 / 450.000 / 900.000 / 1.800.000 koin.
+Harga jual koin (`coin_price_idr`) dan nilai diamond host (kurs penarikan) adalah dua pengaturan terpisah.
 Pengguna di Indonesia melihat harga Rupiah, negara lain harga USD. Mengetuk paket membuka WhatsApp admin dengan pesan terisi
 (paket + ID akun); setelah pembayaran masuk, admin menambah koin lewat menu **Top up koin**. Nomor WhatsApp admin dan catatan
 pembayaran diatur di halaman Paket koin. Pembelian otomatis lewat Google Play Billing belum dipasang (butuh APK baru).

@@ -198,6 +198,7 @@ router.patch('/settings', wrap(async (req, res) => {
     const n = Number(b[k]);
     if (!Number.isFinite(n) || n < min || n > max) throw badRequest(`${label} harus antara ${min} dan ${max}`);
   };
+  whole('coin_price_idr', 'Harga jual 1 koin (Rupiah)', 0.01, 100000);
   whole('withdraw_diamonds_per_usd', 'Diamond per 1 USD', 1, 1e7);
   whole('withdraw_usd_idr', 'Kurs Rupiah per 1 USD', 1000, 100000);
   whole('withdraw_min_diamonds', 'Minimal penarikan', 1, 1e9);

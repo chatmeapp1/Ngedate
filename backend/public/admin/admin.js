@@ -897,7 +897,7 @@ async function pagePackages() {
   // --- Paket ---
   const fields = (pk) => [
     { name: 'coins', label: 'Jumlah koin', type: 'number', value: pk ? pk.coins : '', hint: 'Contoh: 18000' },
-    { name: 'auto', label: 'Hitung harga otomatis dari kurs saat ini', type: 'checkbox', value: !pk,
+    { name: 'auto', label: 'Hitung harga otomatis dari harga jual per koin (Pengaturan)', type: 'checkbox', value: !pk,
       hint: null },
     { name: 'priceIdr', label: 'Harga Rupiah (Indonesia)', type: 'number', value: pk ? pk.priceIdr : '', hint: 'Diabaikan jika hitung otomatis dicentang' },
     { name: 'priceUsd', label: 'Harga USD (negara lain)', type: 'number', value: pk ? +(pk.priceUsdCents / 100).toFixed(2) : '', hint: 'Dalam dolar, mis. 2.70' },
@@ -905,16 +905,16 @@ async function pagePackages() {
     { name: 'sortOrder', label: 'Urutan', type: 'number', value: pk ? pk.sortOrder : list.length + 1, hint: 'Angka kecil tampil lebih dulu' },
     { name: 'active', label: 'Aktif (tampil di aplikasi)', type: 'checkbox', value: pk ? pk.active : true },
   ];
-  const perUsd = Number(settings.withdraw_diamonds_per_usd);
+  const coinPrice = Number(settings.coin_price_idr); // Rupiah per koin
   const usdIdr = Number(settings.withdraw_usd_idr);
   const body = (r) => {
     const coins = Math.trunc(r.coins || 0);
     let priceIdr = r.priceIdr;
     let usdCents = r.priceUsd === null ? null : Math.round(r.priceUsd * 100);
     if (r.auto) {
-      // Kurs: perUsd koin = 1 USD; Rupiah dibulatkan ke 100 terdekat
-      priceIdr = Math.round(((coins / perUsd) * usdIdr) / 100) * 100;
-      usdCents = Math.round((coins / perUsd) * 100);
+      // Harga jual per koin (Pengaturan); Rupiah dibulatkan ke 100 terdekat, USD dari kurs Rupiah/USD
+      priceIdr = Math.round((coins * coinPrice) / 100) * 100;
+      usdCents = Math.round(((coins * coinPrice) / usdIdr) * 100);
     }
     return { coins, priceIdr, priceUsdCents: usdCents, badge: r.badge || '', sortOrder: r.sortOrder ?? 0, active: r.active };
   };
@@ -1063,7 +1063,8 @@ async function pageSettings() {
     { k: 'wa_threshold_min', label: 'Syarat total gift untuk buka WA — minimum (koin)', min: 0 },
     { k: 'wa_threshold_max', label: 'Syarat total gift untuk buka WA — maksimum (koin)', min: 0 },
     { k: 'reply_window_hours', label: 'Batas balas sebelum koin dikembalikan (jam)', min: 1 },
-    { k: 'withdraw_diamonds_per_usd', label: 'Penarikan: diamond per 1 USD', hint: 'Kurs pencairan host. Samakan dengan harga jual koin (6.667 koin = 1 USD). Berlaku untuk pengajuan berikutnya.', min: 1 },
+    { k: 'coin_price_idr', label: 'Harga jual 1 koin (Rupiah)', hint: 'Dipakai untuk menghitung harga otomatis paket koin. Tidak mengubah paket yang sudah ada.', min: 0.01 },
+    { k: 'withdraw_diamonds_per_usd', label: 'Penarikan: diamond per 1 USD', hint: 'Nilai 1 diamond host dalam USD (tidak harus sama dengan harga jual koin). Berlaku untuk pengajuan berikutnya.', min: 1 },
     { k: 'withdraw_usd_idr', label: 'Penarikan: Rupiah per 1 USD (host Indonesia)', hint: 'Host Indonesia dibayar Rupiah memakai kurs ini; host negara lain dibayar USDT.', min: 1000 },
     { k: 'withdraw_min_diamonds', label: 'Penarikan: minimal diamond per pengajuan', min: 1 },
     { k: 'withdraw_fee_percent', label: 'Penarikan: biaya (%)', hint: 'Dipotong dari jumlah penarikan. 0 = tanpa biaya.', min: 0, max: 50 },

@@ -58,19 +58,18 @@ after(async () => {
   await db.pool.end();
 });
 
-test('8 paket awal: harga tepat Rp 2,55 dan US$ 0,00015 per koin, urut naik', async () => {
+test('8 paket awal: harga tepat Rp 2 per koin (18.000 = Rp 36.000), urut naik', async () => {
   const r = await api('GET', '/api/admin/packages', { token: admin.token });
   assert.equal(r.status, 200);
   assert.deepEqual(r.body.map((p) => p.coins), [18000, 36000, 54000, 90000, 180000, 450000, 900000, 1800000]);
   for (const p of r.body) {
-    assert.equal(p.priceIdr, Math.round(p.coins * 2.55), `Rupiah ${p.coins}`);
-    assert.equal(p.priceUsdCents, Math.round(p.coins * 0.015), `USD ${p.coins}`);
+    assert.equal(p.priceIdr, p.coins * 2, `Rupiah ${p.coins}`);
+    assert.equal(p.priceUsdCents, Math.round(((p.coins * 2) / 17000) * 100), `USD ${p.coins}`);
     assert.equal(p.active, true);
   }
-  assert.equal(r.body[0].priceIdr, 45900);
-  assert.equal(r.body[7].priceIdr, 4590000);
-  assert.equal(r.body[0].priceUsdCents, 270);
-  assert.equal(r.body[7].priceUsdCents, 27000);
+  assert.deepEqual(r.body.map((p) => p.priceIdr), [36000, 72000, 108000, 180000, 360000, 900000, 1800000, 3600000]);
+  assert.equal(r.body[0].priceUsdCents, 212, '$2,12');
+  assert.equal(r.body[7].priceUsdCents, 21176, '$211,76');
 });
 
 test('pengguna melihat paket aktif; mata uang mengikuti negara', async () => {
@@ -119,6 +118,19 @@ test('admin mengelola paket: validasi, duplikat, label, nonaktif, hapus; bukan a
 
   assert.equal((await api('DELETE', `/api/admin/packages/${ok.body.id}`, { token: admin.token })).status, 200);
   assert.equal((await api('DELETE', `/api/admin/packages/${ok.body.id}`, { token: admin.token })).status, 404);
+});
+
+test('harga jual koin bisa diatur terpisah dari nilai diamond host', async () => {
+  const set = (b) => api('PATCH', '/api/admin/settings', { token: admin.token, body: b });
+  const get = async () => (await api('GET', '/api/admin/settings', { token: admin.token })).body;
+  assert.equal((await get()).coin_price_idr, 2);
+  assert.equal((await set({ coin_price_idr: 0 })).status, 400);
+  assert.equal((await set({ coin_price_idr: 'abc' })).status, 400);
+  assert.equal((await set({ coin_price_idr: 2.5 })).status, 200);
+  const s = await get();
+  assert.equal(s.coin_price_idr, 2.5);
+  assert.equal(s.withdraw_diamonds_per_usd, 6667, 'nilai diamond host tidak ikut berubah');
+  await set({ coin_price_idr: 2 });
 });
 
 test('kontak WhatsApp top up dinormalkan; catatan pembayaran dibatasi', async () => {
