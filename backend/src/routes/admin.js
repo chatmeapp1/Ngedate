@@ -250,6 +250,9 @@ router.patch('/settings', wrap(async (req, res) => {
   whole('host_media_per_day', 'Foto/video privat host per hari', 0, 1000);
   whole('host_video_max_seconds', 'Video privat maksimum (detik)', 10, 3600);
   whole('free_card_host_diamonds', 'Diamond host per pesan gratis', 0, 1000);
+  for (const [k, label] of [['task_reward_moment', 'Hadiah tugas momen'], ['task_reward_photos', 'Hadiah tugas foto'], ['task_reward_checkin', 'Hadiah tugas check-in host'], ['task_reward_like', 'Hadiah tugas sukai']]) whole(k, label, 0, 10000);
+  whole('task_like_target', 'Target sukai per hari', 1, 500);
+  for (const k of ['task_reward_moment', 'task_reward_photos', 'task_reward_checkin', 'task_reward_like', 'task_like_target']) if (b[k] !== undefined) b[k] = Math.round(Number(b[k]));
   whole('withdraw_fee_percent', 'Biaya penarikan (%)', 0, 50);
   whole('withdraw_usdt_fee_usd', 'Biaya jaringan USDT (USD)', 0, 50);
   for (const k of ['withdraw_diamonds_per_usd', 'withdraw_usd_idr', 'withdraw_min_diamonds']) {

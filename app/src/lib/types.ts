@@ -334,3 +334,14 @@ export interface CheckinStatus {
   /** hadiah yang baru diterima (hanya pada respons klaim) */
   granted?: CheckinReward;
 }
+
+export interface HostTask {
+  key: 'moment' | 'photos' | 'checkin' | 'like' | string;
+  group: 'beginner' | 'daily';
+  title: string;
+  reward: number;
+  progress: number;
+  target: number;
+  go: 'moment' | 'photos' | 'checkin' | 'like' | string;
+  state: 'todo' | 'claimable' | 'done';
+}

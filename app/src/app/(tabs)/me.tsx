@@ -229,6 +229,7 @@ export default function Me() {
         {isHost ? (
           <>
             <Item icon="eye-outline" label="Lihat profil saya" onPress={() => router.push({ pathname: '/host/[id]', params: { id: String(user.id) } })} />
+            <Item icon="calendar-outline" label="Tugas harian" onPress={() => router.push('/tasks')} />
             <Item icon="options-outline" label="Pengaturan host (tarif & WhatsApp)" onPress={() => router.push('/host-settings')} />
             {!user.verified ? (
               <Item
