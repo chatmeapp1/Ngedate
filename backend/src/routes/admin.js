@@ -282,6 +282,7 @@ router.get('/stats', wrap(async (req, res) => {
        (SELECT COUNT(*) FROM user_photos WHERE status = 'pending')::int AS pending_photos,
        (SELECT COUNT(*) FROM users WHERE pending_avatar_url IS NOT NULL)::int AS pending_avatars,
        (SELECT COUNT(*) FROM reports WHERE status = 'pending')::int AS pending_reports,
+       (SELECT COUNT(*) FROM moments WHERE status = 'pending')::int AS pending_moments,
        ((SELECT COUNT(*) FROM withdrawals WHERE status = 'pending') + (SELECT COUNT(*) FROM agency_withdrawals WHERE status = 'pending'))::int AS pending_withdrawals,
        ((SELECT COALESCE(SUM(net), 0) FROM withdrawals WHERE status = 'pending' AND currency = 'IDR') + (SELECT COALESCE(SUM(net), 0) FROM agency_withdrawals WHERE status = 'pending' AND currency = 'IDR'))::bigint AS pending_withdraw_idr,
        ((SELECT COALESCE(SUM(net), 0) FROM withdrawals WHERE status = 'pending' AND currency = 'USD') + (SELECT COALESCE(SUM(net), 0) FROM agency_withdrawals WHERE status = 'pending' AND currency = 'USD'))::bigint AS pending_withdraw_usd_cents,
@@ -301,6 +302,7 @@ router.get('/stats', wrap(async (req, res) => {
       photos: x.pending_photos,
       avatars: x.pending_avatars,
       reports: x.pending_reports,
+      moments: x.pending_moments,
       withdrawals: x.pending_withdrawals,
     },
     pendingWithdrawIdr: Number(x.pending_withdraw_idr),
@@ -493,7 +495,37 @@ router.patch('/packages/:id', wrap(async (req, res) => {
   }
 }));
 
-// Moderasi momen: hapus postingan yang melanggar
+// Moderasi momen: foto host harus disetujui dulu
+router.get('/moments', wrap(async (req, res) => {
+  const status = ['pending', 'approved', 'rejected'].includes(req.query.status) ? req.query.status : 'pending';
+  const { rows } = await db.query(
+    `SELECT m.id, m.body, m.image_url, m.status, m.reject_reason, m.created_at, m.views, u.id AS host_id, u.display_name,
+       (SELECT COUNT(*) FROM moment_likes l WHERE l.moment_id = m.id)::int AS likes
+     FROM moments m JOIN users u ON u.id = m.host_id WHERE m.status = $1 ORDER BY m.id ${status === 'pending' ? 'ASC' : 'DESC'} LIMIT 100`,
+    [status]
+  );
+  res.json(rows.map((r) => ({ id: Number(r.id), body: r.body, imageUrl: r.image_url, status: r.status, rejectReason: r.reject_reason, createdAt: r.created_at, views: r.views, likes: r.likes, hostId: Number(r.host_id), displayName: r.display_name })));
+}));
+
+router.post('/moments/:id/approve', wrap(async (req, res) => {
+  const { rowCount } = await db.query(`UPDATE moments SET status = 'approved', reject_reason = NULL WHERE id = $1`, [v.id(req.params.id)]);
+  if (!rowCount) throw notFound('Momen tidak ditemukan');
+  res.json({ ok: true });
+}));
+
+// Tolak: foto langsung dihapus dari server; teks (jika ada) tetap tersimpan sebagai riwayat
+router.post('/moments/:id/reject', wrap(async (req, res) => {
+  const reason = v.str(req.body.reason, 'Alasan', { min: 3, max: 200 });
+  const { rows } = await db.query(
+    `UPDATE moments m SET status = 'rejected', reject_reason = $2, image_url = NULL
+     FROM (SELECT id, image_url FROM moments WHERE id = $1) o WHERE m.id = o.id RETURNING o.image_url`,
+    [v.id(req.params.id), reason]
+  );
+  if (!rows.length) throw notFound('Momen tidak ditemukan');
+  if (rows[0].image_url) await require('../lib/storage').remove(rows[0].image_url);
+  res.json({ ok: true });
+}));
+
 router.delete('/moments/:id', wrap(async (req, res) => {
   const { rows } = await db.query(`DELETE FROM moments WHERE id = $1 RETURNING image_url`, [v.id(req.params.id)]);
   if (rows.length && rows[0].image_url) await require('../lib/storage').remove(rows[0].image_url);

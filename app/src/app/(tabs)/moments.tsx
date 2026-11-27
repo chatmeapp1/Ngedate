@@ -128,6 +128,11 @@ export default function Moments() {
                   </Text>
                 </LinearGradient>
               )}
+              {item.status !== 'approved' ? (
+                <View style={[s.status, item.status === 'rejected' && { backgroundColor: 'rgba(239,68,68,0.92)' }]}>
+                  <Text style={s.statusText}>{item.status === 'pending' ? 'Menunggu persetujuan' : 'Ditolak'}</Text>
+                </View>
+              ) : null}
               <LinearGradient colors={['transparent', 'rgba(236,72,153,0.85)']} style={s.cardFoot}>
                 <Ionicons name="stats-chart" size={14} color="#fff" />
                 <Text style={s.cardViews}>{compact(item.views)}</Text>
@@ -162,6 +167,8 @@ const s = StyleSheet.create({
   textCard: { padding: 14, justifyContent: 'center' },
   textBody: { color: '#fff', fontSize: 15, fontWeight: '600', lineHeight: 21 },
   cardFoot: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 56, paddingHorizontal: 12, paddingBottom: 10, flexDirection: 'row', alignItems: 'flex-end', gap: 4 },
+  status: { position: 'absolute', top: 10, left: 10, backgroundColor: 'rgba(17,10,30,0.7)', paddingHorizontal: 9, paddingVertical: 4, borderRadius: 10 },
+  statusText: { color: '#fff', fontSize: 11, fontWeight: '600' },
   cardViews: { color: '#fff', fontSize: 13, fontWeight: '600' },
   fab: { position: 'absolute', right: 18, bottom: 22, borderRadius: 30, elevation: 6, shadowColor: colors.pink, shadowOpacity: 0.4, shadowRadius: 8, shadowOffset: { width: 0, height: 3 } },
   fabIn: { width: 58, height: 58, borderRadius: 29, alignItems: 'center', justifyContent: 'center' },

@@ -101,6 +101,7 @@ const get = (p) => api('GET', p);
 const post = (p, b) => api('POST', p, b || {});
 const patch = (p, b) => api('PATCH', p, b || {});
 const put = (p, b) => api('PUT', p, b || {});
+const del = (p) => api('DELETE', p);
 
 async function act(fn, okMsg) {
   try {
@@ -545,6 +546,34 @@ async function pagePhotos() {
   root.append(d.avatars.length ? h('div', { class: 'grid g3' }, d.avatars.map((a) => card(a, 'avatar'))) : empty('Tidak ada'));
   root.append(h('div', { class: 'sec' }, 'Foto album (' + d.album.length + ')'));
   root.append(d.album.length ? h('div', { class: 'grid g3' }, d.album.map((a) => card(a, 'album'))) : empty('Tidak ada'));
+  return root;
+}
+
+// ----- Momen host -----
+const momenFilt = { status: 'pending' };
+async function pageMoments() {
+  const list = await get('/api/admin/moments?status=' + momenFilt.status);
+  const root = h('div', {}, ...pageHead('Momen host', 'Foto momen harus disetujui sebelum tampil ke pengguna. Menolak atau menghapus langsung membuang fotonya dari server.'));
+  root.append(h('div', { class: 'tabs' }, [['pending', 'Menunggu'], ['approved', 'Disetujui'], ['rejected', 'Ditolak']].map(([k, l]) =>
+    h('button', { class: 'tab' + (momenFilt.status === k ? ' on' : ''), onclick: () => { momenFilt.status = k; render(); } }, l))));
+  if (!list.length) { root.append(empty('Tidak ada momen')); return root; }
+  root.append(h('div', { class: 'grid g3' }, list.map((m) => h('div', { class: 'card' },
+    m.imageUrl ? h('img', { class: 'thumb', src: m.imageUrl, alt: '', onclick: () => lightbox(m.imageUrl) }) : null,
+    h('div', { style: 'margin:8px 0' },
+      h('b', {}, m.displayName), h('span', { class: 'dim' }, ' · ID ' + m.hostId + ' · ' + new Date(m.createdAt).toLocaleString('id-ID')),
+      m.body ? h('div', { style: 'margin-top:4px' }, m.body) : null,
+      m.status === 'rejected' && m.rejectReason ? h('div', { class: 'dim' }, 'Alasan: ' + m.rejectReason) : null,
+      m.status === 'approved' ? h('div', { class: 'dim' }, m.views + ' dilihat · ' + m.likes + ' suka') : null),
+    h('div', { class: 'row', style: 'flex-wrap:wrap;gap:6px' },
+      m.status !== 'approved' && m.imageUrl !== null ? h('button', { class: 'btn ok sm', onclick: async () => { if (await act(() => post('/api/admin/moments/' + m.id + '/approve'), 'Disetujui')) render(); } }, 'Setujui') : null,
+      m.status === 'pending' ? h('button', { class: 'btn bad sm', onclick: async () => {
+        const r = await formModal({ title: 'Tolak momen', submit: 'Tolak', danger: true, fields: [{ name: 'reason', label: 'Alasan', type: 'textarea' }] });
+        if (r && (await act(() => post('/api/admin/moments/' + m.id + '/reject', { reason: r.reason }), 'Ditolak'))) render();
+      } }, 'Tolak') : null,
+      h('button', { class: 'btn bad sm', onclick: async () => {
+        if (!(await confirmModal('Hapus momen', 'Momen dan fotonya dihapus permanen', 'Hapus'))) return;
+        if (await act(() => del('/api/admin/moments/' + m.id), 'Dihapus')) render();
+      } }, 'Hapus'))))));
   return root;
 }
 
@@ -1166,6 +1195,7 @@ const pages = {
   dashboard: { title: 'Dashboard', icon: '📊', fn: pageDashboard },
   verifikasi: { title: 'Verifikasi wajah', icon: '🪪', fn: pageVerifikasi, badge: () => stats && stats.pending.verifications },
   foto: { title: 'Foto host', icon: '🖼️', fn: pagePhotos, badge: () => stats && stats.pending.photos + stats.pending.avatars },
+  momen: { title: 'Momen host', icon: '📸', fn: pageMoments, badge: () => stats && stats.pending.moments },
   pengguna: { title: 'Pengguna', icon: '👥', fn: pageUsers },
   topup: { title: 'Top up koin', icon: '💰', fn: pageTopup },
   paket: { title: 'Paket koin', icon: '🪙', fn: pagePackages },

@@ -24,6 +24,8 @@ const mapMoment = (r) => ({
   comments: Number(r.comments),
   liked: !!r.liked,
   createdAt: r.created_at,
+  status: r.status,
+  rejectReason: r.reject_reason,
   host: {
     id: Number(r.host_id),
     displayName: r.display_name,
@@ -32,7 +34,7 @@ const mapMoment = (r) => ({
   },
 });
 
-const SELECT = `SELECT m.id, m.host_id, m.body, m.image_url, m.views, m.created_at,
+const SELECT = `SELECT m.id, m.host_id, m.body, m.image_url, m.views, m.created_at, m.status, m.reject_reason,
     u.display_name, u.avatar_url, u.verified,
     (SELECT COUNT(*) FROM moment_likes l WHERE l.moment_id = m.id) AS likes,
     (SELECT COUNT(*) FROM moment_comments c WHERE c.moment_id = m.id) AS comments,
@@ -44,7 +46,8 @@ router.get('/', wrap(async (req, res) => {
   const tab = ['popular', 'new', 'mine'].includes(req.query.tab) ? req.query.tab : 'popular';
   const offset = v.int(req.query.offset, 'offset', { min: 0, max: 5000, optional: true }) || 0;
   const where = [`u.status = 'active'`, safety.notBlockedSql('u', 1)];
-  if (tab === 'mine') where.push(`m.host_id = $1`);
+  // Milik sendiri: semua status; selain itu hanya yang sudah disetujui admin
+  where.push(tab === 'mine' ? `m.host_id = $1` : `m.status = 'approved'`);
   const order = tab === 'popular' ? 'm.views DESC, m.id DESC' : 'm.id DESC';
   const { rows } = await db.query(`${SELECT} WHERE ${where.join(' AND ')} ORDER BY ${order} LIMIT ${PAGE} OFFSET ${offset}`, [req.user.id]);
   res.json({ items: rows.map(mapMoment), hasMore: rows.length === PAGE });
@@ -58,13 +61,14 @@ router.post('/', storage.single, wrap(async (req, res) => {
   let url = null;
   if (req.file) url = (await storage.save(req)).url;
   if (!body && !url) throw badRequest('Isi teks atau pilih foto');
-  const { rows } = await db.query(`INSERT INTO moments (host_id, body, image_url) VALUES ($1, $2, $3) RETURNING id`, [req.user.id, body, url]);
+  // Foto dicek admin dulu (mencegah konten tidak pantas); teks saja langsung tampil
+  const { rows } = await db.query(`INSERT INTO moments (host_id, body, image_url, status) VALUES ($1, $2, $3, $4) RETURNING id`, [req.user.id, body, url, url ? 'pending' : 'approved']);
   const { rows: r } = await db.query(`${SELECT} WHERE m.id = $2`, [req.user.id, rows[0].id]);
   res.status(201).json(mapMoment(r[0]));
 }));
 
 async function loadVisible(req, id) {
-  const { rows } = await db.query(`${SELECT} WHERE m.id = $2 AND u.status = 'active' AND ${safety.notBlockedSql('u', 1)}`, [req.user.id, id]);
+  const { rows } = await db.query(`${SELECT} WHERE m.id = $2 AND u.status = 'active' AND (m.status = 'approved' OR m.host_id = $1) AND ${safety.notBlockedSql('u', 1)}`, [req.user.id, id]);
   if (!rows.length) throw notFound('Momen tidak ditemukan');
   return rows[0];
 }

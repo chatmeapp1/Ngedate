@@ -27,6 +27,7 @@ export default function NewMoment() {
       const form = photo ? imageForm(photo.uri, photo.mimeType) : new FormData();
       if (text.trim()) form.append('body', text.trim());
       await api.post('/api/moments', form);
+      if (photo) Alert.alert('Terkirim', 'Foto akan tampil ke pengguna setelah disetujui admin.');
       router.back();
     } catch (e) {
       Alert.alert('Gagal memposting', errorMessage(e));

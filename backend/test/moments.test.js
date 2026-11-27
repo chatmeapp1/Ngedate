@@ -112,3 +112,44 @@ test('pengguna melihat, suka, komentar; dilihat bertambah; blokir menyembunyikan
   await api('DELETE', `/api/moments/${m.id}`, { token: host.token });
   assert.equal((await api('GET', `/api/moments?tab=mine`, { token: host.token })).body.items.length, 0);
 });
+
+test('foto momen menunggu persetujuan admin; ditolak menghapus foto; teks saja langsung tampil', async () => {
+  const host = await makeHost('hostmomen3');
+  const user = await register('usermomen3');
+  const fd = new FormData();
+  fd.append('body', 'dengan foto');
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
+  fd.append('file', new Blob([png], { type: 'image/png' }), 'a.png');
+  const r = await fetch(base + '/api/moments', { method: 'POST', headers: { authorization: `Bearer ${host.token}` }, body: fd });
+  const m = await r.json();
+  assert.equal(r.status, 201);
+  assert.equal(m.status, 'pending');
+
+  // belum tampil bagi pengguna, tapi pemilik melihatnya
+  assert.equal((await api('GET', `/api/moments/${m.id}`, { token: user.token })).status, 404);
+  assert.ok(!(await api('GET', '/api/moments?tab=new', { token: user.token })).body.items.some((x) => x.id === m.id));
+  assert.ok((await api('GET', '/api/moments?tab=mine', { token: host.token })).body.items.some((x) => x.id === m.id));
+  assert.equal((await api('POST', `/api/moments/${m.id}/comments`, { token: user.token, body: { body: 'hai' } })).status, 404);
+
+  // hanya admin yang bisa moderasi
+  assert.equal((await api('POST', `/api/admin/moments/${m.id}/approve`, { token: user.token })).status, 403);
+  const pending = await A('GET', '/api/admin/moments?status=pending');
+  assert.ok(pending.body.some((x) => x.id === m.id));
+  assert.equal((await A('GET', '/api/admin/stats')).body.pending.moments >= 1, true);
+
+  assert.equal((await A('POST', `/api/admin/moments/${m.id}/approve`)).status, 200);
+  assert.equal((await api('GET', `/api/moments/${m.id}`, { token: user.token })).status, 200);
+
+  // foto kedua: ditolak -> foto hilang, tidak tampil
+  const fd2 = new FormData();
+  fd2.append('file', new Blob([png], { type: 'image/png' }), 'b.png');
+  const m2 = await (await fetch(base + '/api/moments', { method: 'POST', headers: { authorization: `Bearer ${host.token}` }, body: fd2 })).json();
+  assert.equal((await A('POST', `/api/admin/moments/${m2.id}/reject`, { reason: 'tidak pantas' })).status, 200);
+  const mine = (await api('GET', '/api/moments?tab=mine', { token: host.token })).body.items.find((x) => x.id === m2.id);
+  assert.deepEqual([mine.status, mine.imageUrl, mine.rejectReason], ['rejected', null, 'tidak pantas']);
+  assert.equal((await api('GET', `/api/moments/${m2.id}`, { token: user.token })).status, 404);
+
+  // admin bisa menghapus momen yang sudah tampil
+  assert.equal((await A('DELETE', `/api/admin/moments/${m.id}`)).status, 200);
+  assert.equal((await api('GET', `/api/moments/${m.id}`, { token: user.token })).status, 404);
+});

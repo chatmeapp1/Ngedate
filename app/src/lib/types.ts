@@ -285,6 +285,8 @@ export interface Moment {
   comments: number;
   liked: boolean;
   createdAt: string;
+  status: 'pending' | 'approved' | 'rejected';
+  rejectReason: string | null;
   host: { id: number; displayName: string; avatarUrl: string | null; verified: boolean };
 }
 

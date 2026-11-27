@@ -119,6 +119,14 @@ export default function MomentDetail() {
         </Pressable>
       </LinearGradient>
 
+      {m.status !== 'approved' ? (
+        <View style={[s.notice, m.status === 'rejected' && { backgroundColor: '#FEE2E2' }]}>
+          <Text style={[s.noticeText, m.status === 'rejected' && { color: '#B91C1C' }]}>
+            {m.status === 'pending' ? 'Menunggu persetujuan admin. Foto baru tampil ke pengguna setelah disetujui.' : `Ditolak admin${m.rejectReason ? `: ${m.rejectReason}` : ''}`}
+          </Text>
+        </View>
+      ) : null}
+
       <View style={{ paddingHorizontal: 16, gap: 12, paddingTop: 6 }}>
         {m.body ? <Text style={s.body}>{m.body}</Text> : null}
         {m.imageUrl ? (
@@ -188,6 +196,8 @@ export default function MomentDetail() {
 }
 
 const s = StyleSheet.create({
+  notice: { marginHorizontal: 16, marginTop: 8, padding: 10, borderRadius: 12, backgroundColor: '#FEF3C7' },
+  noticeText: { color: '#92400E', fontSize: 12.5, fontWeight: '500' },
   top: { paddingHorizontal: 16, paddingVertical: 10 },
   hostRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   hostName: { flexShrink: 1, fontSize: 16, fontWeight: '600', color: colors.text },
