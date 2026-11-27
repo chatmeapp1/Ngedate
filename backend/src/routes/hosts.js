@@ -35,7 +35,7 @@ router.get('/', wrap(async (req, res) => {
     pattern: new RegExp(`^(${REGION_KEYS.join('|')})$`),
   });
 
-  const online = realtime.onlineUserIds();
+  const online = realtime.presentUserIds();
   const params = [online];
   const where = [];
   if (q) {

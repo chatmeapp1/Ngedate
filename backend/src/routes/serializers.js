@@ -23,7 +23,7 @@ function publicUser(u, { self = false } = {}) {
     verified: !!u.verified,
     language: u.language || 'id',
     tags: u.tags || [],
-    online: realtime.isOnline(Number(u.id)),
+    online: realtime.isPresent(Number(u.id)),
     lastSeenAt: u.last_seen_at,
   };
   if (self) {

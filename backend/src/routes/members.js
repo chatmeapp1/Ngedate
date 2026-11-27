@@ -34,7 +34,7 @@ router.get('/', wrap(async (req, res) => {
   const country = v.str(req.query.country, 'country', { optional: true, pattern: /^[A-Za-z]{2}$/ });
   const tab = v.str(req.query.tab ?? 'all', 'tab', { pattern: /^(all|new|online)$/ });
 
-  const params = [realtime.onlineUserIds()];
+  const params = [realtime.presentUserIds()];
   const where = [MEMBER_WHERE];
   if (q) {
     params.push(`%${q.toLowerCase()}%`);

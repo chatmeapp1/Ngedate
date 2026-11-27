@@ -3,6 +3,9 @@ const db = require('./db');
 const { verifyAccessToken } = require('./lib/tokens');
 
 let io = null;
+// Tanda online diperpanjang 1 menit setelah koneksi terakhir putus (mis. app diminimalkan sebentar)
+const PRESENCE_GRACE_MS = 60_000;
+const lastGone = new Map();
 
 /**
  * Socket.io: setiap koneksi WAJIB membawa access token (handshake.auth.token).
@@ -57,6 +60,7 @@ function attach(httpServer) {
     });
 
     socket.on('disconnect', () => {
+      if (!isOnline(userId)) lastGone.set(userId, Date.now());
       db.query(`UPDATE users SET last_seen_at = now() WHERE id = $1`, [userId]).catch(() => {});
     });
   });
@@ -81,6 +85,16 @@ function isOnline(userId) {
   return !!room && room.size > 0;
 }
 
+// Status online untuk tampilan: tersambung, atau baru terputus kurang dari 1 menit lalu
+function isPresent(userId) {
+  if (isOnline(userId)) return true;
+  const t = lastGone.get(Number(userId));
+  if (!t) return false;
+  if (Date.now() - t < PRESENCE_GRACE_MS) return true;
+  lastGone.delete(Number(userId));
+  return false;
+}
+
 // Semua id user yang sedang tersambung (online)
 function onlineUserIds() {
   if (!io) return [];
@@ -91,4 +105,11 @@ function onlineUserIds() {
   return ids;
 }
 
-module.exports = { attach, emitTo, isOnline, onlineUserIds, disconnectUser };
+// Id user yang tampil online (termasuk masa tenggang 1 menit)
+function presentUserIds() {
+  const ids = new Set(onlineUserIds());
+  for (const id of [...lastGone.keys()]) if (isPresent(id)) ids.add(id);
+  return [...ids];
+}
+
+module.exports = { presentUserIds, attach, emitTo, isOnline, isPresent, onlineUserIds, disconnectUser };

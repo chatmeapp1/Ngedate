@@ -68,7 +68,7 @@ function mapConversation(r, viewerId) {
           lastSeenAt: r.peer_last_seen_at,
           verified: !!r.peer_verified,
           role: r.peer_role,
-          online: realtime.isOnline(Number(r.peer_id)),
+          online: realtime.isPresent(Number(r.peer_id)),
         }
       : undefined,
     giftTotal: Number(r.gift_total),
