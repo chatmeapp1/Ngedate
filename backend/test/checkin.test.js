@@ -57,38 +57,49 @@ after(async () => {
 // Majukan semua check-in mundur sehari (seolah klaim terakhir kemarin)
 const rewind = (u, days = 1) => db.query(`UPDATE user_checkins SET day = day - $2::int WHERE user_id = $1`, [u.id, days]);
 
-test('klaim hari 1, tidak bisa dua kali sehari, koin masuk dan tercatat', async () => {
+const myMembership = async (u) => (await api('GET', '/api/me', { token: u.token })).body.membership;
+
+test('klaim hari 1 (10 koin), tidak bisa dua kali sehari, koin masuk dan tercatat', async () => {
   const u = await register('checkinsatu');
   const st = (await api('GET', '/api/checkin', { token: u.token })).body;
   assert.deepEqual([st.claimedToday, st.currentDay, st.claimedDays, st.rewards.length], [false, 1, 0, 7]);
+  assert.deepEqual(st.reward, { type: 'coins', amount: 10 });
 
   const c = await api('POST', '/api/checkin/claim', { token: u.token });
   assert.equal(c.status, 200);
-  assert.equal(c.body.coins, 5);
+  assert.deepEqual(c.body.granted, { type: 'coins', amount: 10 });
   assert.equal(c.body.claimedToday, true);
-  assert.equal(await coins(u), 5);
+  assert.equal(await coins(u), 10);
   assert.equal((await api('POST', '/api/checkin/claim', { token: u.token })).status, 409);
-  assert.equal(await coins(u), 5);
-  const led = (await db.query(`SELECT amount, reason FROM ledger WHERE user_id = $1 AND reason = 'checkin'`, [u.id])).rows;
-  assert.equal(led.length, 1);
+  assert.equal(await coins(u), 10);
+  assert.equal((await db.query(`SELECT 1 FROM ledger WHERE user_id = $1 AND reason = 'checkin'`, [u.id])).rows.length, 1);
 });
 
-test('7 hari berturut-turut lalu mengulang; lewat sehari mengulang dari hari 1', async () => {
+test('7 hari: koin, bingkai 3 hari, 5 pesan gratis, koin, 5 pesan gratis, bingkai, 100 koin; lalu mengulang', async () => {
   const u = await register('checkindua');
-  const got = [];
+  const granted = [];
   for (let i = 0; i < 7; i++) {
     const c = await api('POST', '/api/checkin/claim', { token: u.token });
     assert.equal(c.status, 200, JSON.stringify(c.body));
-    got.push(c.body.coins);
     assert.equal(c.body.day, i + 1);
-    await rewind(u); // besok
+    granted.push(c.body.granted);
+    if (i === 1) {
+      const m = await myMembership(u);
+      assert.equal(m.checkinFrame, 1, 'bingkai model 1 aktif setelah hari 2');
+      // bingkai otomatis lepas setelah 3 hari
+      await db.query(`UPDATE users SET checkin_frame_until = now() - interval '1 minute' WHERE id = $1`, [u.id]);
+      assert.equal((await myMembership(u)).checkinFrame, 0, 'bingkai lepas setelah kedaluwarsa');
+    }
+    if (i === 2) assert.equal((await myMembership(u)).checkinCards, 5);
+    await rewind(u);
   }
-  assert.deepEqual(got, [5, 5, 10, 10, 15, 15, 40]);
-  assert.equal(await coins(u), 100);
-  // setelah hari ke-7: siklus baru dari hari 1
+  assert.deepEqual(granted.map((g) => g.type), ['coins', 'frame', 'cards', 'coins', 'cards', 'frame', 'coins']);
+  assert.equal(await coins(u), 10 + 10 + 100);
+  const m = await myMembership(u);
+  assert.deepEqual([m.checkinCards, m.checkinFrame], [10, 2]);
+
   const next = (await api('GET', '/api/checkin', { token: u.token })).body;
   assert.deepEqual([next.currentDay, next.claimedDays], [1, 0]);
-  assert.equal((await api('POST', '/api/checkin/claim', { token: u.token })).body.day, 1);
 
   // lewat 2 hari -> kembali ke hari 1
   const v = await register('checkintiga');
@@ -96,19 +107,49 @@ test('7 hari berturut-turut lalu mengulang; lewat sehari mengulang dari hari 1',
   await rewind(v);
   await api('POST', '/api/checkin/claim', { token: v.token }); // hari 2
   await rewind(v, 3);
-  const miss = await api('POST', '/api/checkin/claim', { token: v.token });
-  assert.equal(miss.body.day, 1);
+  assert.equal((await api('POST', '/api/checkin/claim', { token: v.token })).body.day, 1);
 });
 
-test('host tidak bisa check-in; admin mengatur hadiah (7 angka)', async () => {
+test('pesan gratis dari check-in: koin pengguna tidak terpotong, host dibayar app, kredit berkurang', async () => {
+  const host = await register('hostchatgratis');
+  await A('PATCH', `/api/admin/users/${host.id}/role`, { role: 'host' });
+  await db.query(`UPDATE users SET host_status = 'approved', profile_completed = true, gender = 'female' WHERE id = $1`, [host.id]);
+  await db.query(`INSERT INTO host_profiles (user_id, chat_price) VALUES ($1, 100) ON CONFLICT (user_id) DO UPDATE SET chat_price = 100`, [host.id]);
+  const u = await register('penggunagratis');
+  await A('POST', `/api/admin/users/${u.id}/coins`, { amount: 1000 });
+  await db.query(`UPDATE users SET checkin_cards = 2 WHERE id = $1`, [u.id]);
+  const conv = (await api('POST', '/api/conversations', { token: u.token, body: { hostId: host.id } })).body;
+
+  const send = (t) => api('POST', `/api/conversations/${conv.id}/messages`, { token: u.token, body: { body: t } });
+  const r1 = await send('halo satu');
+  assert.equal(r1.status, 201, JSON.stringify(r1.body));
+  assert.equal(r1.body.freeCard, true);
+  assert.equal(r1.body.message.freeSource, 'checkin');
+  assert.equal(await coins(u), 1000, 'koin tidak terpotong');
+  const hostDiamonds = async () => Number((await db.query(`SELECT diamonds FROM users WHERE id = $1`, [host.id])).rows[0].diamonds);
+  assert.equal(await hostDiamonds(), 5, 'host menerima 5 diamond dari app');
+  assert.equal((await send('halo dua')).body.freeCard, true);
+  assert.equal((await myMembership(u)).checkinCards, 0);
+  // kredit habis -> pesan berbayar biasa
+  const r3 = await send('halo tiga');
+  assert.equal(r3.body.freeCard, false);
+  assert.equal(await coins(u), 900);
+});
+
+test('host tidak bisa check-in; admin mengatur hadiah dengan format yang benar', async () => {
   const h = await register('hostcheckin');
   await A('PATCH', `/api/admin/users/${h.id}/role`, { role: 'host' });
   assert.equal((await api('POST', '/api/checkin/claim', { token: h.token })).status, 403);
 
-  assert.equal((await A('PATCH', '/api/admin/settings', { checkin_rewards: '1,2,3' })).status, 400);
-  assert.equal((await A('PATCH', '/api/admin/settings', { checkin_rewards: '1,2,3,4,5,6,5000' })).status, 400);
-  assert.equal((await A('PATCH', '/api/admin/settings', { checkin_rewards: '2,2,2,2,2,2,20' })).status, 200);
+  const set = (v) => A('PATCH', '/api/admin/settings', { checkin_rewards: v });
+  assert.equal((await set('coins:1,coins:2')).status, 400);
+  assert.equal((await set('coins:1,coins:1,coins:1,coins:1,coins:1,coins:1,coins:5000')).status, 400);
+  assert.equal((await set('coins:1,coins:1,coins:1,coins:1,coins:1,coins:1,frame:3:3')).status, 400, 'model bingkai hanya 1-2');
+  assert.equal((await set('coins:1,coins:1,coins:1,coins:1,coins:1,coins:1,hadiah:9')).status, 400);
+  assert.equal((await set('coins:2, cards:3, frame:2:7, coins:2, cards:2, frame:1:1, coins:20')).status, 200);
   const u = await register('checkinempat');
-  assert.deepEqual((await api('GET', '/api/checkin', { token: u.token })).body.rewards, [2, 2, 2, 2, 2, 2, 20]);
+  const st = (await api('GET', '/api/checkin', { token: u.token })).body;
+  assert.deepEqual(st.rewards[2], { type: 'frame', frame: 2, days: 7 });
+  assert.deepEqual(st.rewards.map((r) => r.type), ['coins', 'cards', 'frame', 'coins', 'cards', 'frame', 'coins']);
   assert.equal((await api('GET', '/api/checkin')).status, 401);
 });

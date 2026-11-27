@@ -35,7 +35,7 @@ function progress(total, from, to) {
 
 async function freeCardsUsed(client, userId) {
   const { rows } = await client.query(
-    `SELECT COUNT(*)::int AS n FROM messages WHERE sender_id = $1 AND free_card AND created_at >= ${DAY_START_SQL}`,
+    `SELECT COUNT(*)::int AS n FROM messages WHERE sender_id = $1 AND free_card AND free_card_source IS DISTINCT FROM 'checkin' AND created_at >= ${DAY_START_SQL}`,
     [userId]
   );
   return rows[0].n;
@@ -50,7 +50,7 @@ const weekIncomeSql = (idExpr) => WEEK_INCOME_SQL.replace('{id}', idExpr);
 
 async function summary(client, userId, settings) {
   const s = settings || (await getSettings(client));
-  const { rows } = await client.query(`SELECT role, topup_total, ${weekIncomeSql('users.id')} AS week_income FROM users WHERE id = $1`, [userId]);
+  const { rows } = await client.query(`SELECT role, topup_total, checkin_cards, checkin_frame, (checkin_frame_until > now()) AS frame_active, checkin_frame_until, ${weekIncomeSql('users.id')} AS week_income FROM users WHERE id = $1`, [userId]);
   const isHost = rows.length && rows[0].role === 'host';
   // Host: level dari total pendapatan diamond; pengguna: level & VIP dari total top up koin
   const total = rows.length ? Number(isHost ? rows[0].week_income : rows[0].topup_total) : 0;
@@ -88,6 +88,10 @@ async function summary(client, userId, settings) {
     vipProgress: progress(total, vip > 0 ? vips[vip - 1] : 0, nextVipAt),
     freeCardsPerDay: perDay,
     freeCardsLeft: vip > 0 ? Math.max(0, perDay - used) : 0,
+    // hadiah check-in
+    checkinCards: rows.length ? Number(rows[0].checkin_cards) : 0,
+    checkinFrame: rows.length && rows[0].frame_active ? Number(rows[0].checkin_frame) : 0,
+    checkinFrameUntil: rows.length && rows[0].frame_active ? rows[0].checkin_frame_until : null,
   };
 }
 

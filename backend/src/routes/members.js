@@ -16,6 +16,8 @@ const withBadges = (u, s) => ({
   ...publicUser(u),
   level: levelOf(Number(u.topup_total || 0), s.level_thresholds),
   vip: vipOf(Number(u.topup_total || 0), s.vip_thresholds),
+  // bingkai avatar hadiah check-in yang masih aktif (0 = tidak ada)
+  checkinFrame: u.checkin_frame_until && new Date(u.checkin_frame_until) > new Date() ? Number(u.checkin_frame) : 0,
 });
 
 // Pengguna pria yang sudah melengkapi profil (yang dilihat host di Beranda)

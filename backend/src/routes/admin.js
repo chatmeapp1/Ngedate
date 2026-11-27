@@ -226,12 +226,7 @@ router.patch('/settings', wrap(async (req, res) => {
     if ((k === 'level_thresholds' || k === 'host_level_thresholds') && list[0] !== 0) throw badRequest('Level 0 harus dimulai dari 0');
     b[k] = list.map(Math.round);
   }
-  if (b.checkin_rewards !== undefined) {
-    const list = membership.parseList(b.checkin_rewards, null);
-    if (!list || list.length !== 7) throw badRequest('Hadiah check-in: isi 7 angka (koin hari 1 sampai 7) dipisah koma');
-    if (list.some((n) => n > 1000)) throw badRequest('Hadiah check-in maksimal 1000 koin per hari');
-    b.checkin_rewards = list.map(Math.round);
-  }
+  if (b.checkin_rewards !== undefined) b.checkin_rewards = require('../services/checkin').parseRewardList(b.checkin_rewards);
   for (const k of ['host_media_price_max', 'host_media_per_day', 'host_video_max_seconds']) if (b[k] !== undefined) b[k] = Math.round(Number(b[k]));
   if (b.vip_media_per_day !== undefined) b.vip_media_per_day = Math.round(Number(b.vip_media_per_day));
   if (b.free_cards_per_day !== undefined) b.free_cards_per_day = Math.round(Number(b.free_cards_per_day));

@@ -499,11 +499,14 @@ export default function ChatRoom() {
 
       {/* Info tarif (user) */}
       {isUser && price > 0 ? (
-        (user?.membership?.freeCardsLeft ?? 0) > 0 ? (
+        (user?.membership?.freeCardsLeft ?? 0) > 0 || (user?.membership?.checkinCards ?? 0) > 0 ? (
           <View style={s.priceRow}>
             <Ionicons name="ticket-outline" size={14} color="#D9801A" />
             <Text style={s.priceText}>
-              Kartu pesan gratis VIP: sisa {user?.membership?.freeCardsLeft} hari ini · pesan tidak memotong koin
+              {(user?.membership?.freeCardsLeft ?? 0) > 0
+                ? `Kartu pesan gratis VIP: sisa ${user?.membership?.freeCardsLeft} hari ini`
+                : `Pesan gratis check-in: sisa ${user?.membership?.checkinCards}`}
+              {' · tidak memotong koin'}
             </Text>
             <Text style={s.balance}>Saldo {compact(user?.coins ?? 0)}</Text>
           </View>
@@ -657,7 +660,7 @@ function Bubble({
           held: { icon: 'time-outline' as const, text: `${number(m.price)} koin ditahan`, color: colors.textDim },
           paid: { icon: 'checkmark-done' as const, text: 'Dibalas', color: colors.primary },
           refunded: { icon: 'arrow-undo' as const, text: 'Tidak dibalas · koin dikembalikan', color: colors.online },
-          free: m.freeCard ? { icon: 'ticket-outline' as const, text: 'Kartu gratis VIP', color: '#D9801A' } : null,
+          free: m.freeCard ? { icon: 'ticket-outline' as const, text: m.freeSource === 'checkin' ? 'Pesan gratis check-in' : 'Kartu gratis VIP', color: '#D9801A' } : null,
         }[m.paymentStatus]
       : null;
 

@@ -49,6 +49,7 @@ function mapMessage(r) {
     mediaUnlocked: !!r.media_private && (Number(r.media_price || 0) === 0 || r.media_unlock_user != null),
     mediaUrl: r.media_private ? `/api/media/${r.id}` : r.media_url || null,
     freeCard: !!r.free_card,
+    freeSource: r.free_card ? r.free_card_source || 'vip' : null,
     createdAt: r.created_at,
   };
 }
@@ -216,8 +217,8 @@ async function touchConversation(client, conv, senderIsUser, preview) {
 
 async function insertMessage(client, fields) {
   const { rows } = await client.query(
-    `INSERT INTO messages (conversation_id, sender_id, type, body, gift_id, gift_count, price, payment_status, settled_at, free_card, media_url, media_private, media_price, media_file)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8::varchar, CASE WHEN $8::varchar IN ('paid', 'refunded') THEN now() END, $9, $10, $11, $12, $13)
+    `INSERT INTO messages (conversation_id, sender_id, type, body, gift_id, gift_count, price, payment_status, settled_at, free_card, media_url, media_private, media_price, media_file, free_card_source)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8::varchar, CASE WHEN $8::varchar IN ('paid', 'refunded') THEN now() END, $9, $10, $11, $12, $13, $14)
      RETURNING id`,
     [
       fields.conversationId,
@@ -233,6 +234,7 @@ async function insertMessage(client, fields) {
       !!fields.mediaPrivate,
       fields.mediaPrice ?? 0,
       fields.mediaFile ?? null,
+      fields.freeCardSource ?? null,
     ]
   );
   return Number(rows[0].id);
@@ -296,10 +298,18 @@ async function sendText(senderId, convIdRaw, bodyRaw) {
 
     // Kartu pesan gratis (VIP): pesan ke host berbayar tanpa potong koin, host dibayar app
     let freeCard = false;
+    let freeCardSource = null;
     if (senderIsUser && price > 0) {
       await client.query(`SELECT id FROM users WHERE id = $1 FOR UPDATE`, [senderId]); // cegah balapan penghitungan kartu
       const m = await membership.summary(client, senderId, settings);
       freeCard = m.freeCardsLeft > 0;
+      if (freeCard) freeCardSource = 'vip';
+      else if (m.checkinCards > 0) {
+        // Pesan gratis dari hadiah check-in (host tetap dibayar app)
+        await client.query(`UPDATE users SET checkin_cards = checkin_cards - 1 WHERE id = $1 AND checkin_cards > 0`, [senderId]);
+        freeCard = true;
+        freeCardSource = 'checkin';
+      }
     }
 
     const messageId = await insertMessage(client, {
@@ -310,6 +320,7 @@ async function sendText(senderId, convIdRaw, bodyRaw) {
       price: freeCard ? 0 : price,
       paymentStatus: price > 0 && !freeCard ? 'held' : 'free',
       freeCard,
+      freeCardSource,
     });
     if (freeCard) {
       const bonus = Math.max(0, Math.round(Number(settings.free_card_host_diamonds)));

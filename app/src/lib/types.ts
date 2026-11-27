@@ -50,12 +50,19 @@ export interface Membership {
   vipProgress: number;
   freeCardsPerDay: number;
   freeCardsLeft: number;
+  /** sisa pesan gratis dari hadiah check-in */
+  checkinCards?: number;
+  /** model bingkai avatar hadiah check-in yang masih aktif (0 = tidak ada) */
+  checkinFrame?: number;
+  checkinFrameUntil?: string | null;
 }
 
 /** pengguna yang dilihat host: level & VIP dari total top up */
 export interface Member extends User {
   level?: number;
   vip?: number;
+  /** bingkai avatar hadiah check-in yang aktif (0 = tidak ada) */
+  checkinFrame?: number;
 }
 
 export interface Host extends User {
@@ -151,6 +158,8 @@ export interface Message {
   mediaUrl?: string | null;
   /** pesan memakai kartu gratis VIP */
   freeCard?: boolean;
+  /** sumber pesan gratis: 'vip' atau 'checkin' */
+  freeSource?: 'vip' | 'checkin' | null;
   createdAt: string;
   /** hanya di aplikasi: pesan yang sedang dikirim */
   pending?: boolean;
@@ -306,12 +315,16 @@ export interface AppNotification {
   createdAt: string;
 }
 
+export type CheckinReward = { type: 'coins'; amount: number } | { type: 'cards'; amount: number } | { type: 'frame'; frame: number; days: number };
+
 export interface CheckinStatus {
   claimedToday: boolean;
   /** hari (1-7) yang sedang / baru saja diklaim */
   currentDay: number;
   /** jumlah kotak yang sudah bercentang pada siklus ini */
   claimedDays: number;
-  rewards: number[];
-  reward: number;
+  rewards: CheckinReward[];
+  reward: CheckinReward;
+  /** hadiah yang baru diterima (hanya pada respons klaim) */
+  granted?: CheckinReward;
 }

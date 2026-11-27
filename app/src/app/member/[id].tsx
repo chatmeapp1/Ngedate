@@ -61,7 +61,7 @@ export default function MemberProfile() {
         </View>
         <View style={s.info}>
           <View style={{ alignSelf: 'flex-start' }}>
-            <FramedAvatar uri={member.avatarUrl} name={member.displayName} size={40} vip={member.vip ?? 0} />
+            <FramedAvatar uri={member.avatarUrl} name={member.displayName} size={40} vip={member.vip ?? 0} checkinFrame={member.checkinFrame ?? 0} />
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <Text style={s.name} numberOfLines={1}>

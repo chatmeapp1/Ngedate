@@ -5,7 +5,47 @@ import { ActivityIndicator, AppState, Modal, Pressable, StyleSheet, Text, View, 
 import { Coin } from '@/components/ui';
 import { useAuth } from '@/context/auth';
 import { api, errorMessage } from '@/lib/api';
-import type { CheckinStatus } from '@/lib/types';
+import type { CheckinReward, CheckinStatus } from '@/lib/types';
+
+const FRAME_IMG = [require('../../assets/vip/ci1.png'), require('../../assets/vip/ci2.png')];
+
+/** Isi satu kotak hadiah: koin, pesan gratis, atau bingkai avatar. */
+function RewardFace({ r, big }: { r: CheckinReward; big?: boolean }) {
+  if (r.type === 'coins') {
+    return (
+      <>
+        {big ? <Text style={s.bigGift}>🎁</Text> : null}
+        <View style={s.amountRow}>
+          <Coin size={big ? 20 : 16} />
+          <Text style={[s.amount, big && { fontSize: 20 }]}>+{r.amount}</Text>
+        </View>
+      </>
+    );
+  }
+  if (r.type === 'cards') {
+    return (
+      <>
+        <View style={s.amountRow}>
+          <Ionicons name="chatbubble-ellipses" size={big ? 26 : 18} color="#FDE68A" />
+          <Text style={s.amount}>{r.amount}x</Text>
+        </View>
+        <Text style={s.sub} numberOfLines={1}>
+          pesan gratis
+        </Text>
+      </>
+    );
+  }
+  return (
+    <>
+      <Image source={FRAME_IMG[Math.min(r.frame, FRAME_IMG.length) - 1]} style={{ width: big ? 70 : 38, height: big ? 70 : 38 }} contentFit="contain" />
+      <Text style={s.sub} numberOfLines={1}>
+        {r.days} hari
+      </Text>
+    </>
+  );
+}
+
+const rewardText = (r: CheckinReward) => (r.type === 'coins' ? `+${r.amount} koin` : r.type === 'cards' ? `${r.amount} pesan gratis` : `bingkai avatar ${r.days} hari`);
 
 // Posisi kotak pada gambar bingkai (900 x 941), dipakai sebagai pecahan
 const W = 900;
@@ -32,13 +72,13 @@ const rect = (x: [number, number], y: [number, number]) => ({
 
 /** Pop-up check-in harian (hari 1-7) untuk pengguna. Muncul saat masuk aplikasi jika hari ini belum diklaim. */
 export function CheckinModal() {
-  const { user } = useAuth();
+  const { user, refreshMe } = useAuth();
   const { width } = useWindowDimensions();
   const [st, setSt] = useState<CheckinStatus | null>(null);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [gained, setGained] = useState<number | null>(null);
+  const [gained, setGained] = useState<CheckinReward | null>(null);
   const shownFor = useRef<string | null>(null);
   const eligible = user?.role === 'user' && !!user.profileCompleted;
   const userId = user?.id;
@@ -75,7 +115,8 @@ export function CheckinModal() {
     try {
       const r = await api.post<CheckinStatus & { coins: number }>('/api/checkin/claim');
       setSt(r);
-      setGained(r.coins);
+      setGained(r.granted ?? null);
+      refreshMe(); // saldo, pesan gratis, bingkai
     } catch (e) {
       setError(errorMessage(e));
     } finally {
@@ -93,15 +134,14 @@ export function CheckinModal() {
     const isCurrent = day === st.currentDay && !st.claimedToday;
     return (
       <View style={[s.cell, done && s.cellDone, isCurrent && s.cellNow]}>
-        <Text style={s.dayText}>Hari {day}</Text>
-        {big ? <Text style={s.bigGift}>🎁</Text> : null}
-        <View style={s.amountRow}>
-          <Coin size={big ? 20 : 16} />
-          <Text style={[s.amount, big && { fontSize: 20 }]}>+{st.rewards[day - 1]}</Text>
+        <View style={s.dayRow}>
+          <Text style={s.dayText}>Hari {day}</Text>
+          {done && !big ? <Ionicons name="checkmark-circle" size={14} color="#34D399" /> : null}
         </View>
-        {done ? (
+        <RewardFace r={st.rewards[day - 1]} big={big} />
+        {done && big ? (
           <View style={s.check}>
-            <Ionicons name="checkmark-circle" size={big ? 34 : 26} color="#34D399" />
+            <Ionicons name="checkmark-circle" size={34} color="#34D399" />
           </View>
         ) : null}
       </View>
@@ -136,7 +176,7 @@ export function CheckinModal() {
               <ActivityIndicator color="#fff" />
             ) : (
               <Text style={s.btnText}>
-                {st.claimedToday ? (gained != null ? `+${gained} koin diterima · Tutup` : 'Sudah diklaim · Tutup') : `Klaim hari ke-${st.currentDay}`}
+                {st.claimedToday ? (gained ? `${rewardText(gained)} diterima · Tutup` : 'Sudah diklaim · Tutup') : `Klaim hari ke-${st.currentDay}`}
               </Text>
             )}
           </Pressable>
@@ -155,14 +195,16 @@ export function CheckinModal() {
 const s = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(10,5,25,0.72)', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 },
   title: { position: 'absolute', left: 0, right: 0, textAlign: 'center', color: '#fff', fontWeight: '700', textShadowColor: 'rgba(0,0,0,0.35)', textShadowRadius: 4 },
-  cell: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 4, borderRadius: 16, borderWidth: 1.5, borderColor: 'transparent' },
+  cell: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 2, borderRadius: 16, borderWidth: 1.5, borderColor: 'transparent' },
   cellDone: { backgroundColor: 'rgba(52,211,153,0.12)' },
   cellNow: { borderColor: '#FACC15', backgroundColor: 'rgba(250,204,21,0.14)' },
+  dayRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   dayText: { color: 'rgba(255,255,255,0.85)', fontSize: 11, fontWeight: '600' },
   bigGift: { fontSize: 44 },
+  sub: { color: 'rgba(255,255,255,0.88)', fontSize: 10, fontWeight: '600', textAlign: 'center' },
   amountRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   amount: { color: '#fff', fontSize: 15, fontWeight: '700' },
-  check: { position: 'absolute', right: 5, bottom: 5 },
+  check: { position: 'absolute', right: 6, bottom: 6 },
   btn: { alignItems: 'center', justifyContent: 'center' },
   btnText: { color: '#fff', fontSize: 16, fontWeight: '700', textShadowColor: 'rgba(0,0,0,0.3)', textShadowRadius: 3 },
   close: { position: 'absolute', top: '3%', right: '2%', width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(0,0,0,0.35)', alignItems: 'center', justifyContent: 'center' },
