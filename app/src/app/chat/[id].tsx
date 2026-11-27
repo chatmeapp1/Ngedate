@@ -7,8 +7,10 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Keyboard,
   KeyboardAvoidingView,
   Linking,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -16,6 +18,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { EmojiPicker } from '@/components/EmojiPicker';
 import { GiftIcon } from '@/components/GiftIcon';
 import { MediaBubble } from '@/components/ChatMedia';
 import { LockedMedia, PrivateMediaSheet } from '@/components/PrivateMedia';
@@ -231,6 +234,30 @@ export default function ChatRoom() {
       lastTypingSent.current = Date.now();
       emitRealtime('typing', { conversationId: convId });
     }
+  };
+
+  // Emoji: sisipkan di posisi kursor; panel menggantikan keyboard
+  const [emojiOpen, setEmojiOpen] = useState(false);
+  const inputRef = useRef<TextInput>(null);
+  const sel = useRef({ start: 0, end: 0 });
+  const toggleEmoji = () => {
+    if (emojiOpen) {
+      setEmojiOpen(false);
+      inputRef.current?.focus();
+    } else {
+      Keyboard.dismiss();
+      setEmojiOpen(true);
+    }
+  };
+  const addEmoji = (e: string) => {
+    setText((cur) => {
+      const start = Math.min(sel.current.start, cur.length);
+      const end = Math.min(sel.current.end, cur.length);
+      const next = (cur.slice(0, start) + e + cur.slice(end)).slice(0, 1000);
+      const pos = start + e.length;
+      sel.current = { start: pos, end: pos };
+      return next;
+    });
   };
 
   // Host: kirim foto/video privat berharga
@@ -492,7 +519,7 @@ export default function ChatRoom() {
       ) : null}
 
       {/* Kolom tulis */}
-      <View style={[s.composer, { paddingBottom: insets.bottom + 8 }]}>
+      <View style={[s.composer, { paddingBottom: emojiOpen ? 8 : insets.bottom + 8 }]}>
         {isUser ? (
           <Pressable onPress={openGift} style={s.giftBtn} hitSlop={6}>
             <Ionicons name="gift" size={22} color="#F59E0B" />
@@ -508,7 +535,15 @@ export default function ChatRoom() {
             <Ionicons name="image" size={22} color={(user?.membership?.vip ?? 0) > 0 ? colors.primary : colors.textDim} />
           </Pressable>
         ) : null}
+        <Pressable onPress={toggleEmoji} style={s.giftBtn} hitSlop={6}>
+          <Ionicons name={emojiOpen ? 'keypad-outline' : 'happy-outline'} size={24} color={emojiOpen ? colors.primary : colors.textSub} />
+        </Pressable>
         <TextInput
+          ref={inputRef}
+          onFocus={() => setEmojiOpen(false)}
+          onSelectionChange={(e) => {
+            sel.current = e.nativeEvent.selection;
+          }}
           value={text}
           onChangeText={onChangeText}
           placeholder="Tulis pesan…"
@@ -529,6 +564,8 @@ export default function ChatRoom() {
           </LinearGradient>
         </Pressable>
       </View>
+
+      {emojiOpen ? <EmojiPicker onPick={addEmoji} height={260} /> : null}
 
       {!isUser ? <PrivateMediaSheet visible={privateOpen} onClose={() => setPrivateOpen(false)} onPick={sendPrivate} /> : null}
 
@@ -749,7 +786,8 @@ const s = StyleSheet.create({
     backgroundColor: '#F3E8FF',
   },
   hostHintText: { flex: 1, color: colors.primaryDark, fontWeight: '700', fontSize: 13 },
-  empty: { alignItems: 'center', paddingVertical: 40, transform: [{ scaleY: -1 }] },
+  // Daftar terbalik: di web tulisan kosong ikut terbalik, di Android tidak
+  empty: { alignItems: 'center', paddingVertical: 40, ...(Platform.OS === 'web' ? { transform: [{ scaleY: -1 }] } : null) },
   emptyText: { color: colors.textSub, fontSize: 15, fontWeight: '600' },
   date: { alignSelf: 'center', color: colors.textDim, fontSize: 12, fontWeight: '700', marginVertical: 10 },
   system: { alignSelf: 'center', backgroundColor: '#ECFDF5', paddingHorizontal: 14, paddingVertical: 8, borderRadius: radius.pill, marginVertical: 8 },
