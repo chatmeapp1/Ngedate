@@ -41,9 +41,10 @@ function push(fx: GiftFx) {
   // Hindari animasi ganda (respons HTTP + event realtime untuk pesan yang sama)
   if (played.has(fx.key)) return;
   played.add(fx.key);
-  if (fx.kind === 'gift') playGiftSound(fx.soundUrl);
   if (played.size > 300) played.delete(played.values().next().value as string);
   listener?.(fx);
+  // Suara diputar setelah animasi dimulai dan tidak boleh mengganggunya
+  if (fx.kind === 'gift' && fx.soundUrl) setTimeout(() => playGiftSound(fx.soundUrl), 50);
 }
 
 export function playGift(args: {
