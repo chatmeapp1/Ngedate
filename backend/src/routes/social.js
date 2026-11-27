@@ -38,7 +38,8 @@ router.post('/:id/like', wrap(async (req, res) => {
   const id = v.id(req.params.id);
   if (id === req.user.id) throw badRequest('Tidak bisa menyukai diri sendiri');
   const t = await target(id);
-  if (t.role !== 'host') throw badRequest('Hanya host yang bisa disukai');
+  // Pengguna menyukai host; host boleh menyukai pengguna. Pengguna ke pengguna tidak.
+  if (t.role !== 'host' && req.user.role !== 'host') throw badRequest('Hanya host yang bisa disukai');
   await db.query(`INSERT INTO likes (user_id, target_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, [req.user.id, id]);
   res.json({ isLiked: true, ...(await counts(id)) });
 }));

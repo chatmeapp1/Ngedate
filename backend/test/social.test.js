@@ -133,8 +133,9 @@ test('ikuti & suka: idempoten dan terhitung di profil', async () => {
   assert.equal(l.body.likes, 1);
   const self = await api('POST', `/api/users/${user.id}/follow`, { token: user.token });
   assert.equal(self.status, 400);
+  // host boleh menyukai pengguna (profil pengguna); pengguna ke pengguna tidak (diuji di member-social.test.js)
   const likeUser = await api('POST', `/api/users/${user.id}/like`, { token: idHost.token });
-  assert.equal(likeUser.status, 400, 'hanya host yang bisa disukai');
+  assert.equal(likeUser.status, 200);
 
   const p = await api('GET', `/api/hosts/${idHost.id}`, { token: user.token });
   assert.equal(p.status, 200);

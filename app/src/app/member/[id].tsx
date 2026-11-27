@@ -3,7 +3,7 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LevelBadge, VipBadge } from '@/components/Badges';
 import { FramedAvatar } from '@/components/FramedAvatar';
@@ -23,6 +23,27 @@ export default function MemberProfile() {
   const insets = useSafeAreaInsets();
   const [member, setMember] = useState<Member | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const load = () =>
+    api
+      .get<Member>(`/api/members/${id}`)
+      .then(setMember)
+      .catch((e) => setError(errorMessage(e)));
+
+  // Suka / ikuti: tampilan berubah dulu, lalu disesuaikan dengan jawaban server
+  const toggle = async (kind: 'follow' | 'like') => {
+    if (!member) return;
+    const on = kind === 'follow' ? member.isFollowing : member.isLiked;
+    setMember({ ...member, ...(kind === 'follow' ? { isFollowing: !on } : { isLiked: !on }) });
+    try {
+      const path = `/api/users/${member.id}/${kind}`;
+      const r = on ? await api.del<{ followers: number; likes: number }>(path) : await api.post<{ followers: number; likes: number }>(path);
+      setMember((m) => (m ? { ...m, followers: r.followers, likes: r.likes } : m));
+    } catch (e) {
+      load();
+      Alert.alert('Gagal', errorMessage(e));
+    }
+  };
 
   useEffect(() => {
     api
@@ -59,6 +80,19 @@ export default function MemberProfile() {
         <View style={[s.menuFloat, { top: insets.top + 8 }]}>
           <SafetyMenu light userId={member.id} name={member.displayName} onBlocked={() => router.back()} />
         </View>
+        <Pressable onPress={() => toggle('follow')} style={s.followWrap}>
+          {member.isFollowing ? (
+            <View style={[s.followBtn, { backgroundColor: 'rgba(255,255,255,0.25)' }]}>
+              <Ionicons name="checkmark" size={20} color="#fff" />
+              <Text style={s.followText}>Diikuti</Text>
+            </View>
+          ) : (
+            <LinearGradient colors={gradients.brand} style={s.followBtn}>
+              <Ionicons name="person-add" size={18} color="#fff" />
+              <Text style={s.followText}>Ikuti</Text>
+            </LinearGradient>
+          )}
+        </Pressable>
         <View style={s.info}>
           <View style={{ alignSelf: 'flex-start' }}>
             <FramedAvatar uri={member.avatarUrl} name={member.displayName} size={40} vip={member.vip ?? 0} checkinFrame={member.checkinFrame ?? 0} />
@@ -105,7 +139,12 @@ export default function MemberProfile() {
         </View>
       </View>
       <View style={[s.cta, { paddingBottom: insets.bottom + 12 }]}>
-        <GradientButton title="Sapa sekarang · Gratis" icon="chatbubble-ellipses" onPress={() => openChatWithMember(member.id)} />
+        <Pressable onPress={() => toggle('like')} style={[s.circle, { backgroundColor: member.isLiked ? colors.pink : '#FFE4EF' }]}>
+          <Ionicons name={member.isLiked ? 'heart' : 'heart-outline'} size={26} color={member.isLiked ? '#fff' : colors.pink} />
+        </Pressable>
+        <View style={{ flex: 1 }}>
+          <GradientButton title="Sapa sekarang · Gratis" icon="chatbubble-ellipses" onPress={() => openChatWithMember(member.id)} />
+        </View>
       </View>
     </View>
   );
@@ -118,7 +157,11 @@ const s = StyleSheet.create({
   fade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '55%' },
   menuFloat: { position: 'absolute', right: 14 },
   backFloat: { position: 'absolute', left: 14, width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(0,0,0,0.35)', alignItems: 'center', justifyContent: 'center' },
-  info: { position: 'absolute', left: 16, right: 16, bottom: 16, gap: 8 },
+  info: { position: 'absolute', left: 16, right: 88, bottom: 16, gap: 8 },
+  followWrap: { position: 'absolute', right: 16, bottom: 16 },
+  followBtn: { width: 60, height: 60, borderRadius: 18, alignItems: 'center', justifyContent: 'center', gap: 2 },
+  followText: { color: '#fff', fontSize: 11, fontWeight: '600' },
+  circle: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center' },
   name: { color: '#fff', fontSize: 21, fontWeight: '600', flexShrink: 1 },
   age: { fontSize: 16, fontWeight: '500', color: 'rgba(255,255,255,0.85)' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
@@ -131,7 +174,7 @@ const s = StyleSheet.create({
   tags: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   tag: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.pill, backgroundColor: colors.surfaceAlt },
   tagText: { color: colors.primaryDark, fontWeight: '700', fontSize: 13 },
-  cta: { position: 'absolute', left: 16, right: 16, bottom: 0 },
+  cta: { position: 'absolute', left: 16, right: 16, bottom: 0, flexDirection: 'row', alignItems: 'center', gap: 12 },
   note: { flexDirection: 'row', gap: 8, padding: 12, borderRadius: radius.md, backgroundColor: '#F3E8FF', alignItems: 'flex-start' },
   noteText: { flex: 1, color: colors.textSub, fontSize: 13, lineHeight: 18 },
 });

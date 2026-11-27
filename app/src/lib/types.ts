@@ -63,6 +63,11 @@ export interface Member extends User {
   vip?: number;
   /** bingkai avatar hadiah check-in yang aktif (0 = tidak ada) */
   checkinFrame?: number;
+  /** hanya pada profil lengkap (GET /api/members/:id) */
+  followers?: number;
+  likes?: number;
+  isFollowing?: boolean;
+  isLiked?: boolean;
 }
 
 export interface Host extends User {

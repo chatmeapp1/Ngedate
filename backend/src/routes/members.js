@@ -89,7 +89,15 @@ router.get('/:id', wrap(async (req, res) => {
   const { rows } = await db.query(`SELECT u.* FROM users u WHERE ${MEMBER_WHERE} AND u.id = $1`, [v.id(req.params.id)]);
   if (!rows.length) throw notFound('Pengguna tidak ditemukan');
   if ((await safety.blockerBetween(db, req.user.id, rows[0].id)) !== null) throw notFound('Pengguna tidak ditemukan');
-  res.json(withBadges(rows[0], await getSettings()));
+  const id = Number(rows[0].id);
+  const { rows: st } = await db.query(
+    `SELECT (SELECT COUNT(*) FROM follows WHERE followee_id = $2)::int AS followers,
+            (SELECT COUNT(*) FROM likes WHERE target_id = $2)::int AS likes,
+            EXISTS (SELECT 1 FROM follows WHERE follower_id = $1 AND followee_id = $2) AS is_following,
+            EXISTS (SELECT 1 FROM likes WHERE user_id = $1 AND target_id = $2) AS is_liked`,
+    [req.user.id, id]
+  );
+  res.json({ ...withBadges(rows[0], await getSettings()), followers: st[0].followers, likes: st[0].likes, isFollowing: st[0].is_following, isLiked: st[0].is_liked });
 }));
 
 module.exports = router;
