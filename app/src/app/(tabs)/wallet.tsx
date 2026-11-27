@@ -18,6 +18,7 @@ const REASONS: Record<string, string> = {
   gift_send: 'Kirim gift',
   gift_income: 'Penghasilan gift',
   admin_topup: 'Top up',
+  checkin: 'Check-in harian',
   admin_adjust: 'Penyesuaian admin',
   withdraw_hold: 'Penarikan diamond',
   withdraw_refund: 'Penarikan dikembalikan',

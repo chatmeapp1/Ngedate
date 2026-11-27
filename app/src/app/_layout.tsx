@@ -3,6 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { CheckinModal } from '@/components/CheckinModal';
 import { GiftOverlay } from '@/components/GiftOverlay';
 import { PushBridge } from '@/components/PushBridge';
 import { Loading } from '@/components/ui';
@@ -69,6 +70,7 @@ export default function RootLayout() {
           <StatusBar style="dark" />
           <AuthGate />
           <GiftOverlay />
+          <CheckinModal />
           <PushBridge />
           <UpdateWatcher />
         </RealtimeProvider>

@@ -305,3 +305,13 @@ export interface AppNotification {
   read: boolean;
   createdAt: string;
 }
+
+export interface CheckinStatus {
+  claimedToday: boolean;
+  /** hari (1-7) yang sedang / baru saja diklaim */
+  currentDay: number;
+  /** jumlah kotak yang sudah bercentang pada siklus ini */
+  claimedDays: number;
+  rewards: number[];
+  reward: number;
+}

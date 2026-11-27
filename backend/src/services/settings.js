@@ -32,6 +32,8 @@ const DEFAULTS = {
   // Kartu pesan gratis (VIP): jumlah per hari, dan diamond untuk host per pesan gratis (dibayar app)
   free_cards_per_day: 5,
   free_card_host_diamonds: 5,
+  // Check-in harian (hari 1-7): koin per hari. Koin ini dibiayai app, jadi dibuat kecil.
+  checkin_rewards: [5, 5, 10, 10, 15, 15, 40],
   // Foto & video di chat untuk VIP: batas kiriman per hari (cegah penyalahgunaan penyimpanan)
   vip_media_per_day: 30,
   // Top up koin: pemesanan lewat WhatsApp admin (sampai Google Play Billing dipasang)
