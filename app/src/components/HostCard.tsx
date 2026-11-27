@@ -23,14 +23,8 @@ function HostCardBase({ host, onPress, onMessage }: { host: Host; onPress: () =>
       <LinearGradient colors={gradients.photoFade} style={s.fade} />
 
       <View style={s.top}>
-        {host.online ? (
-          <View style={s.online}>
-            <View style={s.dot} />
-            <Text style={s.onlineText}>Online</Text>
-          </View>
-        ) : (
-          <View />
-        )}
+        {/* Status: bulat hijau = online, abu-abu = offline */}
+        <View style={[s.statusDot, { backgroundColor: host.online ? colors.online : '#9CA3AF' }]} />
         {host.countryCode ? (
           <View style={s.country}>
             <Text style={{ fontSize: 13 }}>{flag(host.countryCode)}</Text>
@@ -84,6 +78,7 @@ const s = StyleSheet.create({
   placeholder: { alignItems: 'center', justifyContent: 'center' },
   fade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '45%' },
   top: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 10, gap: 6 },
+  statusDot: { width: 14, height: 14, borderRadius: 7, borderWidth: 2, borderColor: '#fff' },
   online: {
     flexDirection: 'row',
     alignItems: 'center',

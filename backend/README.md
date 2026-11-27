@@ -213,6 +213,13 @@ server), foto maks 8 MB, video maks 80 MB, batas `host_media_per_day` (awal 30) 
   membuka mendapat 402; mendukung Range untuk video). Sertakan folder ini dalam cadangan.
 - API: `POST /api/conversations/:id/private-media` (multipart `file` + `price`), `POST /api/conversations/:id/media/:messageId/unlock`.
 
+## Papan peringkat
+
+`GET /api/rankings?type=hosts|senders&period=week|all` (butuh login). `hosts` = host dengan penghasilan diamond terbanyak (chat, gift, kartu
+gratis, buka media privat); `senders` = pengguna yang paling banyak membelanjakan koin untuk gift dan buka media privat. `week` = 7 hari
+terakhir, `all` = semua waktu; 20 teratas, akun yang ditangguhkan tidak ikut. Di app: ikon piala di Beranda akun host membuka layar
+"Papan peringkat".
+
 ## Panel admin web
 
 Buka `http://<alamat-server>:<port>/admin` di browser (HP juga bisa) lalu masuk dengan akun admin
