@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import type { ComponentProps } from 'react';
+import { useAuth } from '@/context/auth';
 import { useRealtime } from '@/context/realtime';
 import { colors } from '@/lib/theme';
 
@@ -14,6 +15,8 @@ function icon(active: IconName, inactive: IconName) {
 
 export default function TabsLayout() {
   const { unread } = useRealtime();
+  const { user } = useAuth();
+  const isUser = user?.role === 'user'; // pengguna: saldo ada di profil, ada menu Match
   return (
     <Tabs
       screenOptions={{
@@ -25,6 +28,7 @@ export default function TabsLayout() {
       }}
     >
       <Tabs.Screen name="index" options={{ title: 'Beranda', tabBarIcon: icon('home', 'home-outline') }} />
+      <Tabs.Screen name="match" options={{ title: 'Match', href: isUser ? undefined : null, tabBarIcon: icon('heart', 'heart-outline') }} />
       <Tabs.Screen name="moments" options={{ title: 'Momen', tabBarIcon: icon('images', 'images-outline') }} />
       <Tabs.Screen
         name="messages"
@@ -35,7 +39,7 @@ export default function TabsLayout() {
           tabBarBadgeStyle: { backgroundColor: colors.pink, fontSize: 10, fontWeight: '800' },
         }}
       />
-      <Tabs.Screen name="wallet" options={{ title: 'Dompet', tabBarIcon: icon('wallet', 'wallet-outline') }} />
+      <Tabs.Screen name="wallet" options={{ title: 'Dompet', href: isUser ? null : undefined, tabBarIcon: icon('wallet', 'wallet-outline') }} />
       <Tabs.Screen name="me" options={{ title: 'Saya', tabBarIcon: icon('person', 'person-outline') }} />
     </Tabs>
   );
