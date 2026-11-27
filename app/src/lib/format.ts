@@ -1,3 +1,5 @@
+import { getLang } from '@/lib/i18n';
+
 // 1500 -> "1.5k", 481600 -> "481.6k", 1000000 -> "1M", 2500000000 -> "2.5B"
 export function compact(n: number): string {
   const abs = Math.abs(n);
@@ -10,7 +12,8 @@ export function compact(n: number): string {
 
 // 1234567 -> "1.234.567"
 export function number(n: number): string {
-  return String(Math.trunc(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  // Indonesia: 1.234.567, Inggris: 1,234,567
+  return String(Math.trunc(n)).replace(/\B(?=(\d{3})+(?!\d))/g, getLang() === 'en' ? ',' : '.');
 }
 
 export function lastSeen(iso?: string | null, online?: boolean): string {

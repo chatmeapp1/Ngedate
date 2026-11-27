@@ -1,6 +1,6 @@
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { CheckinModal } from '@/components/CheckinModal';
@@ -10,6 +10,7 @@ import { Loading } from '@/components/ui';
 import { UpdateWatcher } from '@/components/UpdateWatcher';
 import { AuthProvider, useAuth } from '@/context/auth';
 import { RealtimeProvider } from '@/context/realtime';
+import { loadLang, onLangChange, patchAlert, type Lang } from '@/lib/i18n';
 import { colors } from '@/lib/theme';
 
 // Arahkan ke halaman login jika belum masuk, dan sebaliknya
@@ -63,16 +64,27 @@ function AuthGate() {
 }
 
 export default function RootLayout() {
+  // Bahasa: dimuat sekali di awal; saat diganti, layar dibuat ulang (key) supaya semua teks memakai bahasa baru
+  const [lang, setLangState] = useState<Lang | null>(null);
+  useEffect(() => {
+    patchAlert();
+    loadLang().then(setLangState);
+    return onLangChange(setLangState);
+  }, []);
+  if (!lang) return null;
+
   return (
     <SafeAreaProvider>
       <AuthProvider>
         <RealtimeProvider>
           <StatusBar style="dark" />
-          <AuthGate />
-          <GiftOverlay />
-          <CheckinModal />
+          <View key={lang} style={{ flex: 1 }}>
+            <AuthGate />
+            <GiftOverlay />
+            <CheckinModal />
+            <UpdateWatcher />
+          </View>
           <PushBridge />
-          <UpdateWatcher />
         </RealtimeProvider>
       </AuthProvider>
     </SafeAreaProvider>

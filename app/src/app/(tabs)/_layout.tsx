@@ -3,6 +3,7 @@ import { Tabs } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { ComponentProps } from 'react';
 import { useAuth } from '@/context/auth';
+import { tr } from '@/lib/i18n';
 import { useRealtime } from '@/context/realtime';
 import { colors } from '@/lib/theme';
 
@@ -30,20 +31,20 @@ export default function TabsLayout() {
         tabBarLabelStyle: { fontSize: 11, fontWeight: '700' },
       }}
     >
-      <Tabs.Screen name="index" options={{ title: 'Beranda', tabBarIcon: icon('home', 'home-outline') }} />
-      <Tabs.Screen name="match" options={{ title: 'Match', href: isUser ? undefined : null, tabBarIcon: icon('heart', 'heart-outline') }} />
-      <Tabs.Screen name="moments" options={{ title: 'Momen', tabBarIcon: icon('images', 'images-outline') }} />
+      <Tabs.Screen name="index" options={{ title: tr('Beranda'), tabBarIcon: icon('home', 'home-outline') }} />
+      <Tabs.Screen name="match" options={{ title: tr('Match'), href: isUser ? undefined : null, tabBarIcon: icon('heart', 'heart-outline') }} />
+      <Tabs.Screen name="moments" options={{ title: tr('Momen'), tabBarIcon: icon('images', 'images-outline') }} />
       <Tabs.Screen
         name="messages"
         options={{
-          title: 'Pesan',
+          title: tr('Pesan'),
           tabBarIcon: icon('chatbubbles', 'chatbubbles-outline'),
           tabBarBadge: unread > 0 ? (unread > 99 ? '99+' : unread) : undefined,
           tabBarBadgeStyle: { backgroundColor: colors.pink, fontSize: 10, fontWeight: '800' },
         }}
       />
-      <Tabs.Screen name="wallet" options={{ title: 'Dompet', href: isUser ? null : undefined, tabBarIcon: icon('wallet', 'wallet-outline') }} />
-      <Tabs.Screen name="me" options={{ title: 'Saya', tabBarIcon: icon('person', 'person-outline') }} />
+      <Tabs.Screen name="wallet" options={{ title: tr('Dompet'), href: isUser ? null : undefined, tabBarIcon: icon('wallet', 'wallet-outline') }} />
+      <Tabs.Screen name="me" options={{ title: tr('Saya'), tabBarIcon: icon('person', 'person-outline') }} />
     </Tabs>
   );
 }

@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
+import { Text } from '@/components/I18nText';
 import { Field, GradientButton, ScreenHeader } from '@/components/ui';
 import { getServerUrl, setServerUrl } from '@/lib/api';
 import { colors } from '@/lib/theme';

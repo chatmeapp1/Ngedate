@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Modal, Pressable, StyleSheet, View } from 'react-native';
+import { Text, TextInput } from '@/components/I18nText';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Coin } from '@/components/ui';
 import { number } from '@/lib/format';

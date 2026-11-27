@@ -1,8 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useMemo, useState, type ReactNode } from 'react';
-import { FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { FlatList, Modal, Pressable, StyleSheet, View } from 'react-native';
+import { Text, TextInput } from '@/components/I18nText';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { COUNTRY_LIST, countryName, flag } from '@/lib/countries';
+import { countryList, countryName, flag } from '@/lib/countries';
 import { colors, radius } from '@/lib/theme';
 
 export function CountryPicker({
@@ -21,7 +22,7 @@ export function CountryPicker({
   const [q, setQ] = useState('');
   const insets = useSafeAreaInsets();
   const list = useMemo(
-    () => COUNTRY_LIST.filter((c) => c.name.toLowerCase().includes(q.toLowerCase()) || c.code === q.toUpperCase()),
+    () => countryList().filter((c) => c.name.toLowerCase().includes(q.toLowerCase()) || c.code === q.toUpperCase()),
     [q]
   );
 

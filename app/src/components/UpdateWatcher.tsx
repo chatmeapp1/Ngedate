@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Updates from 'expo-updates';
 import { useEffect, useRef, useState } from 'react';
-import { AppState, Pressable, StyleSheet, Text, View } from 'react-native';
+import { AppState, Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '@/components/I18nText';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius } from '@/lib/theme';
 

@@ -1,6 +1,6 @@
 import { Link } from 'expo-router';
 import { useState } from 'react';
-import { Text } from 'react-native';
+import { Text } from '@/components/I18nText';
 import { AuthShell } from '@/components/AuthShell';
 import { Field, GradientButton } from '@/components/ui';
 import { useAuth } from '@/context/auth';

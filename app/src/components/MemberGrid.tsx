@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 import { memo, type ReactElement } from 'react';
-import { StyleSheet, Text, View, Pressable, FlatList, RefreshControl, ActivityIndicator } from 'react-native';
+import { StyleSheet, View, Pressable, FlatList, RefreshControl, ActivityIndicator } from 'react-native';
+import { Text } from '@/components/I18nText';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';

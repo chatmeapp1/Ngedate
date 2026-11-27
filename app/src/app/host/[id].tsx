@@ -4,7 +4,8 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Alert, FlatList, Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Alert, FlatList, Modal, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { RawText, Text } from '@/components/I18nText';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GiftIcon } from '@/components/GiftIcon';
 import { GiftSheet } from '@/components/GiftSheet';
@@ -182,7 +183,7 @@ export default function HostProfileScreen() {
           </View>
         </View>
 
-        {host.bio ? <Text style={s.bio}>{host.bio}</Text> : null}
+        {host.bio ? <RawText style={s.bio}>{host.bio}</RawText> : null}
         {host.tags.length ? (
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingHorizontal: 16, paddingTop: 10 }}>
             {host.tags.map((t) => (

@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '@/components/I18nText';
 import { colors } from '@/lib/theme';
 
 // Pisahkan per emoji: variation selector (FE0F), penyambung ZWJ dan warna kulit ikut ke emoji sebelumnya

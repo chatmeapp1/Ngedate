@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, AppState, Modal, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, AppState, Modal, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Text } from '@/components/I18nText';
 import { Coin } from '@/components/ui';
 import { useAuth } from '@/context/auth';
 import { api, errorMessage } from '@/lib/api';

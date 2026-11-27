@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '@/components/I18nText';
 import { Empty, Loading, ScreenHeader } from '@/components/ui';
 import { api } from '@/lib/api';
 import { countryName, flag } from '@/lib/countries';

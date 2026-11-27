@@ -3,7 +3,9 @@ import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Link, router } from 'expo-router';
 import { useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Animated, Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '@/components/I18nText';
+import { LanguageSwitch } from '@/components/LanguageSwitch';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { VideoBackground } from '@/components/VideoBackground';
 import { useAuth } from '@/context/auth';
@@ -50,6 +52,10 @@ export default function Welcome() {
   return (
     <View style={{ flex: 1, backgroundColor: '#1A0B2E' }}>
       <VideoBackground />
+
+      <View style={{ position: 'absolute', left: 16, top: insets.top + 8, zIndex: 5 }}>
+        <LanguageSwitch compact />
+      </View>
 
       <Pressable style={[s.serverBtn, { top: insets.top + 10 }]} onPress={() => router.push('/server')} hitSlop={10}>
         <Ionicons name="settings-outline" size={22} color="rgba(255,255,255,0.9)" />

@@ -56,6 +56,7 @@ function createApp() {
   app.use('/api/conversations', authenticate, require('./routes/conversations'));
   app.use('/api/media', authenticate, require('./routes/media'));
   app.use('/api/notifications', authenticate, require('./routes/notifications'));
+  app.use('/api/translate', authenticate, require('./routes/translate'));
   app.use('/api/salary', authenticate, requireRole('host'), require('./routes/salary'));
   app.use('/api/tasks', authenticate, requireRole('host'), require('./routes/tasks'));
   app.use('/api/checkin', authenticate, require('./routes/checkin'));

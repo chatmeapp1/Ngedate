@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Text } from '@/components/I18nText';
 import { Loading, ScreenHeader } from '@/components/ui';
 import { useAuth } from '@/context/auth';
 import { api, errorMessage } from '@/lib/api';

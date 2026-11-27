@@ -3,7 +3,8 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, View } from 'react-native';
+import { RawText, Text } from '@/components/I18nText';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LevelBadge, VipBadge } from '@/components/Badges';
 import { FramedAvatar } from '@/components/FramedAvatar';
@@ -131,7 +132,7 @@ export default function MemberProfile() {
       </View>
 
       <View style={s.body}>
-        {member.bio ? <Text style={s.bio}>{member.bio}</Text> : <Text style={s.bioEmpty}>Belum ada bio</Text>}
+        {member.bio ? <RawText style={s.bio}>{member.bio}</RawText> : <Text style={s.bioEmpty}>Belum ada bio</Text>}
         {member.tags?.length ? (
           <View style={s.tags}>
             {member.tags.map((t) => (

@@ -1,7 +1,8 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useEffect, useMemo, useRef } from 'react';
-import { Animated, Easing, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Animated, Easing, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Text } from '@/components/I18nText';
 import { GiftIcon } from '@/components/GiftIcon';
 import { number } from '@/lib/format';
 import type { GiftFx } from '@/lib/giftFx';

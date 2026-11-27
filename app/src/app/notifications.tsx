@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { FlatList, RefreshControl, StyleSheet, View } from 'react-native';
+import { Text } from '@/components/I18nText';
 import { Empty, Loading, ScreenHeader } from '@/components/ui';
 import { useRealtime } from '@/context/realtime';
 import { api } from '@/lib/api';

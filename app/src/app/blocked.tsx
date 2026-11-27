@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
-import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, FlatList, Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '@/components/I18nText';
 import { useFocusEffect } from 'expo-router';
 import { Avatar, Empty, Loading, ScreenHeader } from '@/components/ui';
 import { api, errorMessage } from '@/lib/api';

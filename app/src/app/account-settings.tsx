@@ -1,8 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { useState } from 'react';
-import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Text } from '@/components/I18nText';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LanguageSwitch } from '@/components/LanguageSwitch';
 import { Field, GradientButton, ScreenHeader } from '@/components/ui';
 import { useAuth } from '@/context/auth';
 import { api, errorMessage, setSession } from '@/lib/api';
@@ -96,6 +98,11 @@ export default function AccountSettings() {
       <ScreenHeader title="Pengaturan akun" />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 40 }} keyboardShouldPersistTaps="handled">
+          <Section title="Bahasa aplikasi">
+            <LanguageSwitch />
+            <Text style={s.hintLang}>Pilih bahasa aplikasi. Pesan chat bisa diterjemahkan ke bahasa ini.</Text>
+          </Section>
+
           <Section title="Akun">
             <View style={s.idBox}>
               <Text style={s.k}>ID pengguna kamu</Text>
@@ -233,6 +240,7 @@ function DeleteSheet({
 }
 
 const s = StyleSheet.create({
+  hintLang: { color: colors.textSub, fontSize: 12.5, lineHeight: 18, marginTop: 8 },
   section: { marginBottom: 18 },
   sectionTitle: { fontSize: 13, fontWeight: '800', color: colors.textSub, marginBottom: 8, marginLeft: 4, textTransform: 'uppercase', letterSpacing: 0.4 },
   card: { backgroundColor: colors.surface, borderRadius: radius.md, padding: 14, gap: 12 },

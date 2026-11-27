@@ -3,20 +3,10 @@ import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  Keyboard,
-  KeyboardAvoidingView,
-  Linking,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Keyboard, KeyboardAvoidingView, Linking, Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { RawText, Text } from '@/components/I18nText';
+import { TranslateLink } from '@/components/TranslateLink';
+import { tr } from '@/lib/i18n';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { EmojiPicker } from '@/components/EmojiPicker';
 import { GiftIcon } from '@/components/GiftIcon';
@@ -549,7 +539,7 @@ export default function ChatRoom() {
           }}
           value={text}
           onChangeText={onChangeText}
-          placeholder="Tulis pesan…"
+          placeholder={tr('Tulis pesan…')}
           placeholderTextColor={colors.textDim}
           multiline
           maxLength={1000}
@@ -716,11 +706,12 @@ function Bubble({
     <View style={[s.row, mine ? s.rowMine : s.rowTheirs]}>
       {mine ? (
         <LinearGradient colors={gradients.brand} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[s.bubble, s.bubbleMine]}>
-          <Text style={[s.bubbleText, { color: '#fff' }]}>{m.body}</Text>
+          <RawText style={[s.bubbleText, { color: '#fff' }]}>{m.body}</RawText>
         </LinearGradient>
       ) : (
         <View style={[s.bubble, s.bubbleTheirs]}>
-          <Text style={s.bubbleText}>{m.body}</Text>
+          <RawText style={s.bubbleText}>{m.body}</RawText>
+          {m.type === 'text' && m.body ? <TranslateLink text={m.body} /> : null}
         </View>
       )}
       <View style={[s.metaRow, mine && { justifyContent: 'flex-end' }]}>

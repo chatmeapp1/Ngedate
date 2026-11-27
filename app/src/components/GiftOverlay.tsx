@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, Linking, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Animated, Easing, Linking, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Text } from '@/components/I18nText';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   DriveEffect,

@@ -3,7 +3,9 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { RawText, Text, TextInput } from '@/components/I18nText';
+import { TranslateLink } from '@/components/TranslateLink';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LevelBadge } from '@/components/Badges';
 import { Avatar, Loading, ScreenHeader } from '@/components/ui';
@@ -128,7 +130,12 @@ export default function MomentDetail() {
       ) : null}
 
       <View style={{ paddingHorizontal: 16, gap: 12, paddingTop: 6 }}>
-        {m.body ? <Text style={s.body}>{m.body}</Text> : null}
+        {m.body ? (
+          <View>
+            <RawText style={s.body}>{m.body}</RawText>
+            <TranslateLink text={m.body} />
+          </View>
+        ) : null}
         {m.imageUrl ? (
           <Pressable onPress={() => setViewer(true)} style={{ alignSelf: 'center' }}>
             <Image source={{ uri: m.imageUrl }} style={{ width: imgW, height: imgW * 1.3, borderRadius: 16, backgroundColor: colors.surfaceAlt }} contentFit="cover" transition={150} />
@@ -174,7 +181,8 @@ export default function MomentDetail() {
                 {item.user.verified ? <Verified size={13} /> : null}
               </View>
               <Text style={s.cTime}>{stamp(item.createdAt)}</Text>
-              <Text style={s.cBody}>{item.body}</Text>
+              <RawText style={s.cBody}>{item.body}</RawText>
+              <TranslateLink text={item.body} />
             </View>
           </View>
         )}
