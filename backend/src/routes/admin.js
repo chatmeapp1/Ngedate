@@ -5,6 +5,7 @@ const wallet = require('../services/wallet');
 const realtime = require('../realtime');
 const { getSettings, updateSettings } = require('../services/settings');
 const { wrap, badRequest, notFound } = require('../lib/errors');
+const { notify, money } = require('../services/notifications');
 const crypto = require('crypto');
 const storage = require('../lib/storage');
 const { describe } = require('../lib/gestures');
@@ -101,6 +102,7 @@ router.post('/users/:id/coins', wrap(async (req, res) => {
   });
   const b = await wallet.balances(db, userId);
   realtime.emitTo(userId, 'wallet:update', b);
+  if (amount > 0) await notify(userId, 'topup', 'Top up berhasil', `${amount.toLocaleString('id-ID')} koin sudah ditambahkan ke saldo kamu.`);
   res.json({ coins: balance });
 }));
 
@@ -406,12 +408,14 @@ router.post('/agency-withdrawals/:id/reject', wrap(async (req, res) => {
 router.post('/withdrawals/:id/pay', wrap(async (req, res) => {
   const w = await withdraw.adminPay(req.user.id, req.params.id, req.body || {});
   realtime.emitTo(Number(w.user_id), 'withdrawal:update', { id: Number(w.id), status: 'paid' });
+  await notify(Number(w.user_id), 'withdraw', 'Penarikan terkirim', `Penarikan ${money(w)} sudah dikirim ke rekening/dompet kamu.`);
   res.json({ ok: true });
 }));
 
 router.post('/withdrawals/:id/reject', wrap(async (req, res) => {
   const w = await withdraw.adminReject(req.user.id, req.params.id, req.body || {});
   realtime.emitTo(Number(w.user_id), 'withdrawal:update', { id: Number(w.id), status: 'rejected' });
+  await notify(Number(w.user_id), 'withdraw', 'Penarikan ditolak', `Penarikan ${money(w)} ditolak dan diamond dikembalikan ke saldo kamu.`);
   const b = await wallet.balances(db, Number(w.user_id));
   if (b) realtime.emitTo(Number(w.user_id), 'wallet:update', b);
   res.json({ ok: true });
@@ -508,8 +512,9 @@ router.get('/moments', wrap(async (req, res) => {
 }));
 
 router.post('/moments/:id/approve', wrap(async (req, res) => {
-  const { rowCount } = await db.query(`UPDATE moments SET status = 'approved', reject_reason = NULL WHERE id = $1`, [v.id(req.params.id)]);
-  if (!rowCount) throw notFound('Momen tidak ditemukan');
+  const { rows } = await db.query(`UPDATE moments SET status = 'approved', reject_reason = NULL WHERE id = $1 RETURNING host_id`, [v.id(req.params.id)]);
+  if (!rows.length) throw notFound('Momen tidak ditemukan');
+  await notify(Number(rows[0].host_id), 'moment', 'Foto momen disetujui', 'Momenmu sudah disetujui dan tampil ke pengguna.');
   res.json({ ok: true });
 }));
 
@@ -518,11 +523,12 @@ router.post('/moments/:id/reject', wrap(async (req, res) => {
   const reason = v.str(req.body.reason, 'Alasan', { min: 3, max: 200 });
   const { rows } = await db.query(
     `UPDATE moments m SET status = 'rejected', reject_reason = $2, image_url = NULL
-     FROM (SELECT id, image_url FROM moments WHERE id = $1) o WHERE m.id = o.id RETURNING o.image_url`,
+     FROM (SELECT id, image_url FROM moments WHERE id = $1) o WHERE m.id = o.id RETURNING o.image_url, m.host_id`,
     [v.id(req.params.id), reason]
   );
   if (!rows.length) throw notFound('Momen tidak ditemukan');
   if (rows[0].image_url) await require('../lib/storage').remove(rows[0].image_url);
+  await notify(Number(rows[0].host_id), 'moment', 'Foto momen ditolak', `Alasan: ${reason}`);
   res.json({ ok: true });
 }));
 
@@ -707,21 +713,23 @@ router.get('/photos/pending', wrap(async (req, res) => {
 }));
 
 router.post('/photos/:id/approve', wrap(async (req, res) => {
-  const { rowCount } = await db.query(
-    `UPDATE user_photos SET status = 'approved', reject_reason = NULL WHERE id = $1`,
+  const { rows } = await db.query(
+    `UPDATE user_photos SET status = 'approved', reject_reason = NULL WHERE id = $1 RETURNING user_id`,
     [v.id(req.params.id)]
   );
-  if (!rowCount) throw notFound('Foto tidak ditemukan');
+  if (!rows.length) throw notFound('Foto tidak ditemukan');
+  await notify(Number(rows[0].user_id), 'photo', 'Foto album disetujui', 'Foto albummu sudah disetujui dan tampil ke pengguna.');
   res.json({ ok: true });
 }));
 
 router.post('/photos/:id/reject', wrap(async (req, res) => {
   const reason = v.str(req.body.reason, 'Alasan', { min: 3, max: 200 });
-  const { rowCount } = await db.query(
-    `UPDATE user_photos SET status = 'rejected', reject_reason = $2 WHERE id = $1`,
+  const { rows } = await db.query(
+    `UPDATE user_photos SET status = 'rejected', reject_reason = $2 WHERE id = $1 RETURNING user_id`,
     [v.id(req.params.id), reason]
   );
-  if (!rowCount) throw notFound('Foto tidak ditemukan');
+  if (!rows.length) throw notFound('Foto tidak ditemukan');
+  await notify(Number(rows[0].user_id), 'photo', 'Foto album ditolak', `Alasan: ${reason}`);
   res.json({ ok: true });
 }));
 
@@ -736,6 +744,7 @@ router.post('/users/:id/avatar/approve', wrap(async (req, res) => {
     [userId]
   );
   if (rows[0].avatar_url) await storage.remove(rows[0].avatar_url);
+  await notify(userId, 'avatar', 'Foto profil disetujui', 'Foto profil barumu sudah disetujui dan tampil ke pengguna.');
   res.json({ ok: true });
 }));
 
@@ -749,6 +758,7 @@ router.post('/users/:id/avatar/reject', wrap(async (req, res) => {
   );
   if (!rows.length) throw notFound('Tidak ada foto profil yang menunggu');
   await storage.remove(rows[0].old);
+  await notify(userId, 'avatar', 'Foto profil ditolak', 'Foto profil barumu tidak disetujui. Silakan unggah foto lain.');
   res.json({ ok: true });
 }));
 

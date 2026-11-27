@@ -15,7 +15,8 @@ function icon(active: IconName, inactive: IconName) {
 }
 
 export default function TabsLayout() {
-  const { unread } = useRealtime();
+  const { unread: chatUnread, notifUnread } = useRealtime();
+  const unread = chatUnread + notifUnread; // pesan + notifikasi sistem
   const { user } = useAuth();
   const insets = useSafeAreaInsets(); // jangan mepet ke tombol navigasi Android
   const isUser = user?.role === 'user'; // pengguna: saldo ada di profil, ada menu Match

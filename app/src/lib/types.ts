@@ -296,3 +296,12 @@ export interface MomentComment {
   createdAt: string;
   user: { id: number; displayName: string; avatarUrl: string | null; verified: boolean; role: Role; level: number | null };
 }
+
+export interface AppNotification {
+  id: number;
+  type: 'topup' | 'photo' | 'avatar' | 'moment' | 'agency' | 'withdraw' | string;
+  title: string;
+  body: string;
+  read: boolean;
+  createdAt: string;
+}

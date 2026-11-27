@@ -330,6 +330,8 @@ test('admin: daftar per mata uang, alamat lengkap, bayar (TXID) & tolak; hanya a
   const paid = await api('GET', '/api/admin/withdrawals?status=paid', { token: admin.token });
   assert.equal(paid.body[0].transferRef, txid);
   assert.equal(paid.body[0].adminNote, 'Kirim USDT TRC20');
+  const notes = (await api('GET', '/api/notifications', { token: maria.token })).body;
+  assert.ok(notes.some((n) => n.type === 'withdraw' && /terkirim/i.test(n.title) && /\$/.test(n.body)), 'host diberi tahu penarikan terkirim');
   assert.equal((await api('GET', '/api/admin/withdrawals?status=rejected', { token: admin.token })).body.length, 1);
 });
 

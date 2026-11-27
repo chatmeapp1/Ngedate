@@ -11,6 +11,7 @@ import { api, errorMessage } from '@/lib/api';
 import { onBlockChange } from '@/lib/blockEvents';
 import { countryName, flag } from '@/lib/countries';
 import { openChatWithMember } from '@/lib/openChat';
+import { useRealtime } from '@/context/realtime';
 import { onRealtime, onRealtimeConnect } from '@/lib/realtime';
 import { colors, gradients, radius } from '@/lib/theme';
 import type { Conversation, Host, Message, User } from '@/lib/types';
@@ -69,6 +70,7 @@ function agoText(iso: string) {
 export default function Messages() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
+  const { notifUnread } = useRealtime();
   const [online, setOnline] = useState<Host[]>([]);
   const isUser = user?.role === 'user';
   const isHost = user?.role === 'host';
@@ -220,6 +222,24 @@ export default function Messages() {
         <FlatList
           data={list}
           keyExtractor={(c) => String(c.id)}
+          ListHeaderComponent={
+            <Pressable style={({ pressed }) => [s.row, pressed && { backgroundColor: colors.surfaceAlt }]} onPress={() => router.push('/notifications')}>
+              <LinearGradient colors={gradients.brand} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.sysIcon}>
+                <Ionicons name="notifications" size={24} color="#fff" />
+              </LinearGradient>
+              <View style={{ flex: 1, gap: 3 }}>
+                <Text style={s.nameText}>Notifikasi</Text>
+                <Text style={s.preview} numberOfLines={1}>
+                  {notifUnread > 0 ? `${notifUnread} pemberitahuan baru` : 'Top up, persetujuan foto, penarikan'}
+                </Text>
+              </View>
+              {notifUnread > 0 ? (
+                <View style={s.sysBadge}>
+                  <Text style={s.sysBadgeText}>{notifUnread > 99 ? '99+' : notifUnread}</Text>
+                </View>
+              ) : null}
+            </Pressable>
+          }
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -305,6 +325,9 @@ const s = StyleSheet.create({
     borderColor: colors.surface,
   },
   stripName: { marginTop: 5, fontSize: 12, fontWeight: '700', color: colors.text, maxWidth: 70 },
+  sysIcon: { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },
+  sysBadge: { minWidth: 22, height: 22, borderRadius: 11, paddingHorizontal: 6, backgroundColor: colors.pink, alignItems: 'center', justifyContent: 'center' },
+  sysBadgeText: { color: '#fff', fontSize: 12, fontWeight: '700' },
   chips: { flexDirection: 'row', gap: 10, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 6 },
   chip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, height: 36, borderRadius: radius.pill, backgroundColor: '#F1EEF6' },
   chipOn: { backgroundColor: colors.primary },

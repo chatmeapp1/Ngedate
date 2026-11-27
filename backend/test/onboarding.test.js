@@ -158,6 +158,8 @@ test('wanita: wajib kode agency, jadi host "pending" dan belum tampil', async ()
   assert.equal(r.body.agencyName, 'Bintang Agency');
   assert.equal(r.body.verificationStatus, 'none');
   host = u;
+  const notes = (await api('GET', '/api/notifications', { token: u.token })).body;
+  assert.ok(notes.some((n) => n.type === 'agency' && /Bintang Agency/.test(n.body)), 'host diberi tahu sudah masuk agency');
 
   const list = await api('GET', '/api/hosts', { token: u.token });
   assert.ok(!list.body.some((h) => h.id === u.id), 'host pending tidak tampil');

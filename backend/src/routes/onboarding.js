@@ -38,6 +38,7 @@ router.post('/complete', wrap(async (req, res) => {
   const displayName = v.str(b.displayName, 'Nickname', { min: 2, max: 30 });
   const birthDate = v.str(b.birthDate, 'Tanggal lahir', { pattern: /^\d{4}-\d{2}-\d{2}$/ });
   validateBirthDate(birthDate);
+  let agencyName = null;
 
   await db.tx(async (client) => {
     const { rows } = await client.query(`SELECT * FROM users WHERE id = $1 FOR UPDATE`, [req.user.id]);
@@ -57,6 +58,7 @@ router.post('/complete', wrap(async (req, res) => {
 
     const agency = await findAgency(b.inviteCode);
     if (!agency) throw badRequest('Kode undangan agency tidak valid', 'INVALID_INVITE');
+    agencyName = agency.name;
     await client.query(
       `UPDATE users SET gender = 'female', display_name = $2, birth_date = $3, role = 'host',
          host_status = 'pending', agency_id = $4, profile_completed = true, updated_at = now()
@@ -66,6 +68,7 @@ router.post('/complete', wrap(async (req, res) => {
     await client.query(`INSERT INTO host_profiles (user_id) VALUES ($1) ON CONFLICT DO NOTHING`, [me.id]);
   });
 
+  if (agencyName) await require('../services/notifications').notify(req.user.id, 'agency', 'Bergabung ke agency', `Kamu telah masuk ke agency ${agencyName}.`);
   res.json(await loadMe(req.user.id));
 }));
 
