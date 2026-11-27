@@ -3,7 +3,8 @@ import { AppState } from 'react-native';
 import { useAuth } from '@/context/auth';
 import { api } from '@/lib/api';
 import { connectRealtime, disconnectRealtime, onRealtime, onRealtimeConnect } from '@/lib/realtime';
-import type { Message } from '@/lib/types';
+import { playGiftMessage, replayMissedGifts } from '@/lib/giftFx';
+import type { Conversation, Message } from '@/lib/types';
 
 interface RealtimeState {
   unread: number;
@@ -18,6 +19,7 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
   const [unread, setUnread] = useState(0);
   const active = !!user && (user.profileCompleted || user.role === 'admin');
   const userId = user?.id;
+  const isHost = user?.role === 'host';
 
   const refreshUnread = useCallback(() => {
     api
@@ -36,10 +38,15 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
     refreshUnread();
 
     const offs = [
-      onRealtime<{ message: Message }>('message:new', (e) => {
+      onRealtime<{ message: Message; conversation?: Conversation }>('message:new', (e) => {
         if (e.message.senderId !== userId) refreshUnread();
+        // Efek gift tampil di layar mana pun (dobel dengan layar chat dicegah lewat key pesan)
+        if (e.message.senderId !== userId) playGiftMessage(e.message, isHost, e.conversation?.peer?.displayName);
       }),
-      onRealtimeConnect(() => refreshUnread()),
+      onRealtimeConnect(() => {
+        refreshUnread();
+        replayMissedGifts(userId, isHost);
+      }),
       onRealtime<{ coins: number; diamonds: number }>('wallet:update', (b) => {
         setUser((u) => (u ? { ...u, coins: b.coins, diamonds: b.diamonds } : u));
       }),
@@ -48,6 +55,7 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
       if (s === 'active') {
         connectRealtime();
         refreshUnread();
+        replayMissedGifts(userId, isHost);
       } else if (s === 'background') {
         // Putus saat di latar belakang supaya server mengirim notifikasi push
         disconnectRealtime();

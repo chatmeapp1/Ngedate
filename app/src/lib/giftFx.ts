@@ -1,4 +1,6 @@
+import { api } from './api';
 import { playGiftSound } from './giftSound';
+import type { Conversation, Message } from './types';
 
 /**
  * Antrean animasi gift. Layar mana pun bisa memanggil playGift / playWaUnlocked,
@@ -84,4 +86,42 @@ export function playGift(args: {
 
 export function playWaUnlocked(conversationId: number, hostName?: string, link?: string | null) {
   push({ kind: 'wa', key: `wa${conversationId}`, hostName, link });
+}
+
+/** Putar efek untuk pesan gift (dari realtime / sinkron ulang). Hanya gift dari lawan bicara. */
+export function playGiftMessage(m: Message, isHost: boolean, peerName?: string) {
+  if (m.type !== 'gift' || !m.gift) return;
+  const g = m.gift;
+  playGift({
+    messageId: m.id,
+    giftId: g.id,
+    name: g.name,
+    icon: g.icon,
+    imageUrl: g.imageUrl,
+    videoUrl: g.animationUrl,
+    soundUrl: g.soundUrl,
+    hostIncome: isHost ? m.hostIncome ?? null : null,
+    blend: g.animationBlend,
+    count: g.count,
+    price: g.price,
+    category: g.category,
+    total: m.price,
+    from: peerName ?? 'Seseorang',
+  });
+}
+
+/** Gift yang masuk saat app di latar belakang / socket terputus: putar efeknya begitu app dibuka lagi. */
+export async function replayMissedGifts(myId: number | undefined, isHost: boolean) {
+  try {
+    const convs = await api.get<Conversation[]>('/api/conversations');
+    for (const c of convs.filter((x) => x.unread > 0).slice(0, 5)) {
+      const msgs = await api.get<Message[]>(`/api/conversations/${c.id}/messages?limit=8`);
+      for (const m of [...msgs].reverse()) {
+        const fresh = Date.now() - new Date(m.createdAt).getTime() < 10 * 60_000;
+        if (fresh && m.type === 'gift' && m.senderId !== myId) playGiftMessage(m, isHost, c.peer?.displayName);
+      }
+    }
+  } catch {
+    /* abaikan */
+  }
 }
