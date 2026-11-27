@@ -57,16 +57,15 @@ export default function Home() {
         <View style={s.titleRow}>
           <Text style={s.title}>Amora</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-            {isHost ? (
-              <Pressable style={s.iconBtn} onPress={() => router.push('/rankings')} hitSlop={8}>
-                <MaterialCommunityIcons name="trophy" size={22} color="#E0A82E" />
-              </Pressable>
-            ) : (
+            {isHost ? null : (
               <Pressable style={s.coins} onPress={() => router.push('/wallet')}>
                 <Coin size={18} />
                 <Text style={s.coinsText}>{compact(user?.coins ?? 0)}</Text>
               </Pressable>
             )}
+            <Pressable style={s.iconBtn} onPress={() => router.push('/rankings')} hitSlop={8}>
+              <MaterialCommunityIcons name="trophy" size={22} color="#E0A82E" />
+            </Pressable>
             <Pressable style={s.iconBtn} onPress={() => router.push('/search')} hitSlop={8}>
               <Ionicons name="search" size={22} color={colors.text} />
             </Pressable>
