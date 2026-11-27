@@ -213,6 +213,13 @@ server), foto maks 8 MB, video maks 80 MB, batas `host_media_per_day` (awal 30) 
   membuka mendapat 402; mendukung Range untuk video). Sertakan folder ini dalam cadangan.
 - API: `POST /api/conversations/:id/private-media` (multipart `file` + `price`), `POST /api/conversations/:id/media/:messageId/unlock`.
 
+## Orang asing (pengunjung profil host)
+
+Tiap kali pengguna membuka profil host, dicatat di `profile_views` (jumlah kunjungan dan waktu terakhir; kunjungan sendiri/host tidak
+dihitung). `GET /api/members/visitors` (khusus host) mengembalikan pengunjung yang **belum punya percakapan** dengan host itu, terbaru dulu,
+tanpa yang saling blokir. Di app: Pesan akun host punya dua chip, "Obrolan" dan "Orang asing"; ketuk baris membuka profil pengguna,
+tombol chat menyapa lebih dulu.
+
 ## Papan peringkat
 
 `GET /api/rankings?type=hosts|senders&period=week|all` (butuh login). `hosts` = host dengan penghasilan diamond terbanyak (chat, gift, kartu

@@ -120,6 +120,15 @@ router.get('/:id', wrap(async (req, res) => {
   if (!rows.length) throw notFound('Host tidak ditemukan');
   if ((await safety.blockerBetween(db, viewer, hostId)) !== null) throw notFound('Host tidak ditemukan');
 
+  // Catat pengunjung profil (pengguna biasa saja; bukan diri sendiri / host lain)
+  if (req.user.role === 'user' && viewer !== hostId) {
+    db.query(
+      `INSERT INTO profile_views (host_id, viewer_id) VALUES ($1, $2)
+       ON CONFLICT (host_id, viewer_id) DO UPDATE SET views = profile_views.views + 1, last_at = now()`,
+      [hostId, viewer]
+    ).catch(() => {});
+  }
+
   const [stats, photos, reply, conv] = await Promise.all([
     db.query(
       `SELECT

@@ -1,6 +1,7 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
+import { Ionicons } from '@expo/vector-icons';
 import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar, Empty, Loading } from '@/components/ui';
@@ -8,9 +9,11 @@ import { Verified } from '@/components/Verified';
 import { useAuth } from '@/context/auth';
 import { api, errorMessage } from '@/lib/api';
 import { onBlockChange } from '@/lib/blockEvents';
+import { countryName, flag } from '@/lib/countries';
+import { openChatWithMember } from '@/lib/openChat';
 import { onRealtime, onRealtimeConnect } from '@/lib/realtime';
-import { colors, gradients } from '@/lib/theme';
-import type { Conversation, Host, Message } from '@/lib/types';
+import { colors, gradients, radius } from '@/lib/theme';
+import type { Conversation, Host, Message, User } from '@/lib/types';
 
 function time(iso: string | null) {
   if (!iso) return '';
@@ -53,11 +56,24 @@ function OnlineStrip({ hosts }: { hosts: Host[] }) {
   );
 }
 
+type Visitor = User & { views: number; viewedAt: string };
+
+function agoText(iso: string) {
+  const m = (Date.now() - new Date(iso).getTime()) / 60000;
+  if (m < 1) return 'baru saja';
+  if (m < 60) return `${Math.round(m)} mnt lalu`;
+  if (m < 1440) return `${Math.round(m / 60)} jam lalu`;
+  return `${Math.round(m / 1440)} hari lalu`;
+}
+
 export default function Messages() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const [online, setOnline] = useState<Host[]>([]);
   const isUser = user?.role === 'user';
+  const isHost = user?.role === 'host';
+  const [tab, setTab] = useState<'chats' | 'strangers'>('chats');
+  const [visitors, setVisitors] = useState<Visitor[] | null>(null);
 
   const loadOnline = useCallback(() => {
     if (!isUser) return;
@@ -75,6 +91,21 @@ export default function Messages() {
       return () => clearInterval(t);
     }, [loadOnline])
   );
+  // Host: orang asing = pengguna yang melihat profilnya tetapi belum pernah chat
+  const loadVisitors = useCallback(async () => {
+    if (!isHost) return;
+    try {
+      setVisitors(await api.get<Visitor[]>('/api/members/visitors'));
+    } catch {
+      setVisitors((v) => v ?? []);
+    }
+  }, [isHost]);
+  useFocusEffect(
+    useCallback(() => {
+      if (tab === 'strangers') loadVisitors();
+    }, [tab, loadVisitors])
+  );
+
   const [list, setList] = useState<Conversation[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -116,11 +147,74 @@ export default function Messages() {
         <Text style={s.title}>Pesan</Text>
         <OnlineStrip hosts={online} />
       </LinearGradient>
-      <View style={s.tabRow}>
-        <Text style={s.tabOn}>Obrolan</Text>
-        <View style={s.tabBar} />
-      </View>
-      {list === null ? (
+      {isHost ? (
+        <View style={s.chips}>
+          {(
+            [
+              ['chats', 'chatbubbles', 'Obrolan'],
+              ['strangers', 'heart-circle', 'Orang asing'],
+            ] as const
+          ).map(([k, icon, label]) => (
+            <Pressable key={k} onPress={() => setTab(k)} style={[s.chip, tab === k && s.chipOn]}>
+              <Ionicons name={icon} size={18} color={tab === k ? '#fff' : colors.pink} />
+              <Text style={[s.chipText, tab === k && { color: '#fff' }]}>{label}</Text>
+            </Pressable>
+          ))}
+        </View>
+      ) : (
+        <View style={s.tabRow}>
+          <Text style={s.tabOn}>Obrolan</Text>
+          <View style={s.tabBar} />
+        </View>
+      )}
+      {isHost && tab === 'strangers' ? (
+        visitors === null ? (
+          <Loading />
+        ) : (
+          <FlatList
+            data={visitors}
+            keyExtractor={(u) => String(u.id)}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={async () => {
+                  setRefreshing(true);
+                  await loadVisitors();
+                  setRefreshing(false);
+                }}
+                colors={[colors.primary]}
+              />
+            }
+            ListEmptyComponent={<Empty icon="eye-outline" title="Belum ada orang asing" subtitle="Pengguna yang melihat profilmu dan belum pernah chat akan muncul di sini" />}
+            renderItem={({ item }) => (
+              <Pressable
+                style={({ pressed }) => [s.row, pressed && { backgroundColor: colors.surfaceAlt }]}
+                onPress={() => router.push({ pathname: '/member/[id]', params: { id: String(item.id) } })}
+              >
+                <View>
+                  <Avatar uri={item.avatarUrl} name={item.displayName} size={52} />
+                  <View style={[s.statusDot, { backgroundColor: item.online ? colors.online : '#9CA3AF' }]} />
+                </View>
+                <View style={{ flex: 1, gap: 2 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <Text style={s.nameText} numberOfLines={1}>
+                      {item.displayName}
+                    </Text>
+                    {item.verified ? <Verified size={13} /> : null}
+                  </View>
+                  <Text style={s.preview} numberOfLines={1}>
+                    {item.countryCode ? `${flag(item.countryCode)} ${countryName(item.countryCode)} · ` : ''}melihat profilmu {agoText(item.viewedAt)}
+                    {item.views > 1 ? ` · ${item.views}x` : ''}
+                  </Text>
+                </View>
+                <Pressable onPress={() => openChatWithMember(item.id)} hitSlop={8} style={s.sapaBtn}>
+                  <Ionicons name="chatbubble-ellipses" size={18} color="#fff" />
+                </Pressable>
+              </Pressable>
+            )}
+          />
+        )
+      ) : list === null ? (
         <Loading />
       ) : (
         <FlatList
@@ -155,7 +249,7 @@ export default function Messages() {
               onPress={() => router.push({ pathname: '/chat/[id]', params: { id: String(item.id) } })}
             >
               <View>
-                <Avatar uri={item.peer?.avatarUrl} name={item.peer?.displayName} size={58} />
+                <Avatar uri={item.peer?.avatarUrl} name={item.peer?.displayName} size={52} />
                 {item.peer?.online ? <View style={s.onlineDot} /> : null}
               </View>
               <View style={{ flex: 1, gap: 3 }}>
@@ -211,14 +305,20 @@ const s = StyleSheet.create({
     borderColor: colors.surface,
   },
   stripName: { marginTop: 5, fontSize: 12, fontWeight: '700', color: colors.text, maxWidth: 70 },
+  chips: { flexDirection: 'row', gap: 10, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 6 },
+  chip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, height: 36, borderRadius: radius.pill, backgroundColor: '#F1EEF6' },
+  chipOn: { backgroundColor: colors.primary },
+  chipText: { color: colors.text, fontWeight: '600', fontSize: 14 },
+  statusDot: { position: 'absolute', right: 0, bottom: 0, width: 13, height: 13, borderRadius: 7, borderWidth: 2, borderColor: '#fff' },
+  sapaBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
   tabRow: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4 },
   tabOn: { fontSize: 16, fontWeight: '800', color: colors.text },
   tabBar: { marginTop: 5, width: 26, height: 4, borderRadius: 2, backgroundColor: colors.pink },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 11 },
   line: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  nameText: { flexShrink: 1, fontSize: 16, fontWeight: '800', color: colors.text },
-  time: { fontSize: 12, color: colors.textDim },
-  preview: { flex: 1, color: colors.textSub, fontSize: 14 },
+  nameText: { flexShrink: 1, fontSize: 15, fontWeight: '600', color: colors.text },
+  time: { fontSize: 11, color: colors.textDim },
+  preview: { flex: 1, color: colors.textSub, fontSize: 13 },
   onlineDot: {
     position: 'absolute',
     right: 1,

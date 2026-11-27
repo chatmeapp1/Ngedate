@@ -112,3 +112,37 @@ test('akun yang ditangguhkan tidak muncul di peringkat', async () => {
   const sw = (await api('GET', '/api/rankings?type=senders&period=all', { token: t })).body;
   assert.ok(!sw.items.some((x) => x.displayName === 'menengah'));
 });
+
+test('orang asing: pengunjung profil host yang belum punya percakapan; terbaru dulu; jumlah kunjungan', async () => {
+  const host = await makeHost('hostdilihat');
+  const a = await register('pengunjunga');
+  const b = await register('pengunjungb');
+  const c = await register('pengunjungc');
+  const seen = async (u) => api('GET', `/api/hosts/${host.id}`, { token: u.token });
+
+  await seen(a);
+  await seen(b);
+  await seen(a); // a dua kali
+  await api('GET', `/api/hosts/${host.id}`, { token: host.token }); // diri sendiri tidak dihitung
+  await new Promise((r) => setTimeout(r, 200));
+
+  const list = (await api('GET', '/api/members/visitors', { token: host.token })).body;
+  assert.deepEqual(list.map((x) => [x.displayName, x.views]), [['pengunjunga', 2], ['pengunjungb', 1]], 'a paling baru, dihitung 2x');
+  assert.ok(list[0].viewedAt);
+  assert.ok(!('email' in list[0]) && !('coins' in list[0]), 'tidak membocorkan data pribadi');
+
+  // setelah ada percakapan, tidak lagi "orang asing"
+  await api('POST', '/api/conversations', { token: b.token, body: { hostId: host.id } });
+  const after = (await api('GET', '/api/members/visitors', { token: host.token })).body;
+  assert.deepEqual(after.map((x) => x.displayName), ['pengunjunga']);
+
+  // diblokir host: hilang dari daftar
+  await api('POST', '/api/blocks', { token: host.token, body: { userId: a.id } });
+  assert.equal((await api('GET', '/api/members/visitors', { token: host.token })).body.length, 0);
+
+  // hanya host; host lain tidak melihat daftar milik host ini
+  assert.equal((await api('GET', '/api/members/visitors', { token: a.token })).status, 403);
+  const other = await makeHost('hostlain');
+  assert.equal((await api('GET', '/api/members/visitors', { token: other.token })).body.length, 0);
+  void c;
+});

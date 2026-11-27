@@ -53,6 +53,25 @@ router.get('/', wrap(async (req, res) => {
   res.json(rows.map((u) => publicUser(u)));
 }));
 
+/**
+ * "Orang asing": pengguna yang melihat profil host ini tetapi belum punya percakapan dengannya,
+ * terbaru dulu. Tiap item membawa waktu terakhir melihat dan jumlah kunjungan.
+ */
+router.get('/visitors', wrap(async (req, res) => {
+  const page = v.int(req.query.page ?? 1, 'page', { min: 1, max: 1000 });
+  const params = [req.user.id, (page - 1) * PAGE_SIZE];
+  const { rows } = await db.query(
+    `SELECT u.*, pv.views, pv.last_at AS viewed_at
+     FROM profile_views pv JOIN users u ON u.id = pv.viewer_id
+     WHERE pv.host_id = $1 AND u.role = 'user' AND u.status = 'active'
+       AND NOT EXISTS (SELECT 1 FROM conversations c WHERE c.host_id = $1 AND c.user_id = u.id)
+       AND NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker_id = $1 AND b.blocked_id = u.id) OR (b.blocker_id = u.id AND b.blocked_id = $1))
+     ORDER BY pv.last_at DESC LIMIT ${PAGE_SIZE} OFFSET $2`,
+    params
+  );
+  res.json(rows.map((u) => ({ ...publicUser(u), views: u.views, viewedAt: u.viewed_at })));
+}));
+
 router.get('/:id', wrap(async (req, res) => {
   const { rows } = await db.query(`SELECT u.* FROM users u WHERE ${MEMBER_WHERE} AND u.id = $1`, [v.id(req.params.id)]);
   if (!rows.length) throw notFound('Pengguna tidak ditemukan');
