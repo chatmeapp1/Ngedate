@@ -5,9 +5,18 @@ const realtime = require('../realtime');
 const { wrap, notFound } = require('../lib/errors');
 const { publicUser } = require('./serializers');
 const safety = require('../services/safety');
+const { getSettings } = require('../services/settings');
+const { levelOf, vipOf } = require('../services/membership');
 
 const router = express.Router();
 const PAGE_SIZE = 30;
+
+// Level (dari total top up) dan VIP, ditampilkan kepada host di kartu/profil pengguna
+const withBadges = (u, s) => ({
+  ...publicUser(u),
+  level: levelOf(Number(u.topup_total || 0), s.level_thresholds),
+  vip: vipOf(Number(u.topup_total || 0), s.vip_thresholds),
+});
 
 // Pengguna pria yang sudah melengkapi profil (yang dilihat host di Beranda)
 const MEMBER_WHERE = `u.role = 'user' AND u.gender = 'male' AND u.status = 'active' AND u.profile_completed`;
@@ -50,7 +59,8 @@ router.get('/', wrap(async (req, res) => {
     `SELECT u.* FROM users u WHERE ${where.join(' AND ')} ORDER BY ${order} LIMIT ${PAGE_SIZE} OFFSET $${params.length}`,
     params
   );
-  res.json(rows.map((u) => publicUser(u)));
+  const settings = await getSettings();
+  res.json(rows.map((u) => withBadges(u, settings)));
 }));
 
 /**
@@ -69,14 +79,15 @@ router.get('/visitors', wrap(async (req, res) => {
      ORDER BY pv.last_at DESC LIMIT ${PAGE_SIZE} OFFSET $2`,
     params
   );
-  res.json(rows.map((u) => ({ ...publicUser(u), views: u.views, viewedAt: u.viewed_at })));
+  const settings = await getSettings();
+  res.json(rows.map((u) => ({ ...withBadges(u, settings), views: u.views, viewedAt: u.viewed_at })));
 }));
 
 router.get('/:id', wrap(async (req, res) => {
   const { rows } = await db.query(`SELECT u.* FROM users u WHERE ${MEMBER_WHERE} AND u.id = $1`, [v.id(req.params.id)]);
   if (!rows.length) throw notFound('Pengguna tidak ditemukan');
   if ((await safety.blockerBetween(db, req.user.id, rows[0].id)) !== null) throw notFound('Pengguna tidak ditemukan');
-  res.json(publicUser(rows[0]));
+  res.json(withBadges(rows[0], await getSettings()));
 }));
 
 module.exports = router;

@@ -129,6 +129,8 @@ test('orang asing: pengunjung profil host yang belum punya percakapan; terbaru d
   const list = (await api('GET', '/api/members/visitors', { token: host.token })).body;
   assert.deepEqual(list.map((x) => [x.displayName, x.views]), [['pengunjunga', 2], ['pengunjungb', 1]], 'a paling baru, dihitung 2x');
   assert.ok(list[0].viewedAt);
+  assert.equal(list[0].level, 0);
+  assert.equal(list[0].vip, 0);
   assert.ok(!('email' in list[0]) && !('coins' in list[0]), 'tidak membocorkan data pribadi');
 
   // setelah ada percakapan, tidak lagi "orang asing"
@@ -157,4 +159,22 @@ test('presence: status online terbaru untuk daftar ID (butuh login, maks 100)', 
   assert.deepEqual((await api('GET', '/api/presence', { token: u.token })).body, {});
   const many = Array.from({ length: 101 }, (_, i) => i + 1).join(',');
   assert.equal((await api('GET', `/api/presence?ids=${many}`, { token: u.token })).status, 400);
+});
+
+test('host melihat level dan VIP pengguna (dari total top up) di daftar dan profil', async () => {
+  const host = await makeHost('hostmelihat');
+  const vipUser = await register('pengunjungvip');
+  await A('POST', `/api/admin/users/${vipUser.id}/coins`, { amount: 400000 }); // VIP 1, level 5
+  await db.query(`UPDATE users SET gender = 'male', profile_completed = true WHERE id = $1`, [vipUser.id]);
+  await api('GET', `/api/hosts/${host.id}`, { token: vipUser.token });
+  await new Promise((r) => setTimeout(r, 200));
+  const visitors = (await api('GET', '/api/members/visitors', { token: host.token })).body;
+  assert.equal(visitors[0].vip, 1);
+  assert.equal(visitors[0].level, 5);
+  const profile = (await api('GET', `/api/members/${vipUser.id}`, { token: host.token })).body;
+  assert.equal(profile.vip, 1);
+  assert.equal(profile.level, 5);
+  assert.ok(!('topupTotal' in profile) && !('coins' in profile), 'jumlah top up tidak dibuka ke host');
+  const list = (await api('GET', '/api/members', { token: host.token })).body;
+  assert.equal(list.find((x) => x.id === vipUser.id).vip, 1);
 });

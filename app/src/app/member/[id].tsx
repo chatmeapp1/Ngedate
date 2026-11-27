@@ -5,6 +5,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LevelBadge, VipBadge } from '@/components/Badges';
 import { SafetyMenu } from '@/components/SafetyMenu';
 import { Avatar, Empty, GradientButton, Loading } from '@/components/ui';
 import { Verified } from '@/components/Verified';
@@ -13,18 +14,18 @@ import { countryName, flag } from '@/lib/countries';
 import { lastSeen } from '@/lib/format';
 import { openChatWithMember } from '@/lib/openChat';
 import { colors, gradients, radius } from '@/lib/theme';
-import type { User } from '@/lib/types';
+import type { Member } from '@/lib/types';
 
 // Profil pengguna pria — hanya dilihat oleh akun host. Host boleh menyapa duluan (gratis).
 export default function MemberProfile() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
-  const [member, setMember] = useState<User | null>(null);
+  const [member, setMember] = useState<Member | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     api
-      .get<User>(`/api/members/${id}`)
+      .get<Member>(`/api/members/${id}`)
       .then(setMember)
       .catch((e) => setError(errorMessage(e)));
   }, [id]);
@@ -63,15 +64,15 @@ export default function MemberProfile() {
               {member.displayName}
               {member.age ? <Text style={s.age}>  {member.age}</Text> : null}
             </Text>
-            {member.verified ? <Verified size={20} /> : null}
+            {member.verified ? <Verified size={17} /> : null}
+            {member.level != null ? <LevelBadge level={member.level} size={19} style={{ alignSelf: 'center' }} /> : null}
+            {member.vip ? <VipBadge vip={member.vip} size={18} /> : null}
           </View>
           <View style={s.chips}>
-            {member.countryCode ? (
-              <View style={s.chip}>
-                <Text style={{ fontSize: 13 }}>{flag(member.countryCode)}</Text>
-                <Text style={s.chipText}>{countryName(member.countryCode)}</Text>
-              </View>
-            ) : null}
+            <View style={s.chip}>
+              <Text style={{ fontSize: 13 }}>{member.countryCode ? flag(member.countryCode) : '🌐'}</Text>
+              <Text style={s.chipText}>{member.countryCode ? countryName(member.countryCode) : 'Negara belum diisi'}</Text>
+            </View>
             <View style={s.chip}>
               <View style={[s.dot, { backgroundColor: member.online ? colors.online : colors.textDim }]} />
               <Text style={s.chipText}>{lastSeen(member.lastSeenAt, member.online)}</Text>
@@ -114,11 +115,11 @@ const s = StyleSheet.create({
   menuFloat: { position: 'absolute', right: 14 },
   backFloat: { position: 'absolute', left: 14, width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(0,0,0,0.35)', alignItems: 'center', justifyContent: 'center' },
   info: { position: 'absolute', left: 16, right: 16, bottom: 16, gap: 8 },
-  name: { color: '#fff', fontSize: 28, fontWeight: '900', flexShrink: 1 },
-  age: { fontSize: 20, fontWeight: '600', color: 'rgba(255,255,255,0.85)' },
+  name: { color: '#fff', fontSize: 21, fontWeight: '600', flexShrink: 1 },
+  age: { fontSize: 16, fontWeight: '500', color: 'rgba(255,255,255,0.85)' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(0,0,0,0.4)', paddingHorizontal: 10, height: 26, borderRadius: radius.pill },
-  chipText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  chipText: { color: '#fff', fontSize: 11, fontWeight: '600' },
   dot: { width: 8, height: 8, borderRadius: 4 },
   body: { padding: 16, gap: 14 },
   bio: { fontSize: 15, color: colors.text, lineHeight: 22 },

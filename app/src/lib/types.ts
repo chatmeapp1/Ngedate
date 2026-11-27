@@ -52,6 +52,12 @@ export interface Membership {
   freeCardsLeft: number;
 }
 
+/** pengguna yang dilihat host: level & VIP dari total top up */
+export interface Member extends User {
+  level?: number;
+  vip?: number;
+}
+
 export interface Host extends User {
   /** level host (0-10) dari total pendapatan */
   level?: number;
