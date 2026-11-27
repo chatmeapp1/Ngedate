@@ -120,20 +120,23 @@ export default function Rankings() {
   const { width } = useWindowDimensions();
   const [kind, setKind] = useState<Kind>('gifts');
   const [period, setPeriod] = useState<Period>('week');
-  const [items, setItems] = useState<(Entry | GiftEntry)[] | null>(null);
+  // Data selalu disimpan bersama tab/periode asalnya, supaya data tab lama tidak pernah dirender dengan tampilan tab lain
+  const [data, setData] = useState<{ kind: Kind; period: Period; items: (Entry | GiftEntry)[] } | null>(null);
+  const items = data && data.kind === kind && data.period === period ? data.items : null;
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
+    const k = kind;
+    const p = period;
     try {
-      const r = await api.get<{ items: (Entry | GiftEntry)[] }>(`/api/rankings?type=${kind}&period=${period}`);
-      setItems(r.items);
+      const r = await api.get<{ items: (Entry | GiftEntry)[] }>(`/api/rankings?type=${k}&period=${p}`);
+      setData({ kind: k, period: p, items: r.items });
     } catch {
-      setItems([]);
+      setData({ kind: k, period: p, items: [] });
     }
   }, [kind, period]);
 
   useEffect(() => {
-    setItems(null);
     load();
   }, [load]);
 
@@ -141,7 +144,7 @@ export default function Rankings() {
   const open = (e: Entry) => {
     if (kind === 'hosts') openHost(e.id);
   };
-  const people = kind === 'gifts' ? [] : ((items ?? []) as Entry[]);
+  const people = kind === 'gifts' ? [] : ((items ?? []) as Entry[]).filter((e) => typeof e.displayName === 'string');
   const top = people.slice(0, 3);
   const rest = people.slice(3);
   const frameW = width - 16;
