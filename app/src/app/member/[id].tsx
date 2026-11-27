@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LevelBadge, VipBadge } from '@/components/Badges';
+import { FramedAvatar } from '@/components/FramedAvatar';
 import { SafetyMenu } from '@/components/SafetyMenu';
 import { Avatar, Empty, GradientButton, Loading } from '@/components/ui';
 import { Verified } from '@/components/Verified';
@@ -59,6 +60,9 @@ export default function MemberProfile() {
           <SafetyMenu light userId={member.id} name={member.displayName} onBlocked={() => router.back()} />
         </View>
         <View style={s.info}>
+          <View style={{ alignSelf: 'flex-start' }}>
+            <FramedAvatar uri={member.avatarUrl} name={member.displayName} size={40} vip={member.vip ?? 0} />
+          </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <Text style={s.name} numberOfLines={1}>
               {member.displayName}

@@ -11,6 +11,7 @@ import { GiftSheet } from '@/components/GiftSheet';
 import { SafetyMenu } from '@/components/SafetyMenu';
 import { Avatar, Coin, Empty, Loading } from '@/components/ui';
 import { HostLevelBadge } from '@/components/Badges';
+import { FramedAvatar } from '@/components/FramedAvatar';
 import { Verified } from '@/components/Verified';
 import { useAuth } from '@/context/auth';
 import { api, errorMessage } from '@/lib/api';
@@ -130,6 +131,9 @@ export default function HostProfileScreen() {
 
           <View style={s.identity}>
             <View style={{ flex: 1 }}>
+              <View style={{ alignSelf: 'flex-start', marginBottom: 8 }}>
+                <FramedAvatar uri={host.avatarUrl} name={host.displayName} size={40} />
+              </View>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <Text style={[s.name, { flexShrink: 1 }]} numberOfLines={1}>
                   {host.displayName}

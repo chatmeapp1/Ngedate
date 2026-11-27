@@ -6,6 +6,7 @@ import type { ComponentProps } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HostLevelBadge, LevelBadge, VipBadge } from '@/components/Badges';
+import { FramedAvatar } from '@/components/FramedAvatar';
 import { Avatar, Coin } from '@/components/ui';
 import { Verified } from '@/components/Verified';
 import { versionLabel } from '@/components/UpdateWatcher';
@@ -134,7 +135,7 @@ export default function Me() {
       {isHost ? null : (
       <LinearGradient colors={gradients.header} style={{ paddingTop: insets.top + 20, paddingHorizontal: 16, paddingBottom: 8 }}>
         <View style={s.profile}>
-          <Avatar uri={user.avatarUrl} name={user.displayName} size={78} />
+          <FramedAvatar uri={user.avatarUrl} name={user.displayName} size={72} vip={m?.vip ?? 0} />
           <View style={{ flex: 1, gap: 6 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <Text style={[s.name, { flexShrink: 1 }]} numberOfLines={1}>
