@@ -92,6 +92,16 @@ test('peringkat host (penghasilan) dan pengirim gift (belanja koin), mingguan da
   const sw = (await api('GET', '/api/rankings?type=senders&period=week', { token: rich.token })).body;
   assert.deepEqual(sw.items.map((x) => x.displayName), ['menengah']);
 
+  // gift tunggal terbesar: pengirim -> gift -> host
+  await db.query(`UPDATE messages SET created_at = now() WHERE type = 'gift'`);
+  const gifts = (await api('GET', '/api/rankings?type=gifts&period=week', { token: rich.token })).body;
+  assert.deepEqual(gifts.items.map((x) => [x.sender.displayName, x.host.displayName, x.score, x.count, x.gift.name]), [
+    ['sultan', 'hostjuara', 50000, 50, 'Mawar'],
+    ['menengah', 'hostjuara', 10000, 10, 'Mawar'],
+    ['menengah', 'hostkedua', 5000, 5, 'Mawar'],
+  ]);
+  assert.equal(gifts.items[0].rank, 1);
+
   assert.equal((await api('GET', '/api/rankings?type=hacker', { token: rich.token })).status, 400);
   assert.equal((await api('GET', '/api/rankings')).status, 401);
 });
