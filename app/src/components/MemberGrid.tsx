@@ -25,14 +25,8 @@ const MemberCard = memo(function MemberCard({ member, onPress }: { member: User;
       <LinearGradient colors={gradients.photoFade} style={s.fade} />
 
       <View style={s.top}>
-        {member.online ? (
-          <View style={s.online}>
-            <View style={s.dot} />
-            <Text style={s.onlineText}>Online</Text>
-          </View>
-        ) : (
-          <View />
-        )}
+        {/* Status: bulat hijau = online, abu-abu = offline */}
+        <View style={[s.statusDot, { backgroundColor: member.online ? colors.online : '#9CA3AF' }]} />
         {member.countryCode ? (
           <View style={s.country}>
             <Text style={{ fontSize: 13 }}>{flag(member.countryCode)}</Text>
@@ -118,6 +112,7 @@ const s = StyleSheet.create({
   placeholder: { alignItems: 'center', justifyContent: 'center' },
   fade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '40%' },
   top: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 10, gap: 6 },
+  statusDot: { width: 14, height: 14, borderRadius: 7, borderWidth: 2, borderColor: '#fff' },
   online: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -142,6 +137,6 @@ const s = StyleSheet.create({
   countryText: { color: '#fff', fontSize: 11, fontWeight: '700', flexShrink: 1 },
   bottom: { position: 'absolute', left: 12, right: 10, bottom: 12, flexDirection: 'row', alignItems: 'center', gap: 8 },
   msgBtn: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' },
-  name: { color: '#fff', fontSize: 16, fontWeight: '800' },
-  age: { fontSize: 13, fontWeight: '600', color: 'rgba(255,255,255,0.85)' },
+  name: { color: '#fff', fontSize: 14, fontWeight: '600' },
+  age: { fontSize: 12, fontWeight: '500', color: 'rgba(255,255,255,0.85)' },
 });
