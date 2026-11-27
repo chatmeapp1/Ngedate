@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import type { ComponentProps } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -13,6 +13,7 @@ import { versionLabel } from '@/components/UpdateWatcher';
 import * as Clipboard from 'expo-clipboard';
 import Constants from 'expo-constants';
 import { useAuth } from '@/context/auth';
+import { api } from '@/lib/api';
 import { countryName, flag } from '@/lib/countries';
 import { number } from '@/lib/format';
 import { colors, gradients, radius } from '@/lib/theme';
@@ -120,10 +121,19 @@ function HostHeader({ top }: { top: number }) {
 export default function Me() {
   const insets = useSafeAreaInsets();
   const { user, logout, refreshMe } = useAuth();
+  // Menu Gaji pokok hanya muncul untuk host yang ditambahkan admin ke program
+  const [salaryOn, setSalaryOn] = useState(false);
+  const isHostRole = user?.role === 'host';
   useFocusEffect(
     useCallback(() => {
       refreshMe();
-    }, [refreshMe])
+      if (isHostRole) {
+        api
+          .get<{ enrolled: boolean }>('/api/salary')
+          .then((r) => setSalaryOn(r.enrolled))
+          .catch(() => {});
+      }
+    }, [refreshMe, isHostRole])
   );
   if (!user) return null;
   const isHost = user.role === 'host';
@@ -230,6 +240,7 @@ export default function Me() {
           <>
             <Item icon="eye-outline" label="Lihat profil saya" onPress={() => router.push({ pathname: '/host/[id]', params: { id: String(user.id) } })} />
             <Item icon="calendar-outline" label="Tugas harian" onPress={() => router.push('/tasks')} />
+            {salaryOn ? <Item icon="wallet-outline" label="Gaji pokok" onPress={() => router.push('/salary')} /> : null}
             <Item icon="options-outline" label="Pengaturan host (tarif & WhatsApp)" onPress={() => router.push('/host-settings')} />
             {!user.verified ? (
               <Item

@@ -345,3 +345,17 @@ export interface HostTask {
   go: 'moment' | 'photos' | 'checkin' | 'like' | string;
   state: 'todo' | 'claimable' | 'done';
 }
+
+export interface SalaryStatus {
+  enrolled: boolean;
+  minutesPerDay?: number;
+  daysRequired?: number;
+  incomeTarget?: number;
+  reward?: number;
+  todayMinutes?: number;
+  validDays?: number;
+  income?: number;
+  weekEndsIn?: number;
+  paid?: boolean;
+  met?: boolean;
+}

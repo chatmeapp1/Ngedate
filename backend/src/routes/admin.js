@@ -503,6 +503,24 @@ router.patch('/packages/:id', wrap(async (req, res) => {
   }
 }));
 
+// Gaji pokok host
+router.get('/salary', wrap(async (req, res) => {
+  res.json(await require('../services/salary').adminList());
+}));
+router.get('/salary/risk', wrap(async (req, res) => {
+  res.json(await require('../services/salary').risk(Number(req.query.reward) || 0, Number(req.query.target) || 0));
+}));
+router.post('/salary', wrap(async (req, res) => {
+  res.status(201).json(await require('../services/salary').adminSave(req.user.id, req.body.hostId, req.body || {}, { create: true }));
+}));
+router.patch('/salary/:hostId', wrap(async (req, res) => {
+  res.json(await require('../services/salary').adminSave(req.user.id, req.params.hostId, req.body || {}, { create: false }));
+}));
+router.delete('/salary/:hostId', wrap(async (req, res) => {
+  await require('../services/salary').adminRemove(req.params.hostId);
+  res.json({ ok: true });
+}));
+
 // Moderasi momen: foto host harus disetujui dulu
 router.get('/moments', wrap(async (req, res) => {
   const status = ['pending', 'approved', 'rejected'].includes(req.query.status) ? req.query.status : 'pending';

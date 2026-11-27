@@ -577,6 +577,60 @@ async function pageMoments() {
   return root;
 }
 
+// ----- Gaji pokok host -----
+async function pageSalary() {
+  const list = await get('/api/admin/salary');
+  const root = h('div', {}, ...pageHead('Gaji pokok host', 'Host yang ditambahkan di sini mendapat gaji pokok mingguan (Senin-Minggu, WIB) secara otomatis setelah online cukup lama di app dan target pendapatan chat + gift tercapai. Gaji dibayar dalam diamond.'));
+
+  const fields = (v) => [
+    { name: 'minutesPerDay', label: 'Online di app per hari (menit)', type: 'number', value: v.minutesPerDay ?? 120 },
+    { name: 'daysRequired', label: 'Jumlah hari yang harus terpenuhi per minggu (1-7)', type: 'number', value: v.daysRequired ?? 5 },
+    { name: 'incomeTarget', label: 'Target pendapatan chat + gift per minggu (diamond)', type: 'number', value: v.incomeTarget ?? 70000, hint: 'Pesan gratis dan penghasilan lain tidak dihitung.' },
+    { name: 'reward', label: 'Gaji pokok (diamond)', type: 'number', value: v.reward ?? 70000, hint: 'Diamond host bisa ditarik jadi uang. 1 diamond ≈ Rp 2,55.' },
+  ];
+
+  // Cek perkiraan risiko rugi dulu; kalau berisiko, minta konfirmasi sebelum disimpan
+  const save = async (hostId, vals, create) => {
+    const body = { hostId, minutesPerDay: +vals.minutesPerDay, daysRequired: +vals.daysRequired, incomeTarget: +vals.incomeTarget, reward: +vals.reward };
+    const rk = await act(() => get('/api/admin/salary/risk?reward=' + body.reward + '&target=' + body.incomeTarget));
+    if (!rk) return false;
+    if (rk.risky) {
+      const rp = (n) => 'Rp ' + Math.abs(n).toLocaleString('id-ID');
+      const ok = await confirmModal('Berisiko rugi',
+        'Gaji ' + body.reward.toLocaleString('id-ID') + ' diamond (± ' + rp(rk.salaryRp) + ') lebih besar dari untung app bila target dicapai hanya lewat CHAT: rugi ± ' + rp(rk.chatOnly.lossRp) + ' per host per minggu. ' +
+        'Jika target dicapai lewat GIFT, app tetap untung ± ' + rp(rk.giftOnly.lossRp) + '. Tetap simpan?', 'Tetap simpan');
+      if (!ok) return false;
+      body.force = true;
+    }
+    return act(() => (create ? post('/api/admin/salary', body) : patch('/api/admin/salary/' + hostId, body)), 'Disimpan');
+  };
+
+  root.append(h('div', { class: 'row', style: 'margin-bottom:14px' },
+    h('button', { class: 'btn pri', onclick: async () => {
+      const r = await formModal({ title: 'Tambah host ke gaji pokok', submit: 'Tambah', fields: [{ name: 'hostId', label: 'ID host', type: 'number', hint: 'ID 6 digit host, mis. 100002 (lihat di menu Pengguna).' }, ...fields({})] });
+      if (r && (await save(+r.hostId, r, true))) render();
+    } }, '+ Tambah host')));
+
+  if (!list.length) { root.append(empty('Belum ada host di program gaji pokok')); return root; }
+  const bar = (v, max) => h('div', { class: 'progress', style: 'height:6px;margin:4px 0' }, h('i', { style: 'width:' + Math.min(100, max ? (v / max) * 100 : 0) + '%' }));
+  root.append(h('div', { class: 'grid g3' }, list.map((e) => h('div', { class: 'card', style: e.active ? '' : 'opacity:.55' },
+    h('div', { class: 'row' }, h('b', { class: 'sp' }, e.displayName), h('span', { class: 'pill ' + (e.paid ? 'green' : e.active ? 'purple' : '') }, e.paid ? 'Dibayar minggu ini' : e.active ? 'Berjalan' : 'Nonaktif')),
+    h('div', { class: 'dim' }, '@' + e.username + ' · ID ' + e.hostId),
+    h('div', { class: 'dim', style: 'margin:8px 0 4px' }, e.minutesPerDay + ' menit/hari × ' + e.daysRequired + ' hari · target ' + e.incomeTarget.toLocaleString('id-ID') + ' · gaji ' + e.reward.toLocaleString('id-ID')),
+    h('div', {}, 'Hari valid ' + e.validDays + '/' + e.daysRequired), bar(e.validDays, e.daysRequired),
+    h('div', {}, 'Pendapatan ' + e.income.toLocaleString('id-ID') + '/' + e.incomeTarget.toLocaleString('id-ID')), bar(e.income, e.incomeTarget),
+    h('div', { class: 'dim' }, 'Online hari ini ' + e.todayMinutes + '/' + e.minutesPerDay + ' menit'),
+    e.active ? h('div', { class: 'row', style: 'margin-top:10px;gap:6px' },
+      h('button', { class: 'btn sm', onclick: async () => {
+        const r = await formModal({ title: 'Ubah gaji pokok ' + e.displayName, fields: fields(e) });
+        if (r && (await save(e.hostId, r, false))) render();
+      } }, 'Ubah'),
+      h('button', { class: 'btn bad sm', onclick: async () => {
+        if (await confirmModal('Keluarkan dari gaji pokok', e.displayName + ' tidak lagi mengikuti program, menu Gaji pokok di app-nya hilang.', 'Keluarkan') && (await act(() => del('/api/admin/salary/' + e.hostId), 'Dikeluarkan'))) render();
+      } }, 'Keluarkan')) : null))));
+  return root;
+}
+
 // ----- Pengguna -----
 const filt = { q: '', role: '', status: '' };
 async function pageUsers(param) {
@@ -1202,6 +1256,7 @@ const pages = {
   verifikasi: { title: 'Verifikasi wajah', icon: '🪪', fn: pageVerifikasi, badge: () => stats && stats.pending.verifications },
   foto: { title: 'Foto host', icon: '🖼️', fn: pagePhotos, badge: () => stats && stats.pending.photos + stats.pending.avatars },
   momen: { title: 'Momen host', icon: '📸', fn: pageMoments, badge: () => stats && stats.pending.moments },
+  gaji: { title: 'Gaji pokok host', icon: '🧾', fn: pageSalary },
   pengguna: { title: 'Pengguna', icon: '👥', fn: pageUsers },
   topup: { title: 'Top up koin', icon: '💰', fn: pageTopup },
   paket: { title: 'Paket koin', icon: '🪙', fn: pagePackages },

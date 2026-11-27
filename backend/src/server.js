@@ -4,6 +4,7 @@ const { createApp } = require('./app');
 const realtime = require('./realtime');
 const { migrate } = require('./migrate');
 const { startRefundJob } = require('./jobs/refund');
+const { startSalaryJob } = require('./jobs/salary');
 
 async function main() {
   await migrate();
@@ -11,6 +12,7 @@ async function main() {
   const server = http.createServer(app);
   realtime.attach(server);
   startRefundJob(config.refundJobIntervalMs);
+  startSalaryJob();
   server.listen(config.port, () => console.log(`Ngedate backend jalan di port ${config.port}`));
 }
 

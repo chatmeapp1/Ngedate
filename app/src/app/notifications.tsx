@@ -16,6 +16,7 @@ const META: Record<string, { icon: React.ComponentProps<typeof Ionicons>['name']
   moment: { icon: 'images', color: '#EC4899' },
   agency: { icon: 'business', color: '#0EA5E9' },
   withdraw: { icon: 'cash', color: '#22C55E' },
+  salary: { icon: 'wallet', color: '#F59E0B' },
 };
 
 function when(iso: string) {
