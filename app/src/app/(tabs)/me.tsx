@@ -141,7 +141,7 @@ export default function Me() {
                 {user.displayName}
               </Text>
               {user.verified ? <Verified size={20} /> : null}
-              {m ? (isHost ? <HostLevelBadge level={m.level} size={16} style={{ alignSelf: 'center' }} /> : <LevelBadge level={m.level} size={22} style={{ alignSelf: 'center' }} />) : null}
+              {m ? (isHost ? <HostLevelBadge level={m.level} size={16} style={{ alignSelf: 'center' }} /> : <LevelBadge level={m.level} size={15} style={{ alignSelf: 'center' }} />) : null}
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <View style={s.idChip}>
@@ -151,7 +151,7 @@ export default function Me() {
               <Text style={s.meta}>
                 {flag(user.countryCode)} {countryName(user.countryCode)}
               </Text>
-              {!isHost && m && m.vip > 0 ? <VipBadge vip={m.vip} size={20} /> : null}
+              {!isHost && m && m.vip > 0 ? <VipBadge vip={m.vip} size={17} /> : null}
             </View>
             {isHost ? (
               <View style={s.hostBadge}>
@@ -178,7 +178,7 @@ export default function Me() {
                   <View style={[s.fill, { width: `${Math.max(3, Math.round(m.levelProgress * 100))}%` }]} />
                 </View>
               </View>
-              {isHost ? <HostLevelBadge level={m.level} size={26} /> : <LevelBadge level={m.level} size={40} />}
+              {isHost ? <HostLevelBadge level={m.level} size={26} /> : <LevelBadge level={m.level} size={24} />}
               <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.7)" />
             </LinearGradient>
           </Pressable>
@@ -263,7 +263,7 @@ export default function Me() {
 
 const s = StyleSheet.create({
   profile: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  name: { fontSize: 19, fontWeight: '600', color: colors.text },
+  name: { fontSize: 16, fontWeight: '600', color: colors.text },
   meta: { color: colors.textSub, fontSize: 13 },
   hostBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', backgroundColor: colors.primary, paddingHorizontal: 8, height: 22, borderRadius: radius.pill },
   hostBadgeText: { color: '#fff', fontSize: 11, fontWeight: '800' },
@@ -293,7 +293,7 @@ const s = StyleSheet.create({
   idLabel: { color: '#F59E5B', fontWeight: '900', fontSize: 12 },
   idValue: { color: colors.textSub, fontWeight: '700', fontSize: 13 },
   levelCard: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: radius.lg, padding: 16 },
-  levelTitle: { color: '#FFE3A8', fontSize: 28, fontWeight: '900' },
+  levelTitle: { color: '#FFE3A8', fontSize: 19, fontWeight: '700' },
   levelSub: { color: 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: '600' },
   track: { height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.2)', overflow: 'hidden' },
   fill: { height: 6, borderRadius: 3, backgroundColor: '#FFD98A' },
