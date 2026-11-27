@@ -177,39 +177,42 @@ test('admin menghapus host dari program; daftar admin menampilkan progres', asyn
   assert.equal((await A('POST', '/api/admin/salary', { hostId: host.id, reward: 20000, incomeTarget: 70000 })).status, 201);
 });
 
-test('penghasilan sebelum didaftarkan dan diamond yang sudah ditarik tidak dihitung (lihat saldo diamond)', async () => {
+test('penghasilan sebelum didaftarkan tidak dihitung; penarikan sesudahnya tidak mengurangi progres', async () => {
   const host = await makeHost('hostwd');
   // 70.000 diamond didapat SEBELUM didaftarkan ke gaji pokok
   await earn(host, 70000);
   await A('POST', '/api/admin/salary', { hostId: host.id, reward: 20000, incomeTarget: 70000 });
   assert.equal((await mySalary(host)).income, 0, 'penghasilan sebelum didaftarkan tidak dihitung');
 
-  // setelah didaftarkan: dapat 70.000, progres penuh
+  // setelah didaftarkan: dapat 70.000 -> progres penuh
   await earn(host, 70000);
   assert.equal((await mySalary(host)).income, 70000);
 
-  // lalu 30.000 ditarik: progres berkurang (pengajuan penarikan menahan diamond)
+  // lalu ditarik 100.000: progres yang sudah selesai TIDAK berkurang
   await db.tx(async (c) => {
-    await wallet.debitDiamonds(c, host.id, 30000, 'withdraw_hold', { type: 'test', id: 1 });
+    await wallet.debitDiamonds(c, host.id, 100000, 'withdraw_hold', { type: 'test', id: 1 });
     await c.query(
       `INSERT INTO withdrawals (user_id, diamonds, currency, diamonds_per_usd, usd_idr, gross, fee, net, kind, provider, account_number, status)
-       VALUES ($1, 30000, 'IDR', 6667, 17000, 76500, 0, 76500, 'bank', 'BCA', '123', 'pending')`,
+       VALUES ($1, 100000, 'IDR', 6667, 17000, 255000, 0, 255000, 'bank', 'BCA', '123', 'paid')`,
       [host.id]
     );
   });
-  assert.equal((await mySalary(host)).income, 40000, 'diamond yang ditarik dikurangi');
-  // penarikan ditolak/dibatalkan: diamond kembali, tidak mengurangi progres lagi
-  await db.query(`UPDATE withdrawals SET status = 'rejected' WHERE user_id = $1`, [host.id]);
-  await db.tx((c) => wallet.creditDiamonds(c, host.id, 30000, 'withdraw_refund', { type: 'test', id: 1 }));
-  assert.equal((await mySalary(host)).income, 70000);
-
-  // progres tidak pernah melebihi saldo diamond saat ini
-  await db.query(`UPDATE users SET diamonds = 5000 WHERE id = $1`, [host.id]);
-  assert.equal((await mySalary(host)).income, 5000);
-  await db.query(`UPDATE users SET diamonds = 90000 WHERE id = $1`, [host.id]);
+  assert.equal((await mySalary(host)).income, 70000, 'penarikan tidak mengurangi progres');
 
   // keluar lalu didaftarkan lagi: penghasilan lama tidak ikut
   await A('DELETE', `/api/admin/salary/${host.id}`);
   await A('POST', '/api/admin/salary', { hostId: host.id, reward: 20000, incomeTarget: 70000 });
   assert.equal((await mySalary(host)).income, 0);
+});
+
+test('target tercapai lalu langsung ditarik: gaji tetap dibayar setelah hari valid terpenuhi', async () => {
+  const host = await makeHost('hostwdbayar');
+  await A('POST', '/api/admin/salary', { hostId: host.id, reward: 20000, incomeTarget: 70000 });
+  for (let i = 0; i < 5; i++) await setOnline(host, i, 7200);
+  await earn(host, 70000);
+  // semua diamond ditarik sebelum diperiksa
+  await db.tx((c) => wallet.debitDiamonds(c, host.id, 70000, 'withdraw_hold', { type: 'test', id: 2 }));
+  assert.equal(await diamonds(host), 0);
+  assert.equal(await salary.evaluate(host.id), 20000, 'target yang sudah tercapai tidak hilang karena ditarik');
+  assert.equal(await diamonds(host), 20000);
 });

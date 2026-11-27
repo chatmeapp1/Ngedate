@@ -12,9 +12,9 @@ const { notFound, badRequest } = require('../lib/errors');
  *   - penghasilan diamond dari pesan chat + gift minggu ini >= income_target
  * Waktu online dicatat saat koneksi realtime host terbuka (app dibuka di layar depan).
  *
- * Penghasilan yang dihitung: diamond dari chat + gift SEJAK host didaftarkan (enrolled_at) pada minggu ini,
- * dikurangi diamond yang sudah ditarik (withdraw), dan tidak boleh melebihi saldo diamond host saat ini.
- * Jadi diamond yang sudah ditarik atau diperoleh sebelum didaftarkan tidak ikut terhitung.
+ * Penghasilan yang dihitung: diamond dari chat + gift yang diperoleh SEJAK host didaftarkan (enrolled_at) pada minggu ini.
+ * Penghasilan sebelum didaftarkan tidak ikut terhitung. Penarikan (withdraw) sesudah didaftarkan TIDAK mengurangi
+ * progres: diamond yang sudah menjadi progres tetap terhitung walau kemudian ditarik.
  */
 const TODAY_SQL = `(now() AT TIME ZONE 'Asia/Jakarta')::date`;
 const WEEK_SQL = `date_trunc('week', now() AT TIME ZONE 'Asia/Jakarta')::date`;
@@ -41,12 +41,8 @@ async function progress(client, hostId) {
        COALESCE((SELECT seconds FROM host_online_daily WHERE host_id = s.host_id AND day = ${TODAY_SQL}), 0) AS today_seconds,
        (SELECT COUNT(*) FROM host_online_daily d WHERE d.host_id = s.host_id AND d.day >= ${WEEK_SQL}
           AND d.seconds >= s.minutes_per_day * 60)::int AS valid_days,
-       GREATEST(0, LEAST(
-         (SELECT COALESCE(SUM(l.amount), 0) FROM ledger l WHERE l.user_id = s.host_id AND l.currency = 'diamond' AND l.amount > 0
-            AND l.reason IN ${INCOME_REASONS} AND l.created_at >= ${START_SQL})
-         - (SELECT COALESCE(SUM(w.diamonds), 0) FROM withdrawals w WHERE w.user_id = s.host_id AND w.status IN ('pending', 'paid')
-            AND w.created_at >= ${START_SQL}),
-         (SELECT diamonds FROM users WHERE id = s.host_id)))::bigint AS income,
+       (SELECT COALESCE(SUM(l.amount), 0) FROM ledger l WHERE l.user_id = s.host_id AND l.currency = 'diamond' AND l.amount > 0
+          AND l.reason IN ${INCOME_REASONS} AND l.created_at >= ${START_SQL})::bigint AS income,
        (SELECT created_at FROM host_salary_payouts p WHERE p.host_id = s.host_id AND p.week_start = ${WEEK_SQL}) AS paid_at
      FROM host_salary s WHERE s.host_id = $1`,
     [hostId]
