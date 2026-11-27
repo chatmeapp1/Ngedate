@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { ComponentProps } from 'react';
 import { useAuth } from '@/context/auth';
 import { useRealtime } from '@/context/realtime';
@@ -16,6 +17,7 @@ function icon(active: IconName, inactive: IconName) {
 export default function TabsLayout() {
   const { unread } = useRealtime();
   const { user } = useAuth();
+  const insets = useSafeAreaInsets(); // jangan mepet ke tombol navigasi Android
   const isUser = user?.role === 'user'; // pengguna: saldo ada di profil, ada menu Match
   return (
     <Tabs
@@ -23,7 +25,7 @@ export default function TabsLayout() {
         headerShown: false,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textDim,
-        tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border, height: 64, paddingTop: 6 },
+        tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border, height: 62 + insets.bottom, paddingTop: 6, paddingBottom: insets.bottom + 4 },
         tabBarLabelStyle: { fontSize: 11, fontWeight: '700' },
       }}
     >
