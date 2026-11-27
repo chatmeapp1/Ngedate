@@ -275,3 +275,22 @@ export interface TopupInfo {
   note: string;
   packages: CoinPackage[];
 }
+
+export interface Moment {
+  id: number;
+  body: string | null;
+  imageUrl: string | null;
+  views: number;
+  likes: number;
+  comments: number;
+  liked: boolean;
+  createdAt: string;
+  host: { id: number; displayName: string; avatarUrl: string | null; verified: boolean };
+}
+
+export interface MomentComment {
+  id: number;
+  body: string;
+  createdAt: string;
+  user: { id: number; displayName: string; avatarUrl: string | null; verified: boolean; role: Role; level: number | null };
+}

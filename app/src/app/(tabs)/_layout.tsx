@@ -25,6 +25,7 @@ export default function TabsLayout() {
       }}
     >
       <Tabs.Screen name="index" options={{ title: 'Beranda', tabBarIcon: icon('home', 'home-outline') }} />
+      <Tabs.Screen name="moments" options={{ title: 'Momen', tabBarIcon: icon('images', 'images-outline') }} />
       <Tabs.Screen
         name="messages"
         options={{

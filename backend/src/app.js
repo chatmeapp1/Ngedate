@@ -55,6 +55,7 @@ function createApp() {
   app.use('/api/presence', authenticate, require('./routes/presence'));
   app.use('/api/conversations', authenticate, require('./routes/conversations'));
   app.use('/api/media', authenticate, require('./routes/media'));
+  app.use('/api/moments', authenticate, require('./routes/moments'));
   app.use('/api/admin', authenticate, requireRole('admin'), require('./routes/admin'));
 
   app.use((req, res) => res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Endpoint tidak ditemukan' } }));

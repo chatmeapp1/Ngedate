@@ -493,6 +493,13 @@ router.patch('/packages/:id', wrap(async (req, res) => {
   }
 }));
 
+// Moderasi momen: hapus postingan yang melanggar
+router.delete('/moments/:id', wrap(async (req, res) => {
+  const { rows } = await db.query(`DELETE FROM moments WHERE id = $1 RETURNING image_url`, [v.id(req.params.id)]);
+  if (rows.length && rows[0].image_url) await require('../lib/storage').remove(rows[0].image_url);
+  res.json({ ok: true });
+}));
+
 router.delete('/packages/:id', wrap(async (req, res) => {
   const { rowCount } = await db.query(`DELETE FROM coin_packages WHERE id = $1`, [v.id(req.params.id)]);
   if (!rowCount) throw notFound('Paket tidak ditemukan');
