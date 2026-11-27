@@ -4,7 +4,7 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Alert, FlatList, Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GiftIcon } from '@/components/GiftIcon';
 import { GiftSheet } from '@/components/GiftSheet';
@@ -29,6 +29,7 @@ export default function HostProfileScreen() {
   const [wall, setWall] = useState<GiftWall | null>(null);
   const [tab, setTab] = useState<'album' | 'gifts'>('album');
   const [viewer, setViewer] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [giftOpen, setGiftOpen] = useState(false);
 
@@ -54,7 +55,8 @@ export default function HostProfileScreen() {
   }
 
   const isSelf = user?.id === host.id;
-  const cover = host.avatarUrl ?? host.photos[0]?.url ?? null;
+  // Foto utama: foto profil lalu foto album, bisa digeser ke samping
+  const gallery = [...new Set([host.avatarUrl, ...host.photos.map((p) => p.url)].filter((u): u is string => !!u))];
   const giftTotal = host.conversation?.giftTotal ?? 0;
   const threshold = host.waUnlockThreshold ?? 0;
   const waUnlocked = host.conversation?.waUnlocked ?? false;
@@ -88,16 +90,36 @@ export default function HostProfileScreen() {
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 110 }}>
         {/* Foto utama */}
         <View style={{ width, height: width * 1.05 }}>
-          {cover ? (
-            <Pressable style={StyleSheet.absoluteFill} onPress={() => setViewer(cover)}>
-              <Image source={{ uri: cover }} style={StyleSheet.absoluteFill} contentFit="cover" />
-            </Pressable>
+          {gallery.length ? (
+            <FlatList
+              data={gallery}
+              keyExtractor={(u) => u}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              style={StyleSheet.absoluteFill}
+              onMomentumScrollEnd={(e) => setPage(Math.round(e.nativeEvent.contentOffset.x / width))}
+              getItemLayout={(_, i) => ({ length: width, offset: width * i, index: i })}
+              renderItem={({ item }) => (
+                <Pressable style={{ width, height: width * 1.05 }} onPress={() => setViewer(item)}>
+                  <Image source={{ uri: item }} style={StyleSheet.absoluteFill} contentFit="cover" transition={120} />
+                </Pressable>
+              )}
+            />
           ) : (
             <LinearGradient colors={gradients.soft} style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}>
               <Avatar name={host.displayName} size={120} />
             </LinearGradient>
           )}
           <LinearGradient colors={gradients.photoFade} style={s.coverFade} pointerEvents="none" />
+
+          {gallery.length > 1 ? (
+            <View style={[s.pager, { top: insets.top + 20 }]} pointerEvents="none">
+              {gallery.map((u, i) => (
+                <View key={u} style={[s.pagerBar, i === page && s.pagerBarOn]} />
+              ))}
+            </View>
+          ) : null}
 
           <View style={[s.topBar, { top: insets.top + 6 }]}>
             <Pressable onPress={() => router.back()} style={s.roundBtn} hitSlop={8}>
@@ -112,7 +134,7 @@ export default function HostProfileScreen() {
                 <Text style={[s.name, { flexShrink: 1 }]} numberOfLines={1}>
                   {host.displayName}
                 </Text>
-                {host.verified ? <Verified size={22} /> : null}
+                {host.verified ? <Verified size={17} /> : null}
                 {host.level != null ? <HostLevelBadge level={host.level} size={16} style={{ alignSelf: 'center' }} /> : null}
               </View>
               <View style={s.badges}>
@@ -180,9 +202,9 @@ export default function HostProfileScreen() {
         {host.waAvailable && !isSelf ? (
           <LinearGradient colors={['#ECFDF5', '#F0FDF4']} style={s.waCard}>
             <View style={s.waIcon}>
-              <Ionicons name={waUnlocked ? 'logo-whatsapp' : 'lock-closed'} size={22} color="#fff" />
+              <Ionicons name={waUnlocked ? 'logo-whatsapp' : 'lock-closed'} size={15} color="#fff" />
             </View>
-            <View style={{ flex: 1, gap: 6 }}>
+            <View style={{ flex: 1, gap: 4 }}>
               <Text style={s.waTitle}>{waUnlocked ? 'WhatsApp sudah terbuka 🎉' : 'Buka nomor WhatsApp'}</Text>
               {waUnlocked ? (
                 <Text style={s.waSub}>Lihat nomornya di halaman chat.</Text>
@@ -192,7 +214,7 @@ export default function HostProfileScreen() {
                     <LinearGradient colors={['#22C55E', '#16A34A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[s.fill, { width: `${progress * 100}%` }]} />
                   </View>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                    <Coin size={13} />
+                    <Coin size={11} />
                     <Text style={s.waSub}>
                       {compact(giftTotal)} / {compact(threshold)} koin gift
                     </Text>
@@ -331,7 +353,7 @@ const s = StyleSheet.create({
   topBar: { position: 'absolute', left: 12, right: 12, flexDirection: 'row', justifyContent: 'space-between' },
   roundBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.35)', alignItems: 'center', justifyContent: 'center' },
   identity: { position: 'absolute', left: 16, right: 16, bottom: 18, flexDirection: 'row', alignItems: 'flex-end', gap: 12 },
-  name: { color: '#fff', fontSize: 28, fontWeight: '900' },
+  name: { color: '#fff', fontSize: 21, fontWeight: '600' },
   badges: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 },
   badge: {
     flexDirection: 'row',
@@ -342,23 +364,26 @@ const s = StyleSheet.create({
     borderRadius: radius.pill,
     backgroundColor: 'rgba(255,255,255,0.22)',
   },
-  badgeText: { color: '#fff', fontWeight: '700', fontSize: 12 },
+  badgeText: { color: '#fff', fontWeight: '600', fontSize: 11 },
   statusRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', marginTop: 8 },
   dot: { width: 8, height: 8, borderRadius: 4, marginRight: 6 },
-  statusText: { color: 'rgba(255,255,255,0.9)', fontSize: 12, fontWeight: '600' },
+  statusText: { color: 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: '500' },
   followBtn: { width: 64, height: 64, borderRadius: 18, alignItems: 'center', justifyContent: 'center', gap: 2 },
-  followText: { color: '#fff', fontSize: 11, fontWeight: '800' },
+  followText: { color: '#fff', fontSize: 11, fontWeight: '600' },
   bio: { color: colors.textSub, fontSize: 14, lineHeight: 20, paddingHorizontal: 16, paddingTop: 14 },
-  stats: { flexDirection: 'row', alignItems: 'center', paddingVertical: 18, marginHorizontal: 16, borderBottomWidth: 1, borderColor: colors.border },
-  statValue: { fontSize: 22, fontWeight: '900', color: colors.text },
-  statLabel: { fontSize: 12, color: colors.textSub, marginTop: 2 },
+  stats: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, marginHorizontal: 16, borderBottomWidth: 1, borderColor: colors.border },
+  statValue: { fontSize: 16, fontWeight: '600', color: colors.text },
+  statLabel: { fontSize: 11, color: colors.textSub, marginTop: 1 },
   divider: { width: 1, height: 28, backgroundColor: colors.border },
-  waCard: { flexDirection: 'row', alignItems: 'center', gap: 12, margin: 16, marginBottom: 4, padding: 14, borderRadius: radius.md, borderWidth: 1, borderColor: '#BBF7D0' },
-  waIcon: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#22C55E', alignItems: 'center', justifyContent: 'center' },
-  waTitle: { fontWeight: '800', color: '#14532D', fontSize: 15 },
-  waSub: { color: '#166534', fontSize: 12, fontWeight: '600' },
-  track: { height: 8, borderRadius: 4, backgroundColor: '#DCFCE7', overflow: 'hidden' },
-  fill: { height: 8, borderRadius: 4 },
+  waCard: { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 16, marginTop: 10, marginBottom: 2, paddingVertical: 8, paddingHorizontal: 12, borderRadius: radius.sm + 2, borderWidth: 1, borderColor: '#BBF7D0' },
+  waIcon: { width: 30, height: 30, borderRadius: 15, backgroundColor: '#22C55E', alignItems: 'center', justifyContent: 'center' },
+  waTitle: { fontWeight: '600', color: '#14532D', fontSize: 13 },
+  waSub: { color: '#166534', fontSize: 11, fontWeight: '500' },
+  track: { height: 5, borderRadius: 3, backgroundColor: '#DCFCE7', overflow: 'hidden' },
+  fill: { height: 5, borderRadius: 3 },
+  pager: { position: 'absolute', left: 64, right: 64, flexDirection: 'row', gap: 4, justifyContent: 'center' },
+  pagerBar: { flex: 1, maxWidth: 34, height: 3, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.4)' },
+  pagerBarOn: { backgroundColor: '#fff' },
   tabs: { flexDirection: 'row', gap: 28, paddingHorizontal: 16, marginTop: 16, marginBottom: 12, borderBottomWidth: 1, borderColor: colors.border },
   tab: { paddingVertical: 10 },
   tabText: { fontSize: 16, fontWeight: '700', color: colors.textDim },
