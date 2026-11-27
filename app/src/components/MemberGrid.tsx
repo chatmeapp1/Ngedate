@@ -8,11 +8,12 @@ import { Avatar, Empty } from '@/components/ui';
 import { Verified } from '@/components/Verified';
 import { countryName, flag } from '@/lib/countries';
 import { openChatWithMember } from '@/lib/openChat';
+import { usePresence } from '@/lib/usePresence';
 import { colors, gradients, radius } from '@/lib/theme';
 import type { User } from '@/lib/types';
 
 // Kartu pengguna pria (dilihat oleh host): foto, nama, usia, negara, status online
-const MemberCard = memo(function MemberCard({ member, onPress }: { member: User; onPress: () => void }) {
+const MemberCard = memo(function MemberCard({ member, online, onPress }: { member: User; online?: boolean; onPress: () => void }) {
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [s.card, pressed && { transform: [{ scale: 0.98 }] }]}>
       {member.avatarUrl ? (
@@ -26,7 +27,7 @@ const MemberCard = memo(function MemberCard({ member, onPress }: { member: User;
 
       <View style={s.top}>
         {/* Status: bulat hijau = online, abu-abu = offline */}
-        <View style={[s.statusDot, { backgroundColor: member.online ? colors.online : '#9CA3AF' }]} />
+        <View style={[s.statusDot, { backgroundColor: (online ?? member.online) ? colors.online : '#9CA3AF' }]} />
         {member.countryCode ? (
           <View style={s.country}>
             <Text style={{ fontSize: 13 }}>{flag(member.countryCode)}</Text>
@@ -75,6 +76,7 @@ export function MemberGrid({
   header?: ReactElement;
   emptyText?: string;
 }) {
+  const presence = usePresence(members.map((m) => m.id));
   return (
     <FlatList
       data={members}
@@ -87,7 +89,7 @@ export function MemberGrid({
       onEndReachedThreshold={0.6}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />}
       renderItem={({ item }) => (
-        <MemberCard member={item} onPress={() => router.push({ pathname: '/member/[id]', params: { id: String(item.id) } })} />
+        <MemberCard member={item} online={presence[item.id]} onPress={() => router.push({ pathname: '/member/[id]', params: { id: String(item.id) } })} />
       )}
       ListEmptyComponent={
         loading ? null : error ? (

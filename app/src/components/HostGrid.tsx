@@ -4,6 +4,7 @@ import { ActivityIndicator, FlatList, RefreshControl, View } from 'react-native'
 import { HostCard } from '@/components/HostCard';
 import { Empty } from '@/components/ui';
 import { openChat } from '@/lib/openChat';
+import { usePresence } from '@/lib/usePresence';
 import { colors } from '@/lib/theme';
 import type { Host } from '@/lib/types';
 
@@ -29,6 +30,7 @@ export function HostGrid({
   emptyText?: string;
   bottomInset?: number;
 }) {
+  const presence = usePresence(hosts.map((h) => h.id));
   return (
     <FlatList
       data={hosts}
@@ -43,6 +45,7 @@ export function HostGrid({
       renderItem={({ item }) => (
         <HostCard
           host={item}
+          online={presence[item.id]}
           onPress={() => router.push({ pathname: '/host/[id]', params: { id: String(item.id) } })}
           onMessage={() => openChat(item.id)}
         />

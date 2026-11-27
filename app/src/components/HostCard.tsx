@@ -10,7 +10,7 @@ import { compact } from '@/lib/format';
 import { colors, gradients, radius } from '@/lib/theme';
 import type { Host } from '@/lib/types';
 
-function HostCardBase({ host, onPress, onMessage }: { host: Host; onPress: () => void; onMessage: () => void }) {
+function HostCardBase({ host, online, onPress, onMessage }: { host: Host; online?: boolean; onPress: () => void; onMessage: () => void }) {
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [s.card, pressed && { transform: [{ scale: 0.98 }] }]}>
       {host.avatarUrl ? (
@@ -24,7 +24,7 @@ function HostCardBase({ host, onPress, onMessage }: { host: Host; onPress: () =>
 
       <View style={s.top}>
         {/* Status: bulat hijau = online, abu-abu = offline */}
-        <View style={[s.statusDot, { backgroundColor: host.online ? colors.online : '#9CA3AF' }]} />
+        <View style={[s.statusDot, { backgroundColor: (online ?? host.online) ? colors.online : '#9CA3AF' }]} />
         {host.countryCode ? (
           <View style={s.country}>
             <Text style={{ fontSize: 13 }}>{flag(host.countryCode)}</Text>

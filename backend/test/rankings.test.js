@@ -146,3 +146,15 @@ test('orang asing: pengunjung profil host yang belum punya percakapan; terbaru d
   assert.equal((await api('GET', '/api/members/visitors', { token: other.token })).body.length, 0);
   void c;
 });
+
+test('presence: status online terbaru untuk daftar ID (butuh login, maks 100)', async () => {
+  const u = await register('pengecek');
+  assert.equal((await api('GET', '/api/presence?ids=1,2')).status, 401);
+  const r = await api('GET', `/api/presence?ids=${u.id},999999`, { token: u.token });
+  assert.equal(r.status, 200);
+  assert.deepEqual(Object.keys(r.body).sort(), [String(u.id), '999999'].sort());
+  assert.equal(r.body['999999'], false);
+  assert.deepEqual((await api('GET', '/api/presence', { token: u.token })).body, {});
+  const many = Array.from({ length: 101 }, (_, i) => i + 1).join(',');
+  assert.equal((await api('GET', `/api/presence?ids=${many}`, { token: u.token })).status, 400);
+});

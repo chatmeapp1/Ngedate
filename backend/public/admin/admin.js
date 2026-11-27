@@ -463,6 +463,7 @@ async function pageDashboard() {
       stat(fmt(s.gifts24h), 'Koin gift 24 jam'),
       stat(fmt(s.agencies), 'Agency aktif'),
       stat(fmt(s.coinsInWallets), 'Koin di dompet user'),
+      stat(fmt(s.onlineNow || 0), 'Online sekarang'),
       stat(fmt(s.heldCoins), 'Koin ditahan (menunggu balasan)')),
     h('div', { class: 'sec' }, 'Pendapatan platform'),
     h('div', { class: 'card' },

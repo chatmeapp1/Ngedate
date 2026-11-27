@@ -309,6 +309,7 @@ router.get('/stats', wrap(async (req, res) => {
     messages24h: x.messages_24h,
     gifts24h: Number(x.gifts_24h),
     coinsInWallets: Number(x.coins_total),
+    onlineNow: realtime.onlineUserIds().length,
     agencies: x.agencies,
   });
 }));
