@@ -73,7 +73,7 @@ test('host bisa suka & ikuti pengguna; pengguna tidak bisa menyukai pengguna lai
   const follow = await api('POST', `/api/users/${user.id}/follow`, { token: host.token });
   assert.equal(follow.status, 200);
   p = (await api('GET', `/api/members/${user.id}`, { token: host.token })).body;
-  assert.deepEqual([p.isLiked, p.isFollowing, p.likes, p.followers], [true, true, 1, 1]);
+  assert.deepEqual([p.isLiked, p.isFollowing, p.likes, p.followers, p.following], [true, true, 1, 1, 0]);
 
   // batal
   await api('DELETE', `/api/users/${user.id}/like`, { token: host.token });

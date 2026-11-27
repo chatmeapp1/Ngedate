@@ -12,7 +12,7 @@ import { Avatar, Empty, GradientButton, Loading } from '@/components/ui';
 import { Verified } from '@/components/Verified';
 import { api, errorMessage } from '@/lib/api';
 import { countryName, flag } from '@/lib/countries';
-import { lastSeen } from '@/lib/format';
+import { compact, lastSeen } from '@/lib/format';
 import { openChatWithMember } from '@/lib/openChat';
 import { colors, gradients, radius } from '@/lib/theme';
 import type { Member } from '@/lib/types';
@@ -122,6 +122,14 @@ export default function MemberProfile() {
         </View>
       </View>
 
+      <View style={s.stats}>
+        <Stat value={member.following ?? 0} label="Mengikuti" />
+        <View style={s.divider} />
+        <Stat value={member.followers ?? 0} label="Pengikut" />
+        <View style={s.divider} />
+        <Stat value={member.likes ?? 0} label="Disukai" />
+      </View>
+
       <View style={s.body}>
         {member.bio ? <Text style={s.bio}>{member.bio}</Text> : <Text style={s.bioEmpty}>Belum ada bio</Text>}
         {member.tags?.length ? (
@@ -150,7 +158,20 @@ export default function MemberProfile() {
   );
 }
 
+function Stat({ value, label }: { value: number; label: string }) {
+  return (
+    <View style={{ flex: 1, alignItems: 'center' }}>
+      <Text style={s.statValue}>{compact(value)}</Text>
+      <Text style={s.statLabel}>{label}</Text>
+    </View>
+  );
+}
+
 const s = StyleSheet.create({
+  stats: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, marginHorizontal: 16, borderBottomWidth: 1, borderColor: colors.border },
+  statValue: { fontSize: 16, fontWeight: '600', color: colors.text },
+  statLabel: { fontSize: 11, color: colors.textSub, marginTop: 1 },
+  divider: { width: 1, height: 28, backgroundColor: colors.border },
   back: { padding: 12 },
   cover: { height: 380, backgroundColor: colors.surfaceAlt },
   center: { alignItems: 'center', justifyContent: 'center' },

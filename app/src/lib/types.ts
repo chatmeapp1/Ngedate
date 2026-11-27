@@ -65,6 +65,7 @@ export interface Member extends User {
   checkinFrame?: number;
   /** hanya pada profil lengkap (GET /api/members/:id) */
   followers?: number;
+  following?: number;
   likes?: number;
   isFollowing?: boolean;
   isLiked?: boolean;
