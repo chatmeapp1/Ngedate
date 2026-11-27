@@ -11,10 +11,16 @@ const { notFound, badRequest } = require('../lib/errors');
  *   - online di app >= minutes_per_day menit pada >= days_required hari yang berbeda
  *   - penghasilan diamond dari pesan chat + gift minggu ini >= income_target
  * Waktu online dicatat saat koneksi realtime host terbuka (app dibuka di layar depan).
+ *
+ * Penghasilan yang dihitung: diamond dari chat + gift SEJAK host didaftarkan (enrolled_at) pada minggu ini,
+ * dikurangi diamond yang sudah ditarik (withdraw), dan tidak boleh melebihi saldo diamond host saat ini.
+ * Jadi diamond yang sudah ditarik atau diperoleh sebelum didaftarkan tidak ikut terhitung.
  */
 const TODAY_SQL = `(now() AT TIME ZONE 'Asia/Jakarta')::date`;
 const WEEK_SQL = `date_trunc('week', now() AT TIME ZONE 'Asia/Jakarta')::date`;
 const INCOME_REASONS = `('chat_income', 'gift_income')`;
+// Awal hitungan: Senin 00:00 WIB minggu ini, atau saat host didaftarkan bila lebih baru
+const START_SQL = `GREATEST((date_trunc('week', now() AT TIME ZONE 'Asia/Jakarta')) AT TIME ZONE 'Asia/Jakarta', s.enrolled_at)`;
 
 /** Tambah detik online untuk host program yang sedang tersambung. Dipanggil tiap beberapa detik oleh job. */
 async function tick(seconds, onlineIds = realtime.onlineUserIds()) {
@@ -35,8 +41,12 @@ async function progress(client, hostId) {
        COALESCE((SELECT seconds FROM host_online_daily WHERE host_id = s.host_id AND day = ${TODAY_SQL}), 0) AS today_seconds,
        (SELECT COUNT(*) FROM host_online_daily d WHERE d.host_id = s.host_id AND d.day >= ${WEEK_SQL}
           AND d.seconds >= s.minutes_per_day * 60)::int AS valid_days,
-       (SELECT COALESCE(SUM(l.amount), 0) FROM ledger l WHERE l.user_id = s.host_id AND l.currency = 'diamond' AND l.amount > 0
-          AND l.reason IN ${INCOME_REASONS} AND (l.created_at AT TIME ZONE 'Asia/Jakarta')::date >= ${WEEK_SQL})::bigint AS income,
+       GREATEST(0, LEAST(
+         (SELECT COALESCE(SUM(l.amount), 0) FROM ledger l WHERE l.user_id = s.host_id AND l.currency = 'diamond' AND l.amount > 0
+            AND l.reason IN ${INCOME_REASONS} AND l.created_at >= ${START_SQL})
+         - (SELECT COALESCE(SUM(w.diamonds), 0) FROM withdrawals w WHERE w.user_id = s.host_id AND w.status IN ('pending', 'paid')
+            AND w.created_at >= ${START_SQL}),
+         (SELECT diamonds FROM users WHERE id = s.host_id)))::bigint AS income,
        (SELECT created_at FROM host_salary_payouts p WHERE p.host_id = s.host_id AND p.week_start = ${WEEK_SQL}) AS paid_at
      FROM host_salary s WHERE s.host_id = $1`,
     [hostId]
@@ -170,7 +180,10 @@ async function adminSave(adminId, hostIdRaw, body, { create }) {
   await db.query(
     `INSERT INTO host_salary (host_id, active, minutes_per_day, days_required, income_target, reward, created_by)
      VALUES ($1, true, $2, $3, $4, $5, $6)
-     ON CONFLICT (host_id) DO UPDATE SET active = true, minutes_per_day = $2, days_required = $3, income_target = $4, reward = $5, updated_at = now()`,
+     ON CONFLICT (host_id) DO UPDATE SET minutes_per_day = $2, days_required = $3, income_target = $4, reward = $5, updated_at = now(),
+       -- didaftarkan ulang setelah keluar: hitungan penghasilan mulai dari sekarang
+       enrolled_at = CASE WHEN host_salary.active THEN host_salary.enrolled_at ELSE now() END,
+       active = true`,
     [hostId, cfg.minutes_per_day, cfg.days_required, cfg.income_target, cfg.reward, adminId]
   );
   if (create) await notify(hostId, 'salary', 'Gaji pokok aktif', 'Kamu ikut program gaji pokok. Buka menu Gaji pokok di Saya untuk melihat targetnya.');

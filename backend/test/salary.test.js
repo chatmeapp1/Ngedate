@@ -176,3 +176,40 @@ test('admin menghapus host dari program; daftar admin menampilkan progres', asyn
   // bisa didaftarkan lagi
   assert.equal((await A('POST', '/api/admin/salary', { hostId: host.id, reward: 20000, incomeTarget: 70000 })).status, 201);
 });
+
+test('penghasilan sebelum didaftarkan dan diamond yang sudah ditarik tidak dihitung (lihat saldo diamond)', async () => {
+  const host = await makeHost('hostwd');
+  // 70.000 diamond didapat SEBELUM didaftarkan ke gaji pokok
+  await earn(host, 70000);
+  await A('POST', '/api/admin/salary', { hostId: host.id, reward: 20000, incomeTarget: 70000 });
+  assert.equal((await mySalary(host)).income, 0, 'penghasilan sebelum didaftarkan tidak dihitung');
+
+  // setelah didaftarkan: dapat 70.000, progres penuh
+  await earn(host, 70000);
+  assert.equal((await mySalary(host)).income, 70000);
+
+  // lalu 30.000 ditarik: progres berkurang (pengajuan penarikan menahan diamond)
+  await db.tx(async (c) => {
+    await wallet.debitDiamonds(c, host.id, 30000, 'withdraw_hold', { type: 'test', id: 1 });
+    await c.query(
+      `INSERT INTO withdrawals (user_id, diamonds, currency, diamonds_per_usd, usd_idr, gross, fee, net, kind, provider, account_number, status)
+       VALUES ($1, 30000, 'IDR', 6667, 17000, 76500, 0, 76500, 'bank', 'BCA', '123', 'pending')`,
+      [host.id]
+    );
+  });
+  assert.equal((await mySalary(host)).income, 40000, 'diamond yang ditarik dikurangi');
+  // penarikan ditolak/dibatalkan: diamond kembali, tidak mengurangi progres lagi
+  await db.query(`UPDATE withdrawals SET status = 'rejected' WHERE user_id = $1`, [host.id]);
+  await db.tx((c) => wallet.creditDiamonds(c, host.id, 30000, 'withdraw_refund', { type: 'test', id: 1 }));
+  assert.equal((await mySalary(host)).income, 70000);
+
+  // progres tidak pernah melebihi saldo diamond saat ini
+  await db.query(`UPDATE users SET diamonds = 5000 WHERE id = $1`, [host.id]);
+  assert.equal((await mySalary(host)).income, 5000);
+  await db.query(`UPDATE users SET diamonds = 90000 WHERE id = $1`, [host.id]);
+
+  // keluar lalu didaftarkan lagi: penghasilan lama tidak ikut
+  await A('DELETE', `/api/admin/salary/${host.id}`);
+  await A('POST', '/api/admin/salary', { hostId: host.id, reward: 20000, incomeTarget: 70000 });
+  assert.equal((await mySalary(host)).income, 0);
+});
