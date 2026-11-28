@@ -121,7 +121,7 @@ function HostHeader({ top }: { top: number }) {
 
 export default function Me() {
   const insets = useSafeAreaInsets();
-  const { user, logout, refreshMe } = useAuth();
+  const { user, refreshMe } = useAuth();
   // Menu Gaji pokok hanya muncul untuk host yang ditambahkan admin ke program
   const [salaryOn, setSalaryOn] = useState(false);
   const isHostRole = user?.role === 'host';
@@ -255,20 +255,7 @@ export default function Me() {
       </View>
 
       <View style={s.group}>
-        <Item icon="settings-outline" label="Pengaturan akun" onPress={() => router.push('/account-settings')} />
-        <Item icon="shield-checkmark-outline" label="Pengguna diblokir" onPress={() => router.push('/blocked')} />
-        <Item icon="server-outline" label="Alamat server" onPress={() => router.push('/server')} />
-        <Item
-          icon="log-out-outline"
-          label="Keluar"
-          danger
-          onPress={() =>
-            Alert.alert('Keluar', 'Yakin ingin keluar dari akun ini?', [
-              { text: 'Batal', style: 'cancel' },
-              { text: 'Keluar', style: 'destructive', onPress: logout },
-            ])
-          }
-        />
+        <Item icon="settings-outline" label="Pengaturan sistem" onPress={() => router.push('/settings')} />
       </View>
       <Text style={s.version}>{versionLabel(Constants.expoConfig?.version)}</Text>
     </ScrollView>

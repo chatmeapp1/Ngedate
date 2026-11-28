@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Text } from '@/components/I18nText';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { LanguageSwitch } from '@/components/LanguageSwitch';
 import { RecoveryCodeModal } from '@/components/RecoveryCodeModal';
 import { Field, GradientButton, ScreenHeader } from '@/components/ui';
 import { useAuth } from '@/context/auth';
@@ -130,11 +129,6 @@ export default function AccountSettings() {
               <Text style={[s.noteText, { color: '#92400E' }]}>Password kamu diatur ulang oleh admin. Ganti dengan password baru di bawah, memakai password sementara sebagai password saat ini.</Text>
             </View>
           ) : null}
-
-          <Section title="Bahasa aplikasi">
-            <LanguageSwitch />
-            <Text style={s.hintLang}>Pilih bahasa aplikasi. Pesan chat bisa diterjemahkan ke bahasa ini.</Text>
-          </Section>
 
           <Section title="Akun">
             <View style={s.idBox}>
