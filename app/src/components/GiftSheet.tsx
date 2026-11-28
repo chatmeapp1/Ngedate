@@ -15,6 +15,7 @@ import { colors, radius } from '@/lib/theme';
 import type { Gift, SendGiftResult, WhatsappStatus } from '@/lib/types';
 
 const COUNTS = [1, 10, 99, 520];
+const HOST_GIFT_DIVISOR = 10;
 let cache: Gift[] | null = null;
 
 const isLuxury = (g: Gift) => g.category === 'luxury' || g.price >= LUXURY_PRICE;
@@ -29,12 +30,15 @@ export function GiftSheet({
   getConversationId,
   hostName,
   onSent,
+  asHost,
 }: {
   visible: boolean;
   onClose: () => void;
   getConversationId: () => Promise<number>;
   hostName?: string;
   onSent?: (r: SendGiftResult, conversationId: number) => void;
+  /** host mengirim gift ke pengguna: bayar diamond (harga koin / 10), pengguna tidak menerima apa pun */
+  asHost?: boolean;
 }) {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
@@ -56,12 +60,17 @@ export function GiftSheet({
   }, [visible]);
 
   const list = (gifts ?? []).filter((g) => (tab === 'luxury') === isLuxury(g));
-  const coins = user?.coins ?? 0;
-  const total = selected ? selected.price * count : 0;
+  const coins = asHost ? user?.diamonds ?? 0 : user?.coins ?? 0;
+  const cost = (g: Gift, n = 1) => (asHost ? Math.ceil((g.price * n) / HOST_GIFT_DIVISOR) : g.price * n);
+  const total = selected ? cost(selected, count) : 0;
   const enough = coins >= total;
 
   const send = async () => {
     if (!selected || sending) return;
+    if (!enough && asHost) {
+      Alert.alert('Diamond tidak cukup', `Butuh ${number(total)} diamond, saldo kamu ${number(coins)}.`);
+      return;
+    }
     if (!enough) {
       Alert.alert('Koin tidak cukup', `Butuh ${number(total)} koin, saldo kamu ${number(coins)}.`, [
         { text: 'Nanti', style: 'cancel' },
@@ -72,7 +81,7 @@ export function GiftSheet({
     setSending(true);
     try {
       const convId = await getConversationId();
-      const r = await api.post<SendGiftResult>(`/api/conversations/${convId}/gifts`, { giftId: selected.id, count });
+      const r = await api.post<SendGiftResult>(`/api/conversations/${convId}/${asHost ? 'host-gifts' : 'gifts'}`, { giftId: selected.id, count });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       onClose();
       playGift({
@@ -87,14 +96,17 @@ export function GiftSheet({
         count,
         price: selected.price,
         category: selected.category,
+        label: asHost ? `${number(total)} 💎` : null,
       });
-      if (r.waUnlocked) {
+      if (r.waUnlocked && !asHost) {
         const wa = await api.get<WhatsappStatus>(`/api/conversations/${convId}/whatsapp`).catch(() => null);
         playWaUnlocked(convId, hostName, wa?.link);
       }
       onSent?.(r, convId);
     } catch (e) {
-      if (e instanceof ApiError && e.code === 'INSUFFICIENT_COINS') {
+      if (e instanceof ApiError && e.code === 'INSUFFICIENT_DIAMONDS') {
+        Alert.alert('Diamond tidak cukup', 'Saldo diamond kamu kurang untuk gift ini.');
+      } else if (e instanceof ApiError && e.code === 'INSUFFICIENT_COINS') {
         Alert.alert('Koin tidak cukup', 'Top up koin untuk mengirim gift ini.', [
           { text: 'Nanti', style: 'cancel' },
           { text: 'Top up', onPress: () => (onClose(), router.push('/topup')) },
@@ -159,8 +171,8 @@ export function GiftSheet({
                     {g.name}
                   </Text>
                   <View style={s.priceRow}>
-                    <Coin size={11} />
-                    <Text style={s.price}>{compact(g.price)}</Text>
+                    {asHost ? <Text style={{ fontSize: 10 }}>💎</Text> : <Coin size={11} />}
+                    <Text style={s.price}>{compact(cost(g))}</Text>
                   </View>
                 </Pressable>
               );
@@ -178,16 +190,23 @@ export function GiftSheet({
         </View>
 
         <View style={s.footer}>
-          <Pressable onPress={() => (onClose(), router.push('/topup'))} style={s.balance}>
-            <Coin size={16} />
-            <Text style={s.balanceText}>{number(coins)}</Text>
-            <Text style={s.topup}>Top up ›</Text>
-          </Pressable>
+          {asHost ? (
+            <View style={s.balance}>
+              <Text style={{ fontSize: 15 }}>💎</Text>
+              <Text style={s.balanceText}>{number(coins)}</Text>
+            </View>
+          ) : (
+            <Pressable onPress={() => (onClose(), router.push('/topup'))} style={s.balance}>
+              <Coin size={16} />
+              <Text style={s.balanceText}>{number(coins)}</Text>
+              <Text style={s.topup}>Top up ›</Text>
+            </Pressable>
+          )}
           <GradientButton onPress={send} loading={sending} disabled={!selected} style={{ minWidth: 150 }}>
             <Text style={s.sendText}>{selected ? `Kirim · ${compact(total)}` : 'Pilih gift'}</Text>
           </GradientButton>
         </View>
-        {selected && !enough ? <Text style={s.warn}>Saldo tidak cukup — top up dulu</Text> : null}
+        {selected && !enough ? <Text style={s.warn}>{asHost ? 'Diamond tidak cukup' : 'Saldo tidak cukup — top up dulu'}</Text> : null}
       </View>
     </Modal>
   );

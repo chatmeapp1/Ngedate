@@ -107,6 +107,13 @@ router.post('/:id/media/:messageId/unlock', wrap(async (req, res) => {
   res.json({ message: result.message, paid: result.paid, waUnlocked: !!result.unlockedWa, systemMessage: result.systemMessage });
 }));
 
+router.post('/:id/host-gifts', wrap(async (req, res) => {
+  const result = await chat.sendHostGift(req.user.id, req.params.id, req.body.giftId, req.body.count);
+  await pushMessage(result, result.message);
+  await pushBalances([result.hostId]);
+  res.status(201).json({ message: result.message, cost: result.cost });
+}));
+
 router.post('/:id/gifts', wrap(async (req, res) => {
   const result = await chat.sendGift(req.user.id, req.params.id, req.body.giftId, req.body.count);
   await pushMessage(result, result.message);
