@@ -831,4 +831,16 @@ router.post('/users/:id/avatar/reject', wrap(async (req, res) => {
   res.json({ ok: true });
 }));
 
+// ---- Live stream: pantau siaran aktif dan hentikan yang melanggar ----
+router.get('/live', wrap(async (req, res) => {
+  res.json(await require('../services/live').adminList());
+}));
+
+router.post('/live/:id/end', wrap(async (req, res) => {
+  const ended = await require('../services/live').end(v.id(req.params.id), 'admin');
+  if (!ended) throw notFound('Siaran tidak ditemukan atau sudah berakhir');
+  res.json({ ok: true });
+}));
+
+
 module.exports = router;

@@ -40,6 +40,7 @@ export default function Home() {
   const list = useHosts({ tab, enabled: !isHost });
   const members = useHosts<User>({ tab: tab === 'popular' ? 'all' : tab, path: '/api/members', enabled: isHost });
 
+  const [liveCount, setLiveCount] = useState(0);
   const loadRegions = useCallback(() => {
     if (isHost) return;
     api.get<RegionCount[]>('/api/hosts/regions').then(setRegions).catch(() => {});
@@ -49,6 +50,7 @@ export default function Home() {
     useCallback(() => {
       loadRegions();
       refreshMe();
+      api.get<unknown[]>('/api/live').then((r) => setLiveCount(r.length)).catch(() => {});
     }, [loadRegions, refreshMe])
   );
 
@@ -64,6 +66,10 @@ export default function Home() {
                 <Text style={s.coinsText}>{compact(user?.coins ?? 0)}</Text>
               </Pressable>
             )}
+            <Pressable style={s.iconBtn} onPress={() => router.push('/live')} hitSlop={8}>
+              <Ionicons name="videocam" size={22} color={colors.primary} />
+              {liveCount > 0 ? <View style={s.liveDot} /> : null}
+            </Pressable>
             <Pressable style={s.iconBtn} onPress={() => router.push('/rankings')} hitSlop={8}>
               <MaterialCommunityIcons name="trophy" size={22} color="#E0A82E" />
             </Pressable>
@@ -127,6 +133,7 @@ export default function Home() {
 }
 
 const s = StyleSheet.create({
+  liveDot: { position: 'absolute', top: 6, right: 6, width: 9, height: 9, borderRadius: 5, backgroundColor: '#EF4444', borderWidth: 1.5, borderColor: '#fff' },
   hero: { paddingHorizontal: 16, paddingBottom: 8 },
   titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
   title: { fontSize: 22, fontWeight: '800', color: colors.text, letterSpacing: -0.3 },

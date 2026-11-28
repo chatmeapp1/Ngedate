@@ -381,3 +381,47 @@ export interface SalaryStatus {
   paid?: boolean;
   met?: boolean;
 }
+
+// ---- Live stream ----
+export interface LiveHost {
+  id: number;
+  displayName: string;
+  avatarUrl: string | null;
+  verified: boolean;
+  countryCode: string | null;
+}
+export interface LiveItem {
+  id: number;
+  title: string;
+  startedAt: string | null;
+  viewers: number;
+  host: LiveHost;
+}
+export interface LiveChatMessage {
+  id: string;
+  at: string;
+  body: string;
+  user: { id: number; displayName: string; avatarUrl: string | null; role: string; isHost: boolean; level: number | null };
+}
+export interface LiveDetail extends LiveItem {
+  status: 'waiting' | 'live' | 'ended';
+  endedReason: string | null;
+  playbackUrl: string | null;
+  chat: LiveChatMessage[];
+}
+export interface LiveIngest {
+  id: number;
+  status: 'waiting' | 'live';
+  title: string;
+  publicId: string;
+  rtmpUrl: string;
+  streamKey: string;
+}
+export interface LiveCurrent {
+  id: number;
+  status: 'waiting' | 'live';
+  title: string;
+  startedAt: string | null;
+  viewers: number;
+  disconnected: boolean;
+}

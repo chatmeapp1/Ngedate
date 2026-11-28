@@ -1,0 +1,40 @@
+# MediaMTX untuk live stream Amora (tahap 1)
+#   Host siaran lewat RTMP  : rtmp://<alamat-server>:1935/live/<kunci-siaran>
+#   Penonton memutar LL-HLS : lewat backend (/live-hls/...), MediaMTX hanya dengar di localhost
+# Semua publish dan read dicek ke backend (lihat authHTTPAddress). Ganti port 3000 bila backend memakai port lain.
+
+logLevel: info
+
+# API kendali: hanya localhost (dipakai backend untuk sinkron status & menendang publisher)
+api: yes
+apiAddress: 127.0.0.1:9997
+
+# Protokol yang tidak dipakai dimatikan
+rtsp: no
+webrtc: no
+srt: no
+
+# Ingest dari host
+rtmp: yes
+rtmpAddress: :1935
+
+# Penonton: LL-HLS. Dengar di localhost saja; backend yang meneruskannya.
+hls: yes
+hlsAddress: 127.0.0.1:8888
+hlsVariant: lowLatency
+hlsSegmentCount: 7
+hlsSegmentDuration: 1s
+hlsPartDuration: 250ms
+hlsAllowOrigin: '*'
+hlsAlwaysRemux: no
+
+# Auth: backend menentukan siapa boleh publish (kunci siaran) dan read (siaran aktif)
+authMethod: http
+authHTTPAddress: http://127.0.0.1:3000/api/live-media/auth
+authHTTPExclude:
+  - action: api
+  - action: metrics
+  - action: pprof
+
+paths:
+  all_others:

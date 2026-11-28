@@ -965,6 +965,54 @@ async function pageReports() {
   return root;
 }
 
+// ----- Live stream -----
+let liveTimer = null;
+async function pageLive() {
+  const list = await get('/api/admin/live');
+  const root = h('div');
+  root.append(...pageHead('Live stream', 'Pantau siaran yang sedang berlangsung dan hentikan yang melanggar (konten tidak pantas, nomor kontak, dll). Halaman memuat ulang sendiri tiap 10 detik.'));
+  const active = list.filter((x) => x.status !== 'ended');
+  const done = list.filter((x) => x.status === 'ended');
+  const reasons = { host: 'Diakhiri host', admin: 'Dihentikan admin', dropped: 'Terputus', timeout: 'Tidak pernah mulai' };
+  const dur = (a, b) => { if (!a) return '-'; const m = Math.max(0, Math.round(((b ? new Date(b) : new Date()) - new Date(a)) / 60000)); return m < 60 ? m + ' mnt' : Math.floor(m / 60) + ' j ' + (m % 60) + ' mnt'; };
+
+  root.append(h('h3', {}, 'Sedang berlangsung (' + active.length + ')'));
+  if (!active.length) root.append(empty('Tidak ada siaran aktif'));
+  const grid = h('div', { class: 'grid', style: 'grid-template-columns:repeat(auto-fill,minmax(300px,1fr))' });
+  for (const x of active) {
+    grid.append(h('div', { class: 'card' },
+      h('div', { class: 'row wrap', style: 'gap:6px;margin-bottom:8px' },
+        h('span', { class: 'pill ' + (x.status === 'live' ? 'red' : 'amber') }, x.status === 'live' ? '● LIVE' : 'Menunggu video'),
+        h('span', { class: 'sp' }),
+        h('span', { class: 'dim' }, '👁 ' + x.viewers + ' · puncak ' + x.peakViewers)),
+      h('b', {}, x.hostName), h('span', { class: 'dim' }, ' @' + x.hostUsername + ' · ID ' + x.hostId),
+      h('div', { style: 'margin:6px 0' }, x.title || '(tanpa judul)'),
+      h('div', { class: 'dim' }, 'Durasi ' + dur(x.startedAt)),
+      h('div', { class: 'row', style: 'gap:8px;margin-top:10px' },
+        h('a', { class: 'btn sm', href: '#pengguna/' + x.hostId }, 'Lihat host'),
+        h('button', { class: 'btn danger sm', onclick: () => stop(x) }, 'Hentikan live'))));
+  }
+  root.append(grid);
+
+  if (done.length) {
+    root.append(h('h3', { style: 'margin-top:22px' }, 'Riwayat 7 hari terakhir'));
+    root.append(h('div', { class: 'card' }, h('table', { class: 'tbl' },
+      h('thead', {}, h('tr', {}, ['Host', 'Judul', 'Mulai', 'Durasi', 'Puncak', 'Berakhir'].map((c) => h('th', {}, c)))),
+      h('tbody', {}, done.map((x) => h('tr', {},
+        h('td', {}, x.hostName), h('td', {}, x.title || '-'), h('td', {}, x.startedAt ? ago(x.startedAt) : '-'),
+        h('td', {}, dur(x.startedAt, x.endedAt)), h('td', {}, String(x.peakViewers)), h('td', {}, reasons[x.endedReason] || '-')))))));
+  }
+
+  async function stop(x) {
+    if (!confirm('Hentikan live ' + x.hostName + '? Siaran diputus dan penonton keluar.')) return;
+    if (await act(() => post('/api/admin/live/' + x.id + '/end', {}), 'Live dihentikan')) render();
+  }
+  // Muat ulang sendiri selama masih di halaman ini
+  clearInterval(liveTimer);
+  liveTimer = setInterval(() => { if (current() === 'live') render(); else clearInterval(liveTimer); }, 10000);
+  return root;
+}
+
 // ----- Penarikan diamond host -----
 let wdTab = 'pending';
 const rupiah = (n) => 'Rp ' + fmt(n);
@@ -1330,6 +1378,7 @@ const pages = {
   topup: { title: 'Top up koin', icon: '💰', fn: pageTopup },
   paket: { title: 'Paket koin', icon: '🪙', fn: pagePackages },
   penarikan: { title: 'Penarikan', icon: '💸', fn: pageWithdrawals, badge: () => stats && stats.pending.withdrawals },
+  live: { title: 'Live stream', icon: '📡', fn: pageLive },
   laporan: { title: 'Laporan', icon: '🚩', fn: pageReports, badge: () => stats && stats.pending.reports },
   agency: { title: 'Agency', icon: '🏢', fn: pageAgency },
   gift: { title: 'Gift', icon: '🎁', fn: pageGifts },

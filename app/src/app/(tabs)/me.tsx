@@ -243,6 +243,7 @@ export default function Me() {
         {isHost ? (
           <>
             <Item icon="eye-outline" label="Lihat profil saya" onPress={() => router.push({ pathname: '/host/[id]', params: { id: String(user.id) } })} />
+            <Item icon="videocam-outline" label="Mulai live" onPress={() => router.push('/live/host')} />
             <Item icon="calendar-outline" label="Tugas harian" onPress={() => router.push('/tasks')} />
             {salaryOn ? <Item icon="wallet-outline" label="Gaji pokok" onPress={() => router.push('/salary')} /> : null}
             <Item icon="options-outline" label="Pengaturan host (tarif & WhatsApp)" onPress={() => router.push('/host-settings')} />

@@ -6,6 +6,38 @@ let io = null;
 // Tanda online diperpanjang 1 menit setelah koneksi terakhir putus (mis. app diminimalkan sebentar)
 const PRESENCE_GRACE_MS = 60_000;
 const lastGone = new Map();
+// Penonton live: streamId -> Map(userId -> jumlah socket). Penonton dihitung per pengguna.
+const liveViewers = new Map();
+
+function liveCount(id) {
+  const m = liveViewers.get(Number(id));
+  return m ? m.size : 0;
+}
+
+function liveLeave(socket, id) {
+  const joined = socket.data.live;
+  if (!joined || !joined.has(id)) return;
+  joined.delete(id);
+  socket.leave(`live:${id}`);
+  const m = liveViewers.get(id);
+  if (!m) return;
+  const n = (m.get(socket.data.userId) || 1) - 1;
+  if (n <= 0) m.delete(socket.data.userId);
+  else m.set(socket.data.userId, n);
+  if (!m.size) liveViewers.delete(id);
+  if (io) io.to(`live:${id}`).emit('live:viewers', { id, count: liveCount(id) });
+}
+
+function emitLive(id, event, payload) {
+  if (io) io.to(`live:${id}`).emit(event, payload);
+}
+
+// Siaran berakhir: semua penonton keluar dari room dan hitungannya dibersihkan
+function closeLiveRoom(id) {
+  if (!io) return;
+  io.in(`live:${id}`).socketsLeave(`live:${id}`);
+  liveViewers.delete(Number(id));
+}
 
 /**
  * Socket.io: setiap koneksi WAJIB membawa access token (handshake.auth.token).
@@ -59,7 +91,31 @@ function attach(httpServer) {
       io.to(`user:${other}`).emit('typing', { conversationId: convId, userId });
     });
 
+    // Penonton live: gabung / keluar room siaran
+    socket.on('live:join', async (data, ack) => {
+      const id = Number(data && data.id);
+      if (!Number.isSafeInteger(id)) return typeof ack === 'function' && ack({ ok: false });
+      const s = await require('./services/live').watchable(userId, id);
+      if (!s) return typeof ack === 'function' && ack({ ok: false });
+      socket.data.live = socket.data.live || new Set();
+      if (!socket.data.live.has(id)) {
+        socket.data.live.add(id);
+        socket.join(`live:${id}`);
+        const m = liveViewers.get(id) || new Map();
+        m.set(userId, (m.get(userId) || 0) + 1);
+        liveViewers.set(id, m);
+        require('./services/live').notePeak(id, m.size);
+        io.to(`live:${id}`).emit('live:viewers', { id, count: m.size });
+      }
+      if (typeof ack === 'function') ack({ ok: true, count: liveCount(id) });
+    });
+    socket.on('live:leave', (data) => {
+      const id = Number(data && data.id);
+      if (Number.isSafeInteger(id)) liveLeave(socket, id);
+    });
+
     socket.on('disconnect', () => {
+      for (const id of [...(socket.data.live || [])]) liveLeave(socket, id);
       if (!isOnline(userId)) lastGone.set(userId, Date.now());
       db.query(`UPDATE users SET last_seen_at = now() WHERE id = $1`, [userId]).catch(() => {});
     });
@@ -112,4 +168,4 @@ function presentUserIds() {
   return [...ids];
 }
 
-module.exports = { presentUserIds, attach, emitTo, isOnline, isPresent, onlineUserIds, disconnectUser };
+module.exports = { liveCount, emitLive, closeLiveRoom, presentUserIds, attach, emitTo, isOnline, isPresent, onlineUserIds, disconnectUser };

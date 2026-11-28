@@ -37,6 +37,10 @@ function createApp() {
   );
   app.use('/api/agency', require('./routes/agency'));
 
+  // Live stream: auth untuk media server (hanya localhost), HLS lewat proxy, lalu API aplikasi
+  app.use('/api/live-media', require('./routes/live').mediaAuth);
+  app.use('/live-hls', require('./routes/live').hls);
+
   app.use('/api/auth', require('./routes/auth'));
   app.use('/api/me', authenticate, require('./routes/me'));
   app.use('/api/onboarding', authenticate, require('./routes/onboarding'));
@@ -60,6 +64,7 @@ function createApp() {
   app.use('/api/salary', authenticate, requireRole('host'), require('./routes/salary'));
   app.use('/api/tasks', authenticate, requireRole('host'), require('./routes/tasks'));
   app.use('/api/user-tasks', authenticate, requireRole('user'), require('./routes/userTasks'));
+  app.use('/api/live', authenticate, require('./routes/live'));
   app.use('/api/checkin', authenticate, require('./routes/checkin'));
   app.use('/api/match', authenticate, requireRole('user'), require('./routes/match'));
   app.use('/api/moments', authenticate, require('./routes/moments'));
