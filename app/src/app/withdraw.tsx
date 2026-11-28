@@ -192,7 +192,7 @@ export default function Withdraw() {
               <Ionicons name="lock-closed-outline" size={20} color="#B45309" />
               <View style={{ flex: 1, gap: 8 }}>
                 <Text style={s.alertText}>Atur password dulu untuk melindungi saldo penghasilanmu sebelum menarik diamond.</Text>
-                <Pressable onPress={() => router.push('/account-settings')} style={s.alertBtn}>
+                <Pressable onPress={() => router.push('/account-password')} style={s.alertBtn}>
                   <Text style={s.alertBtnText}>Atur password</Text>
                 </Pressable>
               </View>

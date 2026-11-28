@@ -40,7 +40,7 @@ function AuthGate() {
       ['none', 'rejected'].includes(user.verificationStatus ?? 'none');
     // Password sementara dari admin: wajib diganti dulu
     if (user.mustChangePassword) {
-      if (first !== 'account-settings' && !isPublic) router.replace('/account-settings');
+      if (first !== 'account-password' && !isPublic) router.replace('/account-password');
     } else if (needsProfile) {
       if (first !== 'onboarding' && !isPublic) router.replace('/onboarding');
     } else if (needsVerification) {

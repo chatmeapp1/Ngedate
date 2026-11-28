@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
+import { router } from 'expo-router';
 import { useState } from 'react';
 import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Text } from '@/components/I18nText';
@@ -17,87 +18,30 @@ interface SessionTokens {
   recoveryCode?: string | null;
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+type IconName = React.ComponentProps<typeof Ionicons>['name'];
+
+function Row({ label, value, valueColor, danger, onPress }: { label: string; value?: string; valueColor?: string; danger?: boolean; onPress?: () => void }) {
   return (
-    <View style={s.section}>
-      <Text style={s.sectionTitle}>{title}</Text>
-      <View style={s.card}>{children}</View>
-    </View>
+    <Pressable onPress={onPress} disabled={!onPress} style={({ pressed }) => [s.listRow, pressed && { opacity: 0.7 }]}>
+      <Text style={[s.listLabel, danger && { color: colors.danger }]}>{label}</Text>
+      {value ? <Text style={[s.listValue, valueColor ? { color: valueColor } : null]}>{value}</Text> : onPress ? <Ionicons name="arrow-forward" size={18} color={colors.textDim} /> : null}
+    </Pressable>
   );
 }
 
+/** Pengaturan akun: daftar menu; tiap menu membuka halamannya sendiri. */
 export default function AccountSettings() {
-  const { user, refreshMe, logout } = useAuth();
+  const { user, logout } = useAuth();
   const insets = useSafeAreaInsets();
-  const passwordSet = user?.passwordSet !== false;
-
-  // --- salin ID ---
   const [copied, setCopied] = useState(false);
-
-  // --- password ---
-  const [current, setCurrent] = useState('');
-  const [next, setNext] = useState('');
-  const [again, setAgain] = useState('');
-  const [savingPass, setSavingPass] = useState(false);
-  const [passError, setPassError] = useState<string | null>(null);
-
-  // --- kode pemulihan (lupa password)
-  const [shownCode, setShownCode] = useState<string | null>(null);
-  const [recoveryOpen, setRecoveryOpen] = useState(false);
-  const [recoveryPass, setRecoveryPass] = useState('');
-  const [recoveryBusy, setRecoveryBusy] = useState(false);
-  const [recoveryError, setRecoveryError] = useState<string | null>(null);
-  const makeRecovery = async () => {
-    setRecoveryError(null);
-    setRecoveryBusy(true);
-    try {
-      const r = await api.post<{ recoveryCode: string }>('/api/account/recovery-code', { password: recoveryPass });
-      setRecoveryOpen(false);
-      setRecoveryPass('');
-      await refreshMe();
-      setShownCode(r.recoveryCode);
-    } catch (e) {
-      setRecoveryError(errorMessage(e));
-    } finally {
-      setRecoveryBusy(false);
-    }
-  };
-
-  // --- hapus akun ---
   const [deleting, setDeleting] = useState(false);
-
   if (!user) return null;
+  const passwordSet = user.passwordSet !== false;
 
   const copyId = async () => {
     await Clipboard.setStringAsync(String(user.id));
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
-  };
-
-  const savePassword = async () => {
-    setPassError(null);
-    if (next.length < 6) return setPassError('Password baru minimal 6 karakter');
-    if (next !== again) return setPassError('Konfirmasi password tidak sama');
-    setSavingPass(true);
-    try {
-      const r = await api.post<SessionTokens>('/api/account/password', {
-        currentPassword: passwordSet ? current : undefined,
-        newPassword: next,
-      });
-      // Sesi lain keluar; sesi ini memakai token baru
-      await setSession({ accessToken: r.accessToken, refreshToken: r.refreshToken });
-      await refreshMe();
-      setCurrent('');
-      setNext('');
-      setAgain('');
-      // Password pertama kali diatur: kode pemulihan ditampilkan sekali
-      if (r.recoveryCode) setShownCode(r.recoveryCode);
-      else Alert.alert(passwordSet ? 'Password diubah' : 'Password diatur', `Sekarang kamu bisa masuk di HP lain lewat Login via Akun dengan ID ${user.id} dan password ini. Perangkat lain yang memakai akun ini otomatis keluar.`);
-    } catch (e) {
-      setPassError(errorMessage(e));
-    } finally {
-      setSavingPass(false);
-    }
   };
 
   const logoutAll = () => {
@@ -121,107 +65,13 @@ export default function AccountSettings() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <ScreenHeader title="Pengaturan akun" />
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 40 }} keyboardShouldPersistTaps="handled">
-          {user.mustChangePassword ? (
-            <View style={[s.note, { backgroundColor: '#FEF3C7', marginBottom: 12 }]}>
-              <Ionicons name="alert-circle-outline" size={18} color="#B45309" />
-              <Text style={[s.noteText, { color: '#92400E' }]}>Password kamu diatur ulang oleh admin. Ganti dengan password baru di bawah, memakai password sementara sebagai password saat ini.</Text>
-            </View>
-          ) : null}
-
-          <Section title="Akun">
-            <View style={s.idBox}>
-              <Text style={s.k}>ID pengguna kamu</Text>
-              <View style={s.idRow}>
-                <Text style={s.idText} selectable>
-                  {user.id}
-                </Text>
-                <Pressable onPress={copyId} style={s.copyBtn} hitSlop={8}>
-                  <Ionicons name={copied ? 'checkmark' : 'copy-outline'} size={16} color={colors.primaryDark} />
-                  <Text style={s.copyText}>{copied ? 'Tersalin' : 'Salin'}</Text>
-                </Pressable>
-              </View>
-            </View>
-            <View style={s.kv}>
-              <Text style={s.k}>Cara masuk</Text>
-              <Text style={s.v}>{passwordSet ? 'ID + password' : 'Login cepat (HP ini)'}</Text>
-            </View>
-            <View style={s.note}>
-              <Ionicons name="information-circle-outline" size={18} color={colors.primary} />
-              <Text style={s.noteText}>
-                {passwordSet
-                  ? `Untuk masuk di HP lain: pilih Login via Akun, isi ID ${user.id} dan passwordmu.`
-                  : `Akunmu terikat ke HP ini. Atur password di bawah, lalu di HP lain pilih Login via Akun dengan ID ${user.id} dan password itu.`}
-              </Text>
-            </View>
-          </Section>
-
-          <Section title={passwordSet ? 'Ubah password' : 'Atur password'}>
-            {passwordSet ? <Field label="Password saat ini" value={current} onChangeText={setCurrent} secureTextEntry autoCapitalize="none" /> : null}
-            <Field label="Password baru" value={next} onChangeText={setNext} secureTextEntry autoCapitalize="none" />
-            <Field label="Ulangi password baru" value={again} onChangeText={setAgain} secureTextEntry autoCapitalize="none" error={passError} />
-            <GradientButton
-              title={passwordSet ? 'Ubah password' : 'Atur password'}
-              onPress={savePassword}
-              loading={savingPass}
-              disabled={!next || !again || (passwordSet && !current)}
-            />
-          </Section>
-
-          {passwordSet ? (
-            <Section title="Kode pemulihan">
-              <Text style={s.hintLang}>
-                {user.hasRecoveryCode
-                  ? 'Kode pemulihan dipakai untuk masuk lagi jika kamu lupa password. Membuat kode baru membuat kode lama tidak berlaku.'
-                  : 'Kamu belum punya kode pemulihan. Buat sekarang supaya bisa masuk lagi jika lupa password.'}
-              </Text>
-              <View style={{ marginTop: 10 }}>
-                <GradientButton title={user.hasRecoveryCode ? 'Buat kode baru' : 'Buat kode pemulihan'} onPress={() => setRecoveryOpen(true)} />
-              </View>
-            </Section>
-          ) : null}
-
-          <Section title="Keamanan">
-            <Pressable onPress={logoutAll} style={s.row}>
-              <Ionicons name="phone-portrait-outline" size={22} color={colors.text} />
-              <View style={{ flex: 1 }}>
-                <Text style={s.rowTitle}>Keluar dari semua perangkat</Text>
-                <Text style={s.rowSub}>Berguna jika HP hilang atau akun dipakai orang lain</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
-            </Pressable>
-          </Section>
-
-          <Section title="Zona berbahaya">
-            <Pressable onPress={() => setDeleting(true)} style={s.row}>
-              <Ionicons name="trash-outline" size={22} color={colors.danger} />
-              <View style={{ flex: 1 }}>
-                <Text style={[s.rowTitle, { color: colors.danger }]}>Hapus akun</Text>
-                <Text style={s.rowSub}>Menghapus akun dan data pribadimu secara permanen</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
-            </Pressable>
-          </Section>
-        </ScrollView>
-      </KeyboardAvoidingView>
-
+      <ScrollView contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: insets.bottom + 24 }}>
+        <Row label="ID pengguna" value={copied ? 'Tersalin ✓' : String(user.id)} valueColor={colors.primaryDark} onPress={copyId} />
+        <Row label={passwordSet ? 'Ganti kata sandi' : 'Atur kata sandi'} onPress={() => router.push('/account-password')} />
+        <Row label="Keluar dari semua perangkat" onPress={logoutAll} />
+        <Row label="Hapus akun" danger onPress={() => setDeleting(true)} />
+      </ScrollView>
       <DeleteSheet visible={deleting} onClose={() => setDeleting(false)} passwordSet={passwordSet} coins={user.coins ?? 0} diamonds={user.diamonds ?? 0} onDeleted={logout} />
-
-      <Modal visible={recoveryOpen} transparent animationType="fade" onRequestClose={() => setRecoveryOpen(false)}>
-        <View style={s.rBackdrop}>
-          <View style={s.rCard}>
-            <Text style={s.rTitle}>Buat kode pemulihan</Text>
-            <Text style={s.hintLang}>Masukkan password kamu untuk membuat kode baru.</Text>
-            <Field label="Password" value={recoveryPass} onChangeText={setRecoveryPass} secureTextEntry autoCapitalize="none" error={recoveryError} />
-            <GradientButton title="Buat kode" onPress={makeRecovery} loading={recoveryBusy} disabled={!recoveryPass} />
-            <Pressable onPress={() => setRecoveryOpen(false)} style={{ alignItems: 'center', paddingVertical: 6 }}>
-              <Text style={{ color: colors.textSub, fontWeight: '600' }}>Batal</Text>
-            </Pressable>
-          </View>
-        </View>
-      </Modal>
-      <RecoveryCodeModal code={shownCode} onClose={() => setShownCode(null)} />
     </View>
   );
 }
@@ -295,6 +145,9 @@ function DeleteSheet({
 }
 
 const s = StyleSheet.create({
+  listRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.surface, borderRadius: 22, paddingHorizontal: 18, paddingVertical: 18 },
+  listLabel: { fontSize: 16, fontWeight: '600', color: colors.text },
+  listValue: { fontSize: 16, fontWeight: '700', color: colors.textSub },
   rBackdrop: { flex: 1, backgroundColor: colors.overlay, alignItems: 'center', justifyContent: 'center', padding: 24 },
   rCard: { width: '100%', maxWidth: 380, backgroundColor: '#fff', borderRadius: radius.lg, padding: 20, gap: 12 },
   rTitle: { fontSize: 17, fontWeight: '700', color: colors.text },

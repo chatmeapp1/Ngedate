@@ -146,6 +146,8 @@ export const EN: Record<string, string> = {
  "{0} koin akan dipotong dari saldomu.": "{0} coins will be deducted from your balance.",
  "Buka · {0} koin": "Unlock · {0} coins",
  "Koin tidak cukup": "Not enough coins",
+ "Ganti kata sandi": "Change password",
+ "Atur kata sandi": "Set password",
  "Pengaturan sistem": "System settings",
  "Bahasa app": "App language",
  "Daftar hitam": "Blacklist",
