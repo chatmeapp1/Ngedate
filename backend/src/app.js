@@ -59,6 +59,7 @@ function createApp() {
   app.use('/api/translate', authenticate, require('./routes/translate'));
   app.use('/api/salary', authenticate, requireRole('host'), require('./routes/salary'));
   app.use('/api/tasks', authenticate, requireRole('host'), require('./routes/tasks'));
+  app.use('/api/user-tasks', authenticate, requireRole('user'), require('./routes/userTasks'));
   app.use('/api/checkin', authenticate, require('./routes/checkin'));
   app.use('/api/match', authenticate, requireRole('user'), require('./routes/match'));
   app.use('/api/moments', authenticate, require('./routes/moments'));

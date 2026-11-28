@@ -41,6 +41,18 @@ const DEFAULTS = {
   task_reward_checkin: 10,
   task_reward_like: 20,
   task_like_target: 50,
+  utask_reward_avatar: 30,
+  utask_reward_match: 20,
+  utask_reward_follow: 20,
+  utask_reward_topup: 100,
+  utask_reward_vip: 200,
+  utask_reward_beginner_all: 100,
+  utask_reward_checkin: 5,
+  utask_reward_match_day: 10,
+  utask_reward_chat: 20,
+  utask_reward_gift: 10,
+  utask_reward_momlike: 5,
+  utask_reward_daily_all: 30,
   // Foto & video di chat untuk VIP: batas kiriman per hari (cegah penyalahgunaan penyimpanan)
   vip_media_per_day: 30,
   // Top up koin: pemesanan lewat WhatsApp admin (sampai Google Play Billing dipasang)
