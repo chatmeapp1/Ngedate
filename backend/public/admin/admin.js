@@ -915,7 +915,17 @@ async function pageReports() {
             h('div', { class: 'msg ' + m.from },
               h('b', {}, m.from === 'pelapor' ? 'Pelapor' : m.from === 'terlapor' ? 'Terlapor' : 'Sistem'),
               ': ', m.type === 'gift' ? '🎁 ' : '', m.body || '', ' ', h('span', { class: 'dim' }, ago(m.at))))))
-      : h('div', { class: 'dim', style: 'margin:8px 0' }, 'Tanpa bukti chat (dilaporkan dari profil).');
+      : r.snapshot ? null : h('div', { class: 'dim', style: 'margin:8px 0' }, 'Tanpa bukti chat (dilaporkan dari profil).');
+    // Momen / komentar yang dilaporkan (salinan saat dilaporkan)
+    const snap = r.snapshot
+      ? h('div', { class: 'quote', style: 'margin:10px 0' },
+          h('b', {}, r.snapshot.kind === 'comment' ? 'Komentar yang dilaporkan' : 'Momen yang dilaporkan'),
+          h('div', { style: 'margin-top:4px' }, r.snapshot.body || '(tanpa teks)'),
+          (r.snapshot.imageUrl || r.snapshot.momentImageUrl)
+            ? h('img', { class: 'thumb', style: 'margin-top:8px;max-width:160px', src: r.snapshot.imageUrl || r.snapshot.momentImageUrl, alt: '', onclick: () => lightbox(r.snapshot.imageUrl || r.snapshot.momentImageUrl) })
+            : null,
+          r.snapshot.kind === 'comment' && r.snapshot.momentBody ? h('div', { class: 'dim', style: 'margin-top:6px' }, 'Pada momen: ' + r.snapshot.momentBody) : null)
+      : null;
 
     grid.append(h('div', { class: 'card' },
       h('div', { class: 'row wrap', style: 'gap:6px;margin-bottom:10px' },
@@ -929,24 +939,26 @@ async function pageReports() {
       person(r.reporter, 'Pelapor'),
       r.details ? h('div', { class: 'quote' }, '“' + r.details + '”') : null,
       evidence,
+      snap,
       r.status === 'pending'
         ? h('div', { class: 'row wrap', style: 'gap:6px;margin-top:6px' },
             h('button', { class: 'btn sm', onclick: () => review(r, 'dismiss') }, 'Abaikan'),
             h('button', { class: 'btn sm ok', onclick: () => review(r, 'resolve') }, 'Tandai selesai'),
+            (r.momentId || r.commentId) ? h('button', { class: 'btn sm bad', onclick: () => review(r, 'remove') }, r.commentId ? 'Hapus komentar' : 'Hapus momen') : null,
             t.status === 'suspended' ? null : h('button', { class: 'btn sm bad', onclick: () => review(r, 'suspend') }, 'Tangguhkan akun'),
             h('a', { class: 'btn sm', href: '#pengguna/' + t.id, style: 'text-decoration:none' }, 'Lihat pengguna'))
-        : h('div', { class: 'dim' }, (r.action === 'suspend' ? 'Akun ditangguhkan' : r.action === 'resolve' ? 'Ditandai selesai' : 'Diabaikan') + (r.adminNote ? ' · ' + r.adminNote : ''))));
+        : h('div', { class: 'dim' }, (r.action === 'suspend' ? 'Akun ditangguhkan' : r.action === 'resolve' ? 'Ditandai selesai' : r.action === 'remove' ? 'Konten dihapus' : 'Diabaikan') + (r.adminNote ? ' · ' + r.adminNote : ''))));
   }
   root.append(grid);
 
   async function review(r, decision) {
-    const labels = { dismiss: 'Abaikan laporan', resolve: 'Tandai selesai', suspend: 'Tangguhkan akun ' + r.target.displayName };
+    const labels = { dismiss: 'Abaikan laporan', resolve: 'Tandai selesai', suspend: 'Tangguhkan akun ' + r.target.displayName, remove: r.commentId ? 'Hapus komentar yang dilaporkan' : 'Hapus momen yang dilaporkan' };
     const f = await formModal({
       title: labels[decision],
-      submit: decision === 'suspend' ? 'Tangguhkan' : 'Simpan',
-      danger: decision === 'suspend',
+      submit: decision === 'suspend' ? 'Tangguhkan' : decision === 'remove' ? 'Hapus' : 'Simpan',
+      danger: decision === 'suspend' || decision === 'remove',
       fields: [{ name: 'note', label: 'Catatan (opsional, hanya untuk admin)', type: 'textarea',
-        hint: decision === 'suspend' ? 'Akun langsung keluar dan tidak bisa masuk lagi. Laporan lain terhadap akun ini ikut selesai.' : null }],
+        hint: decision === 'suspend' ? 'Akun langsung keluar dan tidak bisa masuk lagi. Laporan lain terhadap akun ini ikut selesai.' : decision === 'remove' ? 'Konten dihapus permanen (foto ikut dibuang). Pemilik momen diberi tahu.' : null }],
     });
     if (f && await act(() => post('/api/admin/reports/' + r.id + '/review', { decision, note: f.note || undefined }), 'Laporan diperbarui')) render();
   }

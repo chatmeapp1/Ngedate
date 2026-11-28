@@ -9,6 +9,7 @@ import { TranslateLink } from '@/components/TranslateLink';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LevelBadge } from '@/components/Badges';
 import { Avatar, Loading, ScreenHeader } from '@/components/ui';
+import { SafetyMenu } from '@/components/SafetyMenu';
 import { Verified } from '@/components/Verified';
 import { useAuth } from '@/context/auth';
 import { api, errorMessage } from '@/lib/api';
@@ -72,6 +73,25 @@ export default function MomentDetail() {
       setSending(false);
     }
   };
+
+  // Hapus komentar: penulisnya atau pemilik momen
+  const removeComment = (cid: number) =>
+    Alert.alert('Hapus komentar?', 'Komentar ini akan dihapus.', [
+      { text: 'Batal', style: 'cancel' },
+      {
+        text: 'Hapus',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await api.del(`/api/moments/${id}/comments/${cid}`);
+            setComments((cur) => cur.filter((c) => c.id !== cid));
+            setM((cur) => (cur ? { ...cur, comments: Math.max(0, cur.comments - 1) } : cur));
+          } catch (e) {
+            Alert.alert('Gagal', errorMessage(e));
+          }
+        },
+      },
+    ]);
 
   const remove = () =>
     Alert.alert('Hapus momen?', 'Momen ini akan dihapus permanen.', [
@@ -163,7 +183,18 @@ export default function MomentDetail() {
 
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.bg }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScreenHeader title="Momen" right={mine ? <Pressable onPress={remove} hitSlop={10}><Ionicons name="trash-outline" size={21} color={colors.textSub} /></Pressable> : undefined} />
+      <ScreenHeader
+        title="Momen"
+        right={
+          mine ? (
+            <Pressable onPress={remove} hitSlop={10}>
+              <Ionicons name="trash-outline" size={21} color={colors.textSub} />
+            </Pressable>
+          ) : (
+            <SafetyMenu userId={m.host.id} name={m.host.displayName} momentId={m.id} onBlocked={() => router.back()} />
+          )
+        }
+      />
       <FlatList
         data={comments}
         keyExtractor={(c) => String(c.id)}
@@ -184,6 +215,14 @@ export default function MomentDetail() {
               <RawText style={s.cBody}>{item.body}</RawText>
               <TranslateLink text={item.body} />
             </View>
+            <SafetyMenu
+              small
+              userId={item.user.id === user?.id ? 0 : item.user.id}
+              name={item.user.displayName}
+              commentId={item.id}
+              onDelete={item.user.id === user?.id || mine ? () => removeComment(item.id) : undefined}
+              onBlocked={loadComments}
+            />
           </View>
         )}
       />

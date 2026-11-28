@@ -137,4 +137,17 @@ router.post('/:id/comments', wrap(async (req, res) => {
   res.status(201).json({ id: Number(rows[0].id), body, createdAt: rows[0].created_at });
 }));
 
+// Hapus komentar: penulis komentar atau pemilik momen
+router.delete('/:id/comments/:commentId', wrap(async (req, res) => {
+  const id = v.id(req.params.id);
+  const commentId = v.id(req.params.commentId, 'commentId');
+  const { rows } = await db.query(
+    `DELETE FROM moment_comments c USING moments m
+     WHERE c.id = $1 AND c.moment_id = $2 AND m.id = c.moment_id AND (c.user_id = $3 OR m.host_id = $3) RETURNING c.id`,
+    [commentId, id, req.user.id]
+  );
+  if (!rows.length) throw notFound('Komentar tidak ditemukan');
+  res.json({ ok: true });
+}));
+
 module.exports = router;

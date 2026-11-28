@@ -134,15 +134,46 @@ async function createReport(reporterId, body) {
   const details = v.str(body.details, 'Keterangan', { max: 500, optional: true }) ?? null;
   const conversationId = body.conversationId === undefined || body.conversationId === null ? null : v.id(body.conversationId, 'conversationId');
   const messageId = body.messageId === undefined || body.messageId === null ? null : v.id(body.messageId, 'messageId');
+  const momentId = body.momentId === undefined || body.momentId === null ? null : v.id(body.momentId, 'momentId');
+  const commentId = body.commentId === undefined || body.commentId === null ? null : v.id(body.commentId, 'commentId');
+  if ((momentId || commentId) && (conversationId || messageId)) throw badRequest('Laporan momen tidak bisa digabung dengan laporan chat');
 
   const { rows: targets } = await db.query(`SELECT id, role FROM users WHERE id = $1`, [targetId]);
   if (!targets.length) throw notFound('Pengguna tidak ditemukan');
   if (targets[0].role === 'admin') throw forbidden('Akun ini tidak bisa dilaporkan');
 
-  // Laporan yang sama (masih diproses) tidak dibuat dua kali
+  // Isi momen / komentar yang dilaporkan: harus milik terlapor dan terlihat oleh pelapor; disalin sebagai bukti
+  let snapshot = null;
+  let reportMomentId = null;
+  let reportCommentId = null;
+  if (commentId) {
+    const { rows: cr } = await db.query(
+      `SELECT c.id, c.body, c.created_at, c.user_id, m.id AS moment_id, m.body AS moment_body, m.image_url
+       FROM moment_comments c JOIN moments m ON m.id = c.moment_id
+       WHERE c.id = $1 AND (m.status = 'approved' OR m.host_id = $2)`,
+      [commentId, reporterId]
+    );
+    if (!cr.length) throw notFound('Komentar tidak ditemukan');
+    if (Number(cr[0].user_id) !== targetId) throw badRequest('Komentar ini bukan milik pengguna yang dilaporkan');
+    reportCommentId = commentId;
+    reportMomentId = Number(cr[0].moment_id);
+    snapshot = { kind: 'comment', commentId, momentId: reportMomentId, body: cr[0].body, momentBody: cr[0].moment_body, momentImageUrl: cr[0].image_url, at: cr[0].created_at };
+  } else if (momentId) {
+    const { rows: mr } = await db.query(
+      `SELECT id, host_id, body, image_url, created_at FROM moments WHERE id = $1 AND (status = 'approved' OR host_id = $2)`,
+      [momentId, reporterId]
+    );
+    if (!mr.length) throw notFound('Momen tidak ditemukan');
+    if (Number(mr[0].host_id) !== targetId) throw badRequest('Momen ini bukan milik pengguna yang dilaporkan');
+    reportMomentId = momentId;
+    snapshot = { kind: 'moment', momentId, body: mr[0].body, imageUrl: mr[0].image_url, at: mr[0].created_at };
+  }
+
+  // Laporan yang sama (masih diproses) tidak dibuat dua kali; laporan momen/komentar dibedakan per kontennya
   const { rows: dup } = await db.query(
-    `SELECT id FROM reports WHERE reporter_id = $1 AND target_id = $2 AND status = 'pending' LIMIT 1`,
-    [reporterId, targetId]
+    `SELECT id FROM reports WHERE reporter_id = $1 AND target_id = $2 AND status = 'pending'
+       AND moment_id IS NOT DISTINCT FROM $3 AND comment_id IS NOT DISTINCT FROM $4 LIMIT 1`,
+    [reporterId, targetId, reportMomentId, reportCommentId]
   );
   if (dup.length) return { id: Number(dup[0].id), duplicate: true };
 
@@ -184,9 +215,9 @@ async function createReport(reporterId, body) {
   }
 
   const { rows } = await db.query(
-    `INSERT INTO reports (reporter_id, target_id, conversation_id, message_id, reason, details, evidence)
-     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
-    [reporterId, targetId, conversationId, messageId, reason, details, evidence ? JSON.stringify(evidence) : null]
+    `INSERT INTO reports (reporter_id, target_id, conversation_id, message_id, reason, details, evidence, moment_id, comment_id, snapshot)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
+    [reporterId, targetId, conversationId, messageId, reason, details, evidence ? JSON.stringify(evidence) : null, reportMomentId, reportCommentId, snapshot ? JSON.stringify(snapshot) : null]
   );
   return { id: Number(rows[0].id), duplicate: false };
 }

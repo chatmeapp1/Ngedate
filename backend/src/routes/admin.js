@@ -347,6 +347,9 @@ router.get('/reports', wrap(async (req, res) => {
     reasonLabel: REPORT_REASONS[r.reason] || r.reason,
     details: r.details,
     evidence: r.evidence,
+    snapshot: r.snapshot,
+    momentId: r.moment_id === null ? null : Number(r.moment_id),
+    commentId: r.comment_id === null ? null : Number(r.comment_id),
     status: r.status,
     action: r.action,
     adminNote: r.admin_note,
@@ -363,9 +366,26 @@ router.get('/reports', wrap(async (req, res) => {
 // decision: dismiss (tidak melanggar) | resolve (sudah ditangani) | suspend (resolve + tangguhkan akun terlapor)
 router.post('/reports/:id/review', wrap(async (req, res) => {
   const id = v.id(req.params.id);
-  const decision = v.str(req.body.decision, 'Keputusan', { pattern: /^(dismiss|resolve|suspend)$/ });
+  const decision = v.str(req.body.decision, 'Keputusan', { pattern: /^(dismiss|resolve|suspend|remove)$/ });
   const note = v.str(req.body.note, 'Catatan', { max: 300, optional: true }) ?? null;
+  let removedImage = null;
+  let removedHost = null;
   await db.tx(async (client) => {
+    // Hapus konten yang dilaporkan (momen atau komentar), lalu laporan dianggap selesai
+    if (decision === 'remove') {
+      const { rows: rp } = await client.query(`SELECT moment_id, comment_id, target_id FROM reports WHERE id = $1 AND status = 'pending' FOR UPDATE`, [id]);
+      if (!rp.length) throw notFound('Laporan tidak ditemukan atau sudah ditinjau');
+      if (!rp[0].moment_id && !rp[0].comment_id) throw badRequest('Laporan ini tidak punya momen atau komentar untuk dihapus');
+      if (rp[0].comment_id) {
+        await client.query(`DELETE FROM moment_comments WHERE id = $1`, [rp[0].comment_id]);
+      } else {
+        const { rows: del } = await client.query(`DELETE FROM moments WHERE id = $1 RETURNING image_url, host_id`, [rp[0].moment_id]);
+        if (del.length) {
+          removedImage = del[0].image_url;
+          removedHost = Number(del[0].host_id);
+        }
+      }
+    }
     const { rows } = await client.query(
       `UPDATE reports SET status = $2, action = $3, admin_note = $4, reviewed_by = $5, reviewed_at = now()
        WHERE id = $1 AND status = 'pending' RETURNING target_id`,
@@ -385,6 +405,8 @@ router.post('/reports/:id/review', wrap(async (req, res) => {
       );
     }
   });
+  if (removedImage) await require('../lib/storage').remove(removedImage);
+  if (removedHost) await notify(removedHost, 'moment', 'Momen dihapus admin', 'Momenmu dihapus karena dilaporkan melanggar aturan konten.');
   res.json({ ok: true });
 }));
 

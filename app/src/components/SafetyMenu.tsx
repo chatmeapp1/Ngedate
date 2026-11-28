@@ -26,17 +26,27 @@ const FALLBACK_REASONS: Reason[] = [
 /**
  * Tombol ⋯ dengan menu Laporkan / Blokir untuk pengguna lain.
  * conversationId: jika dilaporkan dari chat, pesan terakhir ikut disertakan sebagai bukti.
+ * momentId / commentId: laporan untuk momen atau komentar (isinya disalin sebagai bukti). onDelete: tampilkan menu Hapus.
  */
 export function SafetyMenu({
   userId,
   name,
   conversationId,
+  momentId,
+  commentId,
+  onDelete,
+  small = false,
   onBlocked,
   light = false,
 }: {
   userId: number;
   name: string;
   conversationId?: number;
+  momentId?: number;
+  commentId?: number;
+  onDelete?: () => void;
+  /** tombol kecil (di dalam daftar komentar) */
+  small?: boolean;
   onBlocked?: () => void;
   /** ikon putih (di atas foto) */
   light?: boolean;
@@ -73,8 +83,8 @@ export function SafetyMenu({
 
   return (
     <>
-      <Pressable hitSlop={10} onPress={() => setMenu(true)} style={[s.btn, light && s.btnLight]}>
-        <Ionicons name="ellipsis-horizontal" size={22} color={light ? '#fff' : colors.text} />
+      <Pressable hitSlop={10} onPress={() => setMenu(true)} style={[s.btn, light && s.btnLight, small && s.btnSmall]}>
+        <Ionicons name="ellipsis-horizontal" size={small ? 18 : 22} color={light ? '#fff' : small ? colors.textDim : colors.text} />
       </Pressable>
 
       <Modal visible={menu} transparent animationType="fade" onRequestClose={() => setMenu(false)} statusBarTranslucent>
@@ -83,20 +93,36 @@ export function SafetyMenu({
             <Text style={s.menuTitle} numberOfLines={1}>
               {name}
             </Text>
-            <Pressable
-              style={s.menuItem}
-              onPress={() => {
-                setMenu(false);
-                setReporting(true);
-              }}
-            >
-              <Ionicons name="flag-outline" size={22} color={colors.text} />
-              <Text style={s.menuText}>Laporkan</Text>
-            </Pressable>
+            {onDelete ? (
+              <Pressable
+                style={s.menuItem}
+                onPress={() => {
+                  setMenu(false);
+                  onDelete();
+                }}
+              >
+                <Ionicons name="trash-outline" size={22} color={colors.danger} />
+                <Text style={[s.menuText, { color: colors.danger }]}>{commentId ? 'Hapus komentar' : 'Hapus'}</Text>
+              </Pressable>
+            ) : null}
+            {userId ? (
+              <Pressable
+                style={s.menuItem}
+                onPress={() => {
+                  setMenu(false);
+                  setReporting(true);
+                }}
+              >
+                <Ionicons name="flag-outline" size={22} color={colors.text} />
+                <Text style={s.menuText}>{commentId ? 'Laporkan komentar' : momentId ? 'Laporkan momen' : 'Laporkan'}</Text>
+              </Pressable>
+            ) : null}
+            {userId ? (
             <Pressable style={s.menuItem} onPress={confirmBlock}>
               <Ionicons name="ban-outline" size={22} color={colors.danger} />
               <Text style={[s.menuText, { color: colors.danger }]}>Blokir</Text>
             </Pressable>
+            ) : null}
             <Pressable style={[s.menuItem, { justifyContent: 'center' }]} onPress={() => setMenu(false)}>
               <Text style={[s.menuText, { color: colors.textSub }]}>Batal</Text>
             </Pressable>
@@ -110,6 +136,8 @@ export function SafetyMenu({
         userId={userId}
         name={name}
         conversationId={conversationId}
+        momentId={momentId}
+        commentId={commentId}
         onBlockAlso={confirmBlock}
       />
     </>
@@ -122,6 +150,8 @@ function ReportSheet({
   userId,
   name,
   conversationId,
+  momentId,
+  commentId,
   onBlockAlso,
 }: {
   visible: boolean;
@@ -129,6 +159,8 @@ function ReportSheet({
   userId: number;
   name: string;
   conversationId?: number;
+  momentId?: number;
+  commentId?: number;
   onBlockAlso: () => void;
 }) {
   const insets = useSafeAreaInsets();
@@ -148,7 +180,7 @@ function ReportSheet({
     if (!reason || sending) return;
     setSending(true);
     try {
-      await api.post('/api/reports', { targetId: userId, reason, details: details.trim() || undefined, conversationId });
+      await api.post('/api/reports', { targetId: userId, reason, details: details.trim() || undefined, conversationId, momentId, commentId });
       onClose();
       Alert.alert('Laporan terkirim', 'Terima kasih. Tim kami akan meninjau laporanmu. Mau sekalian memblokir akun ini?', [
         { text: 'Tidak perlu', style: 'cancel' },
@@ -169,7 +201,7 @@ function ReportSheet({
         <View style={[s.sheet, { paddingBottom: insets.bottom + 14 }]}>
           <View style={s.handle} />
           <View style={s.sheetHead}>
-            <Text style={s.sheetTitle}>Laporkan {name}</Text>
+            <Text style={s.sheetTitle}>{commentId ? `Laporkan komentar ${name}` : momentId ? `Laporkan momen ${name}` : `Laporkan ${name}`}</Text>
             <Pressable onPress={onClose} hitSlop={10}>
               <Ionicons name="close" size={24} color={colors.textSub} />
             </Pressable>
@@ -207,6 +239,7 @@ function ReportSheet({
 
 const s = StyleSheet.create({
   btn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  btnSmall: { width: 30, height: 30, borderRadius: 15 },
   btnLight: { backgroundColor: 'rgba(0,0,0,0.35)' },
   backdrop: { flex: 1, backgroundColor: colors.overlay, justifyContent: 'center', padding: 24 },
   menu: { backgroundColor: colors.surface, borderRadius: 22, paddingVertical: 8, overflow: 'hidden' },
