@@ -103,6 +103,8 @@ test('hanya host; belum ikut program = enrolled false; admin menambah host (peri
   const ok = await A('PATCH', `/api/admin/salary/${host.id}`, { reward: 20000, incomeTarget: 70000 });
   assert.equal(ok.status, 200, JSON.stringify(ok.body));
   const st = await mySalary(host);
+  assert.ok(st.dayEndsIn > 0 && st.dayEndsIn <= 86400, 'sisa detik sampai 00:00 WIB');
+  assert.ok(st.weekEndsIn >= st.dayEndsIn);
   assert.deepEqual(
     [st.enrolled, st.minutesPerDay, st.daysRequired, st.incomeTarget, st.reward, st.todayMinutes, st.validDays, st.income, st.paid],
     [true, 120, 5, 70000, 20000, 0, 0, 0, false]

@@ -48,6 +48,9 @@ export function setLang(l: Lang) {
 const norm = (s: string) => s.replace(/\s+/g, ' ').trim();
 const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+// Bagian yang berubah dibatasi maksimal 3 kata, supaya pola pendek ({0} hari {1}:{2}) tidak ikut mencocokkan kalimat panjang
+const PLACEHOLDER = '((?:\\S+(?: \\S+){0,2})?)';
+
 type Pattern = { re: RegExp; to: string };
 let exact: Map<string, string> | null = null;
 let patterns: Pattern[] = [];
@@ -60,7 +63,7 @@ function build() {
       exact.set(norm(id), en);
       continue;
     }
-    const src = id.split(/(\{\d+\})/).map((p) => (/^\{\d+\}$/.test(p) ? '(.+?)' : esc(norm(p).length === p.length ? p : p.replace(/\s+/g, ' ')))).join('');
+    const src = id.split(/(\{\d+\})/).map((p) => (/^\{\d+\}$/.test(p) ? PLACEHOLDER : esc(norm(p).length === p.length ? p : p.replace(/\s+/g, ' ')))).join('');
     patterns.push({ re: new RegExp(`^${src}$`), to: en });
   }
   // pola yang lebih panjang (lebih spesifik) dicoba lebih dulu

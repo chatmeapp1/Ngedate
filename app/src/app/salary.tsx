@@ -40,7 +40,8 @@ function Bar({ label, value, max, done, suffix = '' }: { label: string; value: n
 export default function Salary() {
   const { refreshMe } = useAuth();
   const [st, setSt] = useState<SalaryStatus | null>(null);
-  const [left, setLeft] = useState(0);
+  const [left, setLeft] = useState(0); // sisa detik periode mingguan
+  const [leftDay, setLeftDay] = useState(0); // sisa detik sampai pergantian hari 00:00 WIB
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
@@ -48,6 +49,7 @@ export default function Salary() {
       const r = await api.get<SalaryStatus>('/api/salary');
       setSt(r);
       setLeft(r.weekEndsIn ?? 0);
+      setLeftDay(r.dayEndsIn ?? 0);
       if (r.paid) refreshMe(); // saldo diamond bertambah
     } catch {
       setSt((x) => x ?? { enrolled: false });
@@ -63,7 +65,10 @@ export default function Salary() {
     }, [load])
   );
   useEffect(() => {
-    const t = setInterval(() => setLeft((l) => Math.max(0, l - 1)), 1000);
+    const t = setInterval(() => {
+      setLeft((l) => Math.max(0, l - 1));
+      setLeftDay((d) => (d <= 1 ? (load(), 0) : d - 1)); // pergantian hari: muat ulang (menit online harian kembali 0)
+    }, 1000);
     return () => clearInterval(t);
   }, []);
 
@@ -116,8 +121,9 @@ export default function Salary() {
 
           <View style={s.timer}>
             <Ionicons name="time" size={16} color="#F43F5E" />
-            <Text style={s.timerText}>Periode ini berakhir dalam {remain(left)} (Senin 00:00 WIB mulai ulang)</Text>
+            <Text style={s.timerText}>Reset harian pukul 00:00 WIB · sisa {remain(leftDay)}</Text>
           </View>
+          <Text style={s.weekNote}>Periode mingguan berakhir Senin 00:00 WIB (sisa {remain(left)}).</Text>
           <Text style={s.hint}>Waktu online dihitung saat app terbuka di layar. Pesan gratis dan hadiah tugas tidak dihitung sebagai pendapatan.</Text>
         </ScrollView>
       )}
@@ -141,5 +147,6 @@ const s = StyleSheet.create({
   chipText: { fontSize: 12.5, fontWeight: '600', color: colors.primary },
   timer: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FFE4E8', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10 },
   timerText: { flex: 1, color: '#F43F5E', fontSize: 12.5, fontWeight: '600' },
+  weekNote: { fontSize: 12.5, color: colors.textSub, marginTop: -6, paddingHorizontal: 4 },
   hint: { fontSize: 12, color: colors.textDim, lineHeight: 18 },
 });

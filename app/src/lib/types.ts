@@ -356,6 +356,8 @@ export interface SalaryStatus {
   validDays?: number;
   income?: number;
   weekEndsIn?: number;
+  /** detik sampai 00:00 WIB berikutnya */
+  dayEndsIn?: number;
   paid?: boolean;
   met?: boolean;
 }

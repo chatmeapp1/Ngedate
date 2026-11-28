@@ -38,6 +38,7 @@ async function progress(client, hostId) {
   const { rows } = await client.query(
     `SELECT s.*, ${WEEK_SQL}::text AS week_start,
        EXTRACT(EPOCH FROM (${WEEK_SQL}::timestamp + interval '7 days') - (now() AT TIME ZONE 'Asia/Jakarta'))::int AS week_ends_in,
+       EXTRACT(EPOCH FROM (date_trunc('day', now() AT TIME ZONE 'Asia/Jakarta') + interval '1 day') - (now() AT TIME ZONE 'Asia/Jakarta'))::int AS day_ends_in,
        COALESCE((SELECT seconds FROM host_online_daily WHERE host_id = s.host_id AND day = ${TODAY_SQL}), 0) AS today_seconds,
        (SELECT COUNT(*) FROM host_online_daily d WHERE d.host_id = s.host_id AND d.day >= ${WEEK_SQL}
           AND d.seconds >= s.minutes_per_day * 60)::int AS valid_days,
@@ -62,6 +63,7 @@ const mapProgress = (r) => ({
   income: Number(r.income),
   weekStart: r.week_start,
   weekEndsIn: r.week_ends_in,
+  dayEndsIn: r.day_ends_in, // detik sampai pergantian hari 00:00 WIB (menit online harian mulai dari 0 lagi)
   paid: !!r.paid_at,
   paidAt: r.paid_at,
   met: r.valid_days >= r.days_required && Number(r.income) >= r.income_target,
