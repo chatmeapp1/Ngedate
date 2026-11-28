@@ -160,6 +160,9 @@ export interface Message {
   mediaPrivate?: boolean;
   mediaPrice?: number;
   mediaUnlocked?: boolean;
+  /** media privat: status review admin (hanya host pengirim yang melihat yang belum disetujui) */
+  mediaReview?: 'pending' | 'approved' | 'rejected' | null;
+  mediaReviewReason?: string | null;
   /** foto/video di chat (VIP) */
   mediaUrl?: string | null;
   /** pesan memakai kartu gratis VIP */

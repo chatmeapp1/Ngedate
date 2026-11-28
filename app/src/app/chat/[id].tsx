@@ -188,6 +188,15 @@ export default function ChatRoom() {
         }
         if (e.message.type !== 'text') loadWa();
       }),
+      // Hasil review admin untuk media privat: host melihat statusnya; pengguna menghapusnya dari daftar bila ditolak/dihapus
+      onRealtime<{ conversationId: number; messageId: number; status: 'approved' | 'rejected'; reason: string | null }>('media:review', (e) => {
+        if (e.conversationId !== convId) return;
+        setMessages((cur) =>
+          isUserRef.current && e.status === 'rejected'
+            ? cur.filter((m) => m.id !== e.messageId)
+            : cur.map((m) => (m.id === e.messageId ? { ...m, mediaReview: e.status, mediaReviewReason: e.reason, mediaUrl: e.status === 'rejected' ? null : m.mediaUrl } : m))
+        );
+      }),
       onRealtime<{ conversationId: number; messageId: number }>('media:unlocked', (e) => {
         if (e.conversationId === convId) setMessages((cur) => cur.map((m) => (m.id === e.messageId ? { ...m, mediaUnlocked: true } : m)));
       }),
@@ -695,6 +704,21 @@ function Bubble({
     );
   }
 
+  if (m.mediaPrivate && m.mediaReview === 'rejected') {
+    return (
+      <View style={[s.row, mine ? s.rowMine : s.rowTheirs]}>
+        <View style={s.rejectedBox}>
+          <Ionicons name="close-circle" size={18} color={colors.danger} />
+          <Text style={s.rejectedText}>
+            {m.type === 'video' ? 'Video privat ditolak admin' : 'Foto privat ditolak admin'}
+            {m.mediaReviewReason ? `: ${m.mediaReviewReason}` : ''}
+          </Text>
+        </View>
+        <Text style={[s.meta, mine && { textAlign: 'right' }]}>{time(m.createdAt)}</Text>
+      </View>
+    );
+  }
+
   if ((m.type === 'image' || m.type === 'video') && m.mediaUrl) {
     return (
       <View style={[s.row, mine ? s.rowMine : s.rowTheirs]}>
@@ -703,6 +727,12 @@ function Bubble({
         ) : (
           <MediaBubble type={m.type} url={m.mediaUrl} />
         )}
+        {m.mediaPrivate && hostView && m.mediaReview === 'pending' ? (
+          <View style={s.pendingBox}>
+            <Ionicons name="time-outline" size={13} color="#B45309" />
+            <Text style={s.pendingText}>Menunggu persetujuan admin</Text>
+          </View>
+        ) : null}
         {m.mediaPrivate ? (
           <Text style={[s.meta, mine && { textAlign: 'right' }]}>
             🔒 {hostView ? ((m.mediaPrice ?? 0) > 0 ? `${number(m.mediaPrice ?? 0)} koin · ${m.mediaUnlocked ? 'dibuka ✓' : 'belum dibuka'}` : 'gratis') : m.mediaUnlocked ? 'dibuka' : 'privat'} · {time(m.createdAt)}
@@ -804,6 +834,10 @@ const s = StyleSheet.create({
   bubble: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 20 },
   bubbleMine: { borderBottomRightRadius: 6 },
   bubbleTheirs: { backgroundColor: colors.surface, borderBottomLeftRadius: 6, borderWidth: 1, borderColor: colors.border },
+  rejectedBox: { flexDirection: 'row', alignItems: 'center', gap: 6, maxWidth: '80%', backgroundColor: '#FEE2E2', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 9 },
+  rejectedText: { flexShrink: 1, color: '#B91C1C', fontSize: 13, fontWeight: '500' },
+  pendingBox: { flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-end', backgroundColor: '#FEF3C7', borderRadius: 10, paddingHorizontal: 9, paddingVertical: 3, marginTop: 3 },
+  pendingText: { color: '#B45309', fontSize: 11.5, fontWeight: '600' },
   bubbleText: { color: colors.text, fontSize: 15, lineHeight: 21 },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 3, paddingHorizontal: 4 },
   meta: { color: colors.textDim, fontSize: 11 },

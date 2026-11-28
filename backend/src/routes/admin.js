@@ -289,6 +289,7 @@ router.get('/stats', wrap(async (req, res) => {
        (SELECT COUNT(*) FROM users WHERE pending_avatar_url IS NOT NULL)::int AS pending_avatars,
        (SELECT COUNT(*) FROM reports WHERE status = 'pending')::int AS pending_reports,
        (SELECT COUNT(*) FROM moments WHERE status = 'pending')::int AS pending_moments,
+       (SELECT COUNT(*) FROM messages WHERE media_private AND review_status = 'pending')::int AS pending_private_media,
        ((SELECT COUNT(*) FROM withdrawals WHERE status = 'pending') + (SELECT COUNT(*) FROM agency_withdrawals WHERE status = 'pending'))::int AS pending_withdrawals,
        ((SELECT COALESCE(SUM(net), 0) FROM withdrawals WHERE status = 'pending' AND currency = 'IDR') + (SELECT COALESCE(SUM(net), 0) FROM agency_withdrawals WHERE status = 'pending' AND currency = 'IDR'))::bigint AS pending_withdraw_idr,
        ((SELECT COALESCE(SUM(net), 0) FROM withdrawals WHERE status = 'pending' AND currency = 'USD') + (SELECT COALESCE(SUM(net), 0) FROM agency_withdrawals WHERE status = 'pending' AND currency = 'USD'))::bigint AS pending_withdraw_usd_cents,
@@ -309,6 +310,7 @@ router.get('/stats', wrap(async (req, res) => {
       avatars: x.pending_avatars,
       reports: x.pending_reports,
       moments: x.pending_moments,
+      privateMedia: x.pending_private_media,
       withdrawals: x.pending_withdrawals,
     },
     pendingWithdrawIdr: Number(x.pending_withdraw_idr),
@@ -501,6 +503,26 @@ router.patch('/packages/:id', wrap(async (req, res) => {
     if (e.code === '23505') throw badRequest('Paket dengan jumlah koin ini sudah ada', 'DUPLICATE_PACKAGE');
     throw e;
   }
+}));
+
+// Review foto/video privat host (dikirim di chat, dibuka pengguna dengan koin)
+router.get('/private-media', wrap(async (req, res) => {
+  res.json(await require('../services/mediaReview').list(req.query.status));
+}));
+router.get('/private-media/:id/file', wrap(async (req, res) => {
+  const { file } = await require('../services/mediaReview').filePath(req.params.id);
+  res.set('Cache-Control', 'private, no-store');
+  res.sendFile(file, (err) => {
+    if (err && !res.headersSent) res.status(404).json({ error: { code: 'NOT_FOUND', message: 'File tidak ditemukan' } });
+  });
+}));
+router.post('/private-media/:id/approve', wrap(async (req, res) => {
+  await require('../services/mediaReview').approve(req.params.id);
+  res.json({ ok: true });
+}));
+router.post('/private-media/:id/reject', wrap(async (req, res) => {
+  await require('../services/mediaReview').reject(req.params.id, (req.body || {}).reason);
+  res.json({ ok: true });
 }));
 
 // Gaji pokok host

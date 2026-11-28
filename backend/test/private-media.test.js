@@ -138,6 +138,73 @@ test('video maksimal 5 menit (durasi dibaca dari file); terlalu panjang ditolak 
   global.freeId = five.body.message.id;
 });
 
+const listFor = async (token) => {
+  const r = (await api('GET', `/api/conversations/${conv.id}/messages?limit=100`, { token })).body;
+  return Array.isArray(r) ? r : r.messages;
+};
+
+test('review admin: media baru menunggu; pengguna belum melihat, belum bisa membuka; host melihat statusnya', async () => {
+  // semua media yang dikirim sampai sini masih menunggu persetujuan
+  const hostList = await listFor(host.token);
+  const mine = hostList.filter((m) => m.mediaPrivate);
+  assert.ok(mine.length >= 3 && mine.every((m) => m.mediaReview === 'pending'), 'host melihat semuanya berstatus pending');
+  assert.equal((await listFor(user.token)).some((m) => m.mediaPrivate), false, 'pengguna tidak melihat yang belum disetujui');
+  assert.equal((await getMedia(user.token, global.freeId)).status, 404, 'file belum disetujui tidak bisa dibuka pengguna');
+  assert.equal((await getMedia(host.token, global.freeId)).status, 200, 'host tetap bisa melihat kirimannya');
+  assert.equal((await api('POST', `/api/conversations/${conv.id}/media/${global.photoId}/unlock`, { token: user.token })).status, 404, 'tidak bisa dibuka sebelum disetujui');
+  const unread0 = (await db.query(`SELECT user_unread FROM conversations WHERE id = $1`, [conv.id])).rows[0].user_unread;
+  assert.equal(unread0, 0, 'pengguna belum diberi tahu');
+
+  // admin: antrean, hanya admin, lihat file
+  const q = (await A('GET', '/api/admin/private-media?status=pending')).body;
+  assert.ok(q.length >= 3 && q.every((m) => m.status === 'pending' && m.host.id === host.id));
+  assert.equal((await api('GET', '/api/admin/private-media', { token: host.token })).status, 403);
+  const file = await fetch(`${base}/api/admin/private-media/${global.photoId}/file`, { headers: { authorization: `Bearer ${admin}` } });
+  assert.equal(file.status, 200);
+  assert.ok(Buffer.from(await file.arrayBuffer()).equals(jpg), 'admin melihat file aslinya');
+  assert.equal((await A('GET', '/api/admin/stats')).body.pending.privateMedia >= 3, true);
+
+  // setujui semuanya: pengguna menerima pesan + belum dibaca, host diberi notifikasi
+  for (const id of [global.photoId, global.videoId, global.freeId]) assert.equal((await A('POST', `/api/admin/private-media/${id}/approve`)).status, 200);
+  assert.equal((await A('POST', `/api/admin/private-media/${global.photoId}/approve`)).status, 404, 'tidak bisa diproses dua kali');
+  const row = (await db.query(`SELECT user_unread, last_message_preview FROM conversations WHERE id = $1`, [conv.id])).rows[0];
+  assert.equal(row.user_unread >= 3, true);
+  assert.match(row.last_message_preview, /privat/i);
+  const userList = await listFor(user.token);
+  assert.ok(userList.some((m) => m.id === global.photoId && m.mediaReview === 'approved'));
+  const notes = (await api('GET', '/api/notifications', { token: host.token })).body;
+  assert.ok(notes.some((n) => n.type === 'media' && /disetujui/.test(n.title)));
+});
+
+test('review admin: ditolak = file dihapus, pengguna tidak pernah melihat; hapus media yang sudah disetujui', async () => {
+  const before = privateFiles().length;
+  const bad = await sendPrivate(host.token, conv.id, jpg, 'image/jpeg', 'bad.jpg', 100);
+  const badId = bad.body.message.id;
+  assert.equal(bad.body.message.mediaReview, 'pending');
+  assert.equal(privateFiles().length, before + 1);
+
+  assert.equal((await A('POST', `/api/admin/private-media/${badId}/reject`, { reason: 'konten tidak pantas' })).status, 200);
+  assert.equal(privateFiles().length, before, 'file dihapus dari server');
+  const hostSees = (await listFor(host.token)).find((m) => m.id === badId);
+  assert.deepEqual([hostSees.mediaReview, hostSees.mediaReviewReason, hostSees.mediaUrl], ['rejected', 'konten tidak pantas', null]);
+  assert.equal((await listFor(user.token)).some((m) => m.id === badId), false, 'pengguna tidak pernah melihatnya');
+  assert.equal((await getMedia(host.token, badId)).status, 404);
+  assert.equal((await fetch(`${base}/api/admin/private-media/${badId}/file`, { headers: { authorization: `Bearer ${admin}` } })).status, 404, 'file sudah tidak ada');
+  const rej = (await A('GET', '/api/admin/private-media?status=rejected')).body;
+  assert.ok(rej.some((m) => m.id === badId && m.reason === 'konten tidak pantas' && !m.hasFile));
+  const notes = (await api('GET', '/api/notifications', { token: host.token })).body;
+  assert.ok(notes.some((n) => n.type === 'media' && /ditolak/.test(n.title) && /tidak pantas/.test(n.body)));
+
+  // hapus media yang sudah disetujui (belum dibuka siapa pun)
+  const ok = await sendPrivate(host.token, conv.id, jpg, 'image/jpeg', 'ok.jpg', 100);
+  await A('POST', `/api/admin/private-media/${ok.body.message.id}/approve`);
+  assert.ok((await listFor(user.token)).some((m) => m.id === ok.body.message.id));
+  assert.equal((await A('POST', `/api/admin/private-media/${ok.body.message.id}/reject`, {})).status, 200);
+  assert.equal((await listFor(user.token)).some((m) => m.id === ok.body.message.id), false, 'setelah dihapus admin, hilang dari pengguna');
+  assert.equal((await getMedia(user.token, ok.body.message.id)).status, 404);
+  assert.equal((await api('POST', `/api/conversations/${conv.id}/media/${ok.body.message.id}/unlock`, { token: user.token })).status, 404);
+});
+
 test('akses file terproteksi: host & pengguna yang sudah membuka saja; Range didukung', async () => {
   assert.equal((await getMedia(null, global.photoId)).status, 401);
   const hostView = await getMedia(host.token, global.photoId);

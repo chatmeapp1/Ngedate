@@ -577,6 +577,50 @@ async function pageMoments() {
   return root;
 }
 
+// ----- Media privat host -----
+const mediaFilt = { status: 'pending' };
+// File media privat dilindungi: ambil dengan token admin lalu tampilkan lewat blob
+async function showPrivateMedia(m) {
+  try {
+    const res = await raw('GET', '/api/admin/private-media/' + m.id + '/file');
+    if (!res.ok) throw new Error('File tidak ditemukan (status ' + res.status + ')');
+    const blobUrl = URL.createObjectURL(await res.blob());
+    if (m.type === 'video') lightboxVideo(blobUrl);
+    else lightbox(blobUrl);
+  } catch (e) {
+    toast(e.message, true);
+  }
+}
+
+async function pageMedia() {
+  const list = await get('/api/admin/private-media?status=' + mediaFilt.status);
+  const root = h('div', {}, ...pageHead('Media privat host', 'Foto dan video privat yang dikirim host di chat harus disetujui sebelum pengguna melihatnya. Menolak atau menghapus langsung membuang file dari server. Koin yang sudah dibayar pengguna tidak dikembalikan otomatis.'));
+  root.append(h('div', { class: 'tabs' }, [['pending', 'Menunggu'], ['approved', 'Disetujui'], ['rejected', 'Ditolak']].map(([k, l]) =>
+    h('button', { class: 'tab' + (mediaFilt.status === k ? ' on' : ''), onclick: () => { mediaFilt.status = k; render(); } }, l))));
+  if (!list.length) { root.append(empty('Tidak ada media')); return root; }
+  root.append(h('div', { class: 'grid g3' }, list.map((m) => h('div', { class: 'card' },
+    h('div', { class: 'row' },
+      h('b', { class: 'sp' }, m.type === 'video' ? '🎬 Video privat' : '🖼️ Foto privat'),
+      h('span', { class: 'pill ' + (m.price > 0 ? 'amber' : '') }, m.price > 0 ? m.price.toLocaleString('id-ID') + ' koin' : 'Gratis')),
+    h('div', { style: 'margin:8px 0' },
+      h('div', {}, h('b', {}, m.host.displayName), h('span', { class: 'dim' }, ' · ID ' + m.host.id)),
+      h('div', { class: 'dim' }, 'Untuk ' + m.userName + ' · ' + new Date(m.createdAt).toLocaleString('id-ID')),
+      m.status === 'rejected' && m.reason ? h('div', { class: 'dim' }, 'Alasan: ' + m.reason) : null,
+      m.status === 'approved' && m.unlocked ? h('div', { class: 'dim' }, 'Sudah dibuka pengguna') : null),
+    h('div', { class: 'row', style: 'flex-wrap:wrap;gap:6px' },
+      m.hasFile ? h('button', { class: 'btn pri sm', onclick: () => showPrivateMedia(m) }, 'Lihat') : null,
+      m.status === 'pending' ? h('button', { class: 'btn ok sm', onclick: async () => { if (await act(() => post('/api/admin/private-media/' + m.id + '/approve'), 'Disetujui')) render(); } }, 'Setujui') : null,
+      m.status === 'pending' ? h('button', { class: 'btn bad sm', onclick: async () => {
+        const r = await formModal({ title: 'Tolak media', submit: 'Tolak', danger: true, fields: [{ name: 'reason', label: 'Alasan', type: 'textarea' }] });
+        if (r && (await act(() => post('/api/admin/private-media/' + m.id + '/reject', { reason: r.reason }), 'Ditolak'))) render();
+      } }, 'Tolak') : null,
+      m.status === 'approved' ? h('button', { class: 'btn bad sm', onclick: async () => {
+        if (!(await confirmModal('Hapus media', 'Media ini dihapus permanen dan hilang dari chat pengguna.' + (m.unlocked ? ' Pengguna sudah membayar untuk membukanya; koin tidak dikembalikan otomatis.' : ''), 'Hapus'))) return;
+        if (await act(() => post('/api/admin/private-media/' + m.id + '/reject', { reason: 'Dihapus admin' }), 'Dihapus')) render();
+      } }, 'Hapus') : null)))));
+  return root;
+}
+
 // ----- Gaji pokok host -----
 async function pageSalary() {
   const list = await get('/api/admin/salary');
@@ -1256,6 +1300,7 @@ const pages = {
   verifikasi: { title: 'Verifikasi wajah', icon: '🪪', fn: pageVerifikasi, badge: () => stats && stats.pending.verifications },
   foto: { title: 'Foto host', icon: '🖼️', fn: pagePhotos, badge: () => stats && stats.pending.photos + stats.pending.avatars },
   momen: { title: 'Momen host', icon: '📸', fn: pageMoments, badge: () => stats && stats.pending.moments },
+  media: { title: 'Media privat', icon: '🔒', fn: pageMedia, badge: () => stats && stats.pending.privateMedia },
   gaji: { title: 'Gaji pokok host', icon: '🧾', fn: pageSalary },
   pengguna: { title: 'Pengguna', icon: '👥', fn: pageUsers },
   topup: { title: 'Top up koin', icon: '💰', fn: pageTopup },

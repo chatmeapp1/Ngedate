@@ -47,7 +47,10 @@ function mapMessage(r) {
     mediaPrivate: !!r.media_private,
     mediaPrice: Number(r.media_price || 0),
     mediaUnlocked: !!r.media_private && (Number(r.media_price || 0) === 0 || r.media_unlock_user != null),
-    mediaUrl: r.media_private ? `/api/media/${r.id}` : r.media_url || null,
+    // media privat yang ditolak admin: file sudah dihapus. mediaReview hanya bermakna bagi host pengirim (pengguna tidak melihat yang belum disetujui)
+    mediaUrl: r.media_private ? (r.review_status === 'rejected' ? null : `/api/media/${r.id}`) : r.media_url || null,
+    mediaReview: r.media_private ? r.review_status : null,
+    mediaReviewReason: r.media_private && r.review_status === 'rejected' ? r.review_reason : null,
     freeCard: !!r.free_card,
     freeSource: r.free_card ? r.free_card_source || 'vip' : null,
     createdAt: r.created_at,
@@ -217,8 +220,8 @@ async function touchConversation(client, conv, senderIsUser, preview) {
 
 async function insertMessage(client, fields) {
   const { rows } = await client.query(
-    `INSERT INTO messages (conversation_id, sender_id, type, body, gift_id, gift_count, price, payment_status, settled_at, free_card, media_url, media_private, media_price, media_file, free_card_source)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8::varchar, CASE WHEN $8::varchar IN ('paid', 'refunded') THEN now() END, $9, $10, $11, $12, $13, $14)
+    `INSERT INTO messages (conversation_id, sender_id, type, body, gift_id, gift_count, price, payment_status, settled_at, free_card, media_url, media_private, media_price, media_file, free_card_source, review_status)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8::varchar, CASE WHEN $8::varchar IN ('paid', 'refunded') THEN now() END, $9, $10, $11, $12, $13, $14, COALESCE($15, 'approved'))
      RETURNING id`,
     [
       fields.conversationId,
@@ -235,6 +238,7 @@ async function insertMessage(client, fields) {
       fields.mediaPrice ?? 0,
       fields.mediaFile ?? null,
       fields.freeCardSource ?? null,
+      fields.reviewStatus ?? null,
     ]
   );
   return Number(rows[0].id);
@@ -466,8 +470,8 @@ async function sendPrivateMedia(senderId, convIdRaw, req) {
         mediaPrivate: true,
         mediaPrice: price,
         mediaFile: require('path').basename(file.path),
+        reviewStatus: 'pending', // admin harus menyetujui dulu; pengguna belum melihat dan belum diberi tahu
       });
-      await touchConversation(client, conv, false, kind === 'image' ? '🔒 Foto privat' : '🔒 Video privat');
       return {
         conversationId: Number(conv.id),
         userId: Number(conv.user_id),
@@ -489,7 +493,7 @@ async function unlockMedia(userId, convIdRaw, messageIdRaw) {
     const conv = await lockConversation(client, convId, userId);
     if (Number(conv.user_id) !== userId) throw forbidden('Hanya pengguna yang bisa membuka media ini');
     await safety.assertNotBlocked(client, userId, Number(conv.host_id));
-    const { rows } = await client.query(`SELECT * FROM messages WHERE id = $1 AND conversation_id = $2 AND media_private FOR UPDATE`, [messageId, conv.id]);
+    const { rows } = await client.query(`SELECT * FROM messages WHERE id = $1 AND conversation_id = $2 AND media_private AND review_status = 'approved' FOR UPDATE`, [messageId, conv.id]);
     if (!rows.length) throw notFound('Media tidak ditemukan');
     const m = rows[0];
     const { rows: done } = await client.query(`SELECT 1 FROM media_unlocks WHERE message_id = $1`, [messageId]);
@@ -606,10 +610,12 @@ async function listMessages(viewerId, convIdRaw, { before, limit } = {}) {
   const convId = v.id(convIdRaw, 'conversationId');
   const n = v.int(limit ?? 30, 'limit', { min: 1, max: 100 });
   const { rows: c } = await db.query(
-    `SELECT 1 FROM conversations WHERE id = $1 AND (user_id = $2 OR host_id = $2)`,
+    `SELECT host_id FROM conversations WHERE id = $1 AND (user_id = $2 OR host_id = $2)`,
     [convId, viewerId]
   );
   if (!c.length) throw notFound('Percakapan tidak ditemukan');
+  // Host melihat semua mediannya (termasuk yang menunggu/ditolak); pengguna hanya yang sudah disetujui
+  const visible = Number(c[0].host_id) === viewerId ? '' : 'AND (NOT m.media_private OR m.review_status = \'approved\')';
 
   const params = [convId, n];
   let cursor = '';
@@ -618,7 +624,7 @@ async function listMessages(viewerId, convIdRaw, { before, limit } = {}) {
     cursor = 'AND m.id < $3';
   }
   const { rows } = await db.query(
-    `${MESSAGE_SELECT} WHERE m.conversation_id = $1 ${cursor} ORDER BY m.id DESC LIMIT $2`,
+    `${MESSAGE_SELECT} WHERE m.conversation_id = $1 ${cursor} ${visible} ORDER BY m.id DESC LIMIT $2`,
     params
   );
   return rows.reverse().map(mapMessage);
@@ -695,6 +701,7 @@ module.exports = {
   sendGift,
   whatsappStatus,
   listMessages,
+  fetchMessage,
   markRead,
   refundExpired,
   waLink,
