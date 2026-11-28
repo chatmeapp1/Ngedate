@@ -310,42 +310,6 @@ export default function ChatRoom() {
 
   // Pengguna: buka foto/video privat dengan koin
   const [unlocking, setUnlocking] = useState<number | null>(null);
-  // Pengguna memenuhi permintaan gift dari host
-  const fulfillRequest = async (m: Message) => {
-    if (!m.gift || unlocking) return;
-    setUnlocking(m.id);
-    try {
-      const r = await api.post<SendGiftResult>(`/api/conversations/${convId}/gifts`, { giftId: m.gift.id, count: 1, requestId: m.id });
-      playGift({
-        messageId: r.message.id,
-        giftId: m.gift.id,
-        name: m.gift.name,
-        icon: m.gift.icon,
-        imageUrl: m.gift.imageUrl,
-        videoUrl: m.gift.animationUrl,
-        soundUrl: m.gift.soundUrl,
-        blend: m.gift.animationBlend,
-        count: 1,
-        price: m.gift.price,
-        category: m.gift.category,
-      });
-      setMessages((cur) => cur.map((x) => (x.id === m.id ? { ...x, giftRequest: 'done' } : x)));
-      onGiftSent(r);
-      refreshMe();
-    } catch (e) {
-      if (e instanceof ApiError && e.code === 'INSUFFICIENT_COINS') {
-        Alert.alert('Koin tidak cukup', `Gift ini butuh ${number(m.gift.price ?? 0)} koin.`, [
-          { text: 'Nanti', style: 'cancel' },
-          { text: 'Top up', onPress: () => router.push('/topup') },
-        ]);
-      } else {
-        Alert.alert('Gift gagal dikirim', errorMessage(e));
-      }
-    } finally {
-      setUnlocking(null);
-    }
-  };
-
   const unlockMedia = (m: Message) => {
     const price = m.mediaPrice ?? 0;
     Alert.alert(
@@ -442,11 +406,22 @@ export default function ChatRoom() {
     }
   };
 
-  const openGift = () => setGiftOpen(true);
+  const [reqGift, setReqGift] = useState<{ giftId: number; requestId: number } | null>(null);
+  const openGift = () => {
+    setReqGift(null);
+    setGiftOpen(true);
+  };
+  // Pengguna mengetuk permintaan gift dari host: buka panel gift dengan gift itu sudah terpilih
+  const openRequest = (m: Message) => {
+    if (!m.gift || m.giftRequest === 'done') return;
+    setReqGift({ giftId: m.gift.id, requestId: m.id });
+    setGiftOpen(true);
+  };
   const getConvId = useCallback(async () => convId, [convId]);
   const onGiftSent = useCallback(
-    (r: { message: Message; systemMessage?: Message | null }) => {
+    (r: { message: Message; systemMessage?: Message | null; requestId?: number | null }) => {
       addMessage(r.message);
+      if (r.requestId) setMessages((cur) => cur.map((x) => (x.id === r.requestId ? { ...x, giftRequest: 'done' } : x)));
       if (r.systemMessage) addMessage(r.systemMessage);
       loadWa();
     },
@@ -541,7 +516,7 @@ export default function ChatRoom() {
           return (
             <View>
               {showDate ? <DateLabel iso={item.createdAt} /> : null}
-              <Bubble message={item} mine={item.senderId === myId} showPayment={isUser} hostView={!isUser} unlockingId={unlocking} onUnlock={unlockMedia} onFulfill={fulfillRequest} />
+              <Bubble message={item} mine={item.senderId === myId} showPayment={isUser} hostView={!isUser} unlockingId={unlocking} onUnlock={unlockMedia} onFulfill={openRequest} />
             </View>
           );
         }}
@@ -634,6 +609,7 @@ export default function ChatRoom() {
         hostName={peer?.displayName}
         onSent={onGiftSent}
         asHost={!isUser}
+        preselect={isUser ? reqGift : null}
       />
     </KeyboardAvoidingView>
   );
@@ -724,24 +700,17 @@ function Bubble({
     const done = m.giftRequest === 'done';
     return (
       <View style={[s.row, mine ? s.rowMine : s.rowTheirs]}>
-        <View style={[s.reqCard, mine ? s.reqMine : s.reqTheirs]}>
-          <View style={{ flex: 1 }}>
-            <Text style={[s.reqText, mine && { color: '#fff' }]}>🎁 Sayang, bisakah kamu memberiku hadiah?</Text>
-            {mine ? (
-              <Text style={[s.reqStatus, done && { color: '#BBF7D0' }]}>{done ? 'Terkirim ✓' : 'Menunggu...'}</Text>
-            ) : done ? (
-              <Text style={[s.reqStatus, { color: colors.online }]}>Sudah kamu kirim ✓</Text>
-            ) : (
-              <Pressable onPress={() => onFulfill(m)} disabled={unlockingId === m.id} style={s.reqBtn}>
-                <Coin size={13} />
-                <Text style={s.reqBtnText}>{unlockingId === m.id ? 'Mengirim…' : `Kirim ${m.gift?.name ?? ''} · ${number(m.gift?.price ?? 0)}`}</Text>
-              </Pressable>
-            )}
+        <Pressable onPress={() => (!mine && !done ? onFulfill(m) : undefined)} style={s.reqCard}>
+          <View style={{ flexShrink: 1 }}>
+            <Text style={s.reqText}>🎁 Sayang, bisakah kamu memberiku hadiah?</Text>
+            <Text style={[s.reqStatus, done && { color: '#BBF7D0' }]}>
+              {done ? (mine ? 'Terkirim ✓' : 'Sudah kamu kirim ✓') : mine ? 'Menunggu...' : 'Ketuk untuk kirim'}
+            </Text>
           </View>
           <View style={s.reqIcon}>
             <GiftIcon icon={m.gift?.icon} imageUrl={m.gift?.imageUrl} size={46} />
           </View>
-        </View>
+        </Pressable>
         <Text style={[s.meta, mine && { textAlign: 'right' }]}>{time(m.createdAt)}</Text>
       </View>
     );
@@ -906,14 +875,10 @@ const s = StyleSheet.create({
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 3, paddingHorizontal: 4 },
   meta: { color: colors.textDim, fontSize: 11 },
   giftCard: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 20 },
-  reqCard: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 20, maxWidth: '86%' },
-  reqMine: { backgroundColor: colors.primary },
-  reqTheirs: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
-  reqText: { fontWeight: '700', fontSize: 14, color: colors.text },
+  reqCard: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 20, maxWidth: '86%', backgroundColor: colors.primary },
+  reqText: { fontWeight: '700', fontSize: 14, color: '#fff' },
   reqStatus: { marginTop: 6, fontWeight: '700', fontSize: 13, color: '#FDE047' },
   reqIcon: { width: 62, height: 62, borderRadius: 14, backgroundColor: 'rgba(40,20,80,0.18)', alignItems: 'center', justifyContent: 'center' },
-  reqBtn: { marginTop: 8, flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start', backgroundColor: '#F59E0B', paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999 },
-  reqBtnText: { color: '#fff', fontWeight: '800', fontSize: 13 },
   giftName: { color: colors.text, fontWeight: '800', fontSize: 15 },
   giftPrice: { color: colors.textSub, fontWeight: '700', fontSize: 12 },
   priceRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 6, backgroundColor: colors.surfaceAlt },

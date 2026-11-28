@@ -30,6 +30,7 @@ export function GiftSheet({
   hostName,
   onSent,
   asHost,
+  preselect,
 }: {
   visible: boolean;
   onClose: () => void;
@@ -38,6 +39,8 @@ export function GiftSheet({
   onSent?: (r: SendGiftResult, conversationId: number) => void;
   /** host: memilih gift untuk DIMINTA dari pengguna (gratis, tanpa potongan saldo) */
   asHost?: boolean;
+  /** pengguna menanggapi permintaan host: gift ini langsung terpilih & tercatat sebagai pemenuhan permintaan */
+  preselect?: { giftId: number; requestId: number } | null;
 }) {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
@@ -57,6 +60,16 @@ export function GiftSheet({
       })
       .catch(() => {});
   }, [visible]);
+
+  useEffect(() => {
+    if (!visible || !preselect || !gifts) return;
+    const g = gifts.find((x) => x.id === preselect.giftId);
+    if (g) {
+      setTab(isLuxury(g) ? 'luxury' : 'normal');
+      setSelected(g);
+      setCount(1);
+    }
+  }, [visible, preselect, gifts]);
 
   const list = (gifts ?? []).filter((g) => (tab === 'luxury') === isLuxury(g));
   const coins = user?.coins ?? 0;
@@ -92,7 +105,7 @@ export function GiftSheet({
     setSending(true);
     try {
       const convId = await getConversationId();
-      const r = await api.post<SendGiftResult>(`/api/conversations/${convId}/gifts`, { giftId: selected.id, count });
+      const r = await api.post<SendGiftResult>(`/api/conversations/${convId}/gifts`, { giftId: selected.id, count, ...(preselect && preselect.giftId === selected.id ? { requestId: preselect.requestId } : {}) });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       onClose();
       playGift({
