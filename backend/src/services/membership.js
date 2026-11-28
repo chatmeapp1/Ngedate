@@ -48,9 +48,17 @@ const WEEK_INCOME_SQL = `(SELECT COALESCE(SUM(l.amount), 0) FROM ledger l
     AND l.reason IN ('chat_income', 'gift_income', 'free_card_income', 'media_income') AND l.created_at > now() - interval '7 days')`;
 const weekIncomeSql = (idExpr) => WEEK_INCOME_SQL.replace('{id}', idExpr);
 
+/** Bingkai yang terpasang: 'vip' | 'checkin' | null. Punya dua -> sesuai pilihan, awal VIP. */
+function wornFrame(vip, checkinActive, choice) {
+  if (vip > 0 && checkinActive) return choice === 'checkin' ? 'checkin' : 'vip';
+  if (vip > 0) return 'vip';
+  if (checkinActive) return 'checkin';
+  return null;
+}
+
 async function summary(client, userId, settings) {
   const s = settings || (await getSettings(client));
-  const { rows } = await client.query(`SELECT role, topup_total, checkin_cards, checkin_frame, (checkin_frame_until > now()) AS frame_active, checkin_frame_until, ${weekIncomeSql('users.id')} AS week_income FROM users WHERE id = $1`, [userId]);
+  const { rows } = await client.query(`SELECT role, topup_total, checkin_cards, checkin_frame, frame_choice, (checkin_frame_until > now()) AS frame_active, checkin_frame_until, ${weekIncomeSql('users.id')} AS week_income FROM users WHERE id = $1`, [userId]);
   const isHost = rows.length && rows[0].role === 'host';
   // Host: level dari total pendapatan diamond; pengguna: level & VIP dari total top up koin
   const total = rows.length ? Number(isHost ? rows[0].week_income : rows[0].topup_total) : 0;
@@ -92,6 +100,9 @@ async function summary(client, userId, settings) {
     checkinCards: rows.length ? Number(rows[0].checkin_cards) : 0,
     checkinFrame: rows.length && rows[0].frame_active ? Number(rows[0].checkin_frame) : 0,
     checkinFrameUntil: rows.length && rows[0].frame_active ? rows[0].checkin_frame_until : null,
+    // bingkai yang terpasang di avatar: hanya satu. Punya keduanya -> sesuai pilihan (awal: VIP)
+    frameWorn: wornFrame(vip, rows.length && rows[0].frame_active, rows.length ? rows[0].frame_choice : null),
+    frameChoice: rows.length ? rows[0].frame_choice : null,
     // bingkai check-in yang sudah kedaluwarsa (untuk halaman Ransel): model + waktu berakhir
     checkinFrameExpired: rows.length && !rows[0].frame_active && Number(rows[0].checkin_frame) > 0 && rows[0].checkin_frame_until ? Number(rows[0].checkin_frame) : 0,
     checkinFrameExpiredAt: rows.length && !rows[0].frame_active && Number(rows[0].checkin_frame) > 0 ? rows[0].checkin_frame_until : null,

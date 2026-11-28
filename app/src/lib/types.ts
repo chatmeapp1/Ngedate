@@ -60,6 +60,9 @@ export interface Membership {
   checkinFrame?: number;
   checkinFrameUntil?: string | null;
   /** bingkai check-in yang sudah kedaluwarsa (0 = tidak ada) */
+  /** bingkai yang terpasang di avatar: hanya satu */
+  frameWorn?: 'vip' | 'checkin' | null;
+  frameChoice?: 'vip' | 'checkin' | null;
   checkinFrameExpired?: number;
   checkinFrameExpiredAt?: string | null;
 }
@@ -70,6 +73,8 @@ export interface Member extends User {
   vip?: number;
   /** bingkai avatar hadiah check-in yang aktif (0 = tidak ada) */
   checkinFrame?: number;
+  /** pilihan bingkai bila punya VIP dan check-in */
+  frameChoice?: 'vip' | 'checkin' | null;
   /** hanya pada profil lengkap (GET /api/members/:id) */
   followers?: number;
   following?: number;

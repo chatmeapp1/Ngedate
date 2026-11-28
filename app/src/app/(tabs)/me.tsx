@@ -146,7 +146,7 @@ export default function Me() {
       {isHost ? null : (
       <LinearGradient colors={gradients.header} style={{ paddingTop: insets.top + 20, paddingHorizontal: 16, paddingBottom: 8 }}>
         <View style={s.profile}>
-          <FramedAvatar uri={user.avatarUrl} name={user.displayName} size={72} vip={m?.vip ?? 0} checkinFrame={m?.checkinFrame ?? 0} />
+          <FramedAvatar uri={user.avatarUrl} name={user.displayName} size={72} vip={m?.vip ?? 0} checkinFrame={m?.checkinFrame ?? 0} worn={m?.frameWorn} />
           <View style={{ flex: 1, gap: 6 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <Text style={[s.name, { flexShrink: 1 }]} numberOfLines={1}>

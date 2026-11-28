@@ -3,7 +3,7 @@ import { View } from 'react-native';
 import { Avatar } from '@/components/ui';
 
 /** Bingkai VIP 1-5 (gambar dari desain). `hole` = diameter lubang foto sebagai pecahan dari lebar gambar. */
-const FRAMES = [
+export const FRAMES = [
   { src: require('../../assets/vip/frame1.png'), hole: 0.5 },
   { src: require('../../assets/vip/frame2.png'), hole: 0.55 },
   { src: require('../../assets/vip/frame3.png'), hole: 0.53 },
@@ -21,9 +21,28 @@ const CHECKIN_FRAMES = [
  * Avatar bulat dengan bingkai VIP yang terpasang otomatis. Tanpa VIP tampil sebagai avatar biasa.
  * `size` = ukuran foto; bingkai menyesuaikan dan sedikit keluar dari kotak (tidak mengubah tata letak banyak).
  */
-export function FramedAvatar({ uri, name, size = 40, vip = 0, checkinFrame = 0 }: { uri?: string | null; name?: string; size?: number; vip?: number; checkinFrame?: number }) {
-  const frame =
-    vip > 0 ? FRAMES[Math.min(vip, FRAMES.length) - 1] : checkinFrame > 0 ? CHECKIN_FRAMES[Math.min(checkinFrame, CHECKIN_FRAMES.length) - 1] : null;
+export function FramedAvatar({
+  uri,
+  name,
+  size = 40,
+  vip = 0,
+  checkinFrame = 0,
+  worn,
+}: {
+  uri?: string | null;
+  name?: string;
+  size?: number;
+  vip?: number;
+  checkinFrame?: number;
+  /** pilihan pemilik bila punya dua bingkai; hanya satu yang dipasang */
+  worn?: 'vip' | 'checkin' | null;
+}) {
+  const useCheckin = checkinFrame > 0 && (vip <= 0 || worn === 'checkin');
+  const frame = useCheckin
+    ? CHECKIN_FRAMES[Math.min(checkinFrame, CHECKIN_FRAMES.length) - 1]
+    : vip > 0
+      ? FRAMES[Math.min(vip, FRAMES.length) - 1]
+      : null;
   if (!frame) return <Avatar uri={uri} name={name} size={size} />;
 
   const outer = (size / frame.hole) * 0.97; // foto sedikit masuk di bawah cincin

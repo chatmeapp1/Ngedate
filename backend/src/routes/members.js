@@ -17,6 +17,7 @@ const withBadges = (u, s) => ({
   level: levelOf(Number(u.topup_total || 0), s.level_thresholds),
   vip: vipOf(Number(u.topup_total || 0), s.vip_thresholds),
   // bingkai avatar hadiah check-in yang masih aktif (0 = tidak ada)
+  frameChoice: u.frame_choice || null,
   checkinFrame: u.checkin_frame_until && new Date(u.checkin_frame_until) > new Date() ? Number(u.checkin_frame) : 0,
 });
 

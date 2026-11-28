@@ -40,6 +40,16 @@ function parseTags(raw) {
 }
 
 // Token notifikasi push perangkat ini (satu token hanya milik satu akun)
+// Pilih bingkai avatar yang dipakai (VIP atau hadiah check-in): hanya satu yang terpasang
+router.post('/frame', wrap(async (req, res) => {
+  const choice = v.str(req.body.choice, 'choice', { pattern: /^(vip|checkin)$/ });
+  const m = await membership.summary(db, req.user.id);
+  if (choice === 'vip' && !(m.vip > 0)) throw badRequest('Kamu belum punya bingkai VIP');
+  if (choice === 'checkin' && !(m.checkinFrame > 0)) throw badRequest('Bingkai check-in sudah habis atau belum dimiliki');
+  await db.query(`UPDATE users SET frame_choice = $2 WHERE id = $1`, [req.user.id, choice]);
+  res.json({ membership: await membership.summary(db, req.user.id) });
+}));
+
 router.post('/push-token', wrap(async (req, res) => {
   const token = v.str(req.body.token, 'token', { min: 20, max: 400 });
   await db.query(
