@@ -66,9 +66,9 @@ export default function Home() {
                 <Text style={s.coinsText}>{compact(user?.coins ?? 0)}</Text>
               </Pressable>
             )}
-            <Pressable style={s.iconBtn} onPress={() => router.push('/live')} hitSlop={8}>
+            <Pressable style={s.iconBtn} onPress={() => router.push(isHost ? '/live/host' : '/live')} hitSlop={8}>
               <Ionicons name="videocam" size={22} color={colors.primary} />
-              {liveCount > 0 ? <View style={s.liveDot} /> : null}
+              {liveCount > 0 && !isHost ? <View style={s.liveDot} /> : null}
             </Pressable>
             <Pressable style={s.iconBtn} onPress={() => router.push('/rankings')} hitSlop={8}>
               <MaterialCommunityIcons name="trophy" size={22} color="#E0A82E" />

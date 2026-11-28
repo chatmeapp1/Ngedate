@@ -1,11 +1,15 @@
 import { Ionicons } from '@expo/vector-icons';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Clipboard from 'expo-clipboard';
+import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
-import { Text } from '@/components/I18nText';
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Text, TextInput } from '@/components/I18nText';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GradientButton, ScreenHeader } from '@/components/ui';
+import { useAuth } from '@/context/auth';
 import { api, errorMessage } from '@/lib/api';
 import { onRealtime } from '@/lib/realtime';
 import { colors, radius } from '@/lib/theme';
@@ -46,6 +50,10 @@ function CopyRow({ label, value, secret }: { label: string; value: string; secre
 /** Host: mulai/akhiri live. Siaran dikirim dari aplikasi RTMP (OBS, Larix, Streamlabs) memakai alamat dan kunci di sini. */
 export default function LiveHost() {
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
+  const [perm, requestPerm] = useCameraPermissions();
+  const [front, setFront] = useState(true);
+  const [policy, setPolicy] = useState(false);
   const [cur, setCur] = useState<LiveCurrent | null | undefined>(undefined);
   const [ingest, setIngest] = useState<LiveIngest | null>(null);
   const [title, setTitle] = useState('');
@@ -104,6 +112,76 @@ export default function LiveHost() {
     ]);
 
   const localOnly = ingest ? /127\.0\.0\.1|localhost/.test(ingest.rtmpUrl) : false;
+
+  // Belum ada siaran: halaman persiapan dengan kamera langsung menyala
+  if (cur === null) {
+    return (
+      <KeyboardAvoidingView style={{ flex: 1, backgroundColor: '#000' }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        {perm?.granted ? <CameraView style={StyleSheet.absoluteFill} facing={front ? 'front' : 'back'} mirror={front} /> : null}
+        <LinearGradient colors={['rgba(0,0,0,0.55)', 'transparent', 'rgba(0,0,0,0.65)']} style={StyleSheet.absoluteFill} pointerEvents="none" />
+
+        <View style={[s.setupTop, { paddingTop: insets.top + 8 }]}>
+          <Pressable onPress={() => router.back()} hitSlop={12} style={s.setupBtn}>
+            <Ionicons name="close" size={26} color="#fff" />
+          </Pressable>
+          <Pressable onPress={() => setPolicy(true)} style={s.policy}>
+            <Text style={s.policyText}>Kebijakan Siaran Langsung</Text>
+          </Pressable>
+          <View style={s.setupBtn} />
+        </View>
+
+        {perm && !perm.granted ? (
+          <View style={s.permBox}>
+            <Ionicons name="videocam-outline" size={44} color="#fff" />
+            <Text style={s.permText}>Izinkan akses kamera untuk mulai live</Text>
+            <GradientButton title="Izinkan kamera" onPress={() => requestPerm()} />
+          </View>
+        ) : null}
+
+        <View style={s.titleRow}>
+          <View style={s.cover}>
+            {user?.avatarUrl ? <Image source={{ uri: user.avatarUrl }} style={StyleSheet.absoluteFill} contentFit="cover" /> : <View style={[StyleSheet.absoluteFill, { backgroundColor: '#7C3AED' }]} />}
+          </View>
+          <TextInput
+            value={title}
+            onChangeText={setTitle}
+            placeholder="Silakan masukkan judul untuk room live"
+            placeholderTextColor="rgba(255,255,255,0.7)"
+            style={s.titleInput}
+            maxLength={60}
+            multiline
+          />
+        </View>
+
+        <View style={[s.setupBottom, { paddingBottom: insets.bottom + 18 }]}>
+          <View style={s.tools}>
+            <Pressable onPress={() => setFront((f) => !f)} style={s.tool} hitSlop={8}>
+              <Ionicons name="camera-reverse-outline" size={30} color="#fff" />
+              <Text style={s.toolText}>Putar</Text>
+            </Pressable>
+          </View>
+          <Pressable onPress={start} disabled={busy || !perm?.granted} style={[s.go, (!perm?.granted || busy) && { opacity: 0.6 }]}>
+            <LinearGradient colors={['#FF5FC4', '#FF2D7E']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.goBg}>
+              {busy ? <ActivityIndicator color="#fff" /> : <Text style={s.goText}>Mulai Live</Text>}
+            </LinearGradient>
+          </Pressable>
+        </View>
+
+        <Modal visible={policy} transparent animationType="fade" onRequestClose={() => setPolicy(false)}>
+          <Pressable style={s.modalBack} onPress={() => setPolicy(false)}>
+            <View style={s.modalCard}>
+              <Text style={s.h}>Kebijakan Siaran Langsung</Text>
+              <Text style={s.step}>• Dilarang konten telanjang, pornografi, kekerasan, atau yang melanggar hukum.</Text>
+              <Text style={s.step}>• Dilarang membagikan nomor HP, link, atau akun sosial media.</Text>
+              <Text style={s.step}>• Admin dapat menghentikan siaran yang melanggar kapan saja, dan akun dapat ditangguhkan.</Text>
+              <Text style={s.step}>• Hanya host yang sudah verifikasi wajah yang bisa live.</Text>
+              <GradientButton title="Mengerti" onPress={() => setPolicy(false)} />
+            </View>
+          </Pressable>
+        </Modal>
+      </KeyboardAvoidingView>
+    );
+  }
 
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.bg }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -168,6 +246,24 @@ export default function LiveHost() {
 }
 
 const s = StyleSheet.create({
+  setupTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14 },
+  setupBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  policy: { backgroundColor: '#8B5CF6', borderRadius: 20, paddingHorizontal: 18, height: 38, alignItems: 'center', justifyContent: 'center' },
+  policyText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 18, marginTop: 22 },
+  cover: { width: 84, height: 84, borderRadius: 14, overflow: 'hidden', backgroundColor: '#222' },
+  titleInput: { flex: 1, color: '#fff', fontSize: 17, fontWeight: '700', minHeight: 52, textAlignVertical: 'center' },
+  permBox: { position: 'absolute', left: 30, right: 30, top: '36%', alignItems: 'center', gap: 14 },
+  permText: { color: '#fff', fontSize: 15, fontWeight: '600', textAlign: 'center' },
+  setupBottom: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 22, gap: 26 },
+  tools: { flexDirection: 'row', justifyContent: 'center', gap: 40 },
+  tool: { alignItems: 'center', gap: 6 },
+  toolText: { color: '#fff', fontSize: 13, fontWeight: '600' },
+  go: { borderRadius: 30, overflow: 'hidden' },
+  goBg: { height: 56, alignItems: 'center', justifyContent: 'center' },
+  goText: { color: '#fff', fontSize: 19, fontWeight: '800' },
+  modalBack: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center', padding: 24 },
+  modalCard: { width: '100%', maxWidth: 380, backgroundColor: colors.surface, borderRadius: radius.lg, padding: 20, gap: 12 },
   card: { backgroundColor: colors.surface, borderRadius: radius.lg, padding: 16, gap: 12 },
   h: { fontSize: 16, fontWeight: '800', color: colors.text },
   input: { height: 48, borderRadius: 14, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 14, fontSize: 15, color: colors.text, backgroundColor: colors.bg },
