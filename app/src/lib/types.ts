@@ -59,6 +59,9 @@ export interface Membership {
   /** model bingkai avatar hadiah check-in yang masih aktif (0 = tidak ada) */
   checkinFrame?: number;
   checkinFrameUntil?: string | null;
+  /** bingkai check-in yang sudah kedaluwarsa (0 = tidak ada) */
+  checkinFrameExpired?: number;
+  checkinFrameExpiredAt?: string | null;
 }
 
 /** pengguna yang dilihat host: level & VIP dari total top up */

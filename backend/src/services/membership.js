@@ -92,6 +92,9 @@ async function summary(client, userId, settings) {
     checkinCards: rows.length ? Number(rows[0].checkin_cards) : 0,
     checkinFrame: rows.length && rows[0].frame_active ? Number(rows[0].checkin_frame) : 0,
     checkinFrameUntil: rows.length && rows[0].frame_active ? rows[0].checkin_frame_until : null,
+    // bingkai check-in yang sudah kedaluwarsa (untuk halaman Ransel): model + waktu berakhir
+    checkinFrameExpired: rows.length && !rows[0].frame_active && Number(rows[0].checkin_frame) > 0 && rows[0].checkin_frame_until ? Number(rows[0].checkin_frame) : 0,
+    checkinFrameExpiredAt: rows.length && !rows[0].frame_active && Number(rows[0].checkin_frame) > 0 ? rows[0].checkin_frame_until : null,
   };
 }
 

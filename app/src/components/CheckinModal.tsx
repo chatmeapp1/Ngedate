@@ -72,6 +72,12 @@ const rect = (x: [number, number], y: [number, number]) => ({
 });
 
 /** Pop-up check-in harian (hari 1-7) untuk pengguna. Muncul saat masuk aplikasi jika hari ini belum diklaim. */
+let manualOpen: (() => void) | null = null;
+/** Buka pop-up check-in harian dari mana saja (mis. halaman Ransel). */
+export function openCheckin() {
+  manualOpen?.();
+}
+
 export function CheckinModal() {
   const { user, refreshMe } = useAuth();
   const { width } = useWindowDimensions();
@@ -108,6 +114,24 @@ export function CheckinModal() {
     const sub = AppState.addEventListener('change', (s) => s === 'active' && check());
     return () => sub.remove();
   }, [eligible, userId, check]);
+
+  useEffect(() => {
+    if (!eligible) return;
+    manualOpen = async () => {
+      try {
+        const r = await api.get<CheckinStatus>('/api/checkin');
+        setSt(r);
+        setGained(null);
+        setError(null);
+        setOpen(true);
+      } catch {
+        /* abaikan */
+      }
+    };
+    return () => {
+      manualOpen = null;
+    };
+  }, [eligible]);
 
   const claim = async () => {
     if (busy || !st || st.claimedToday) return;

@@ -237,6 +237,7 @@ export default function Me() {
 
       <View style={s.group}>
         <Item icon="person-circle-outline" label="Edit profil" onPress={() => router.push('/edit-profile')} />
+        {!isHost ? <Item icon="bag-handle-outline" label="Ransel saya" onPress={() => router.push('/backpack')} /> : null}
         {isHost ? (
           <>
             <Item icon="eye-outline" label="Lihat profil saya" onPress={() => router.push({ pathname: '/host/[id]', params: { id: String(user.id) } })} />
