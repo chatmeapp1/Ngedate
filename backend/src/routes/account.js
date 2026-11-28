@@ -15,6 +15,11 @@ router.post('/password', wrap(async (req, res) => {
   res.json({ ok: true, ...session });
 }));
 
+// Kode pemulihan baru (wajib password). Kode ditampilkan sekali saja.
+router.post('/recovery-code', wrap(async (req, res) => {
+  res.json(await account.regenerateRecovery(req.user.id, req.body || {}));
+}));
+
 router.post('/logout-all', wrap(async (req, res) => {
   await account.logoutAll(req.user.id);
   res.json({ ok: true });

@@ -5,6 +5,7 @@ const v = require('../lib/validate');
 const wallet = require('./wallet');
 const storage = require('../lib/storage');
 const tokens = require('../lib/tokens');
+const { generateRecoveryCode, normalizeRecoveryCode } = require('../lib/recovery');
 const { ApiError, badRequest, forbidden, notFound, unauthorized } = require('../lib/errors');
 
 async function loadUser(client, userId) {
@@ -31,15 +32,103 @@ async function changePassword(userId, { currentPassword, newPassword }) {
     throw badRequest('Password baru harus berbeda dari yang lama');
   }
   const hash = await bcrypt.hash(next, 10);
+  // Kode pemulihan dibuat otomatis saat password pertama kali diatur (ditampilkan sekali saja)
+  const recoveryCode = user.recovery_hash ? null : generateRecoveryCode();
+  const recoveryHash = recoveryCode ? await bcrypt.hash(normalizeRecoveryCode(recoveryCode), 10) : null;
   await db.tx(async (client) => {
-    await client.query(`UPDATE users SET password_hash = $2, password_set = true, updated_at = now() WHERE id = $1`, [userId, hash]);
+    await client.query(
+      `UPDATE users SET password_hash = $2, password_set = true, must_change_password = false,
+         recovery_hash = COALESCE($3, recovery_hash), updated_at = now() WHERE id = $1`,
+      [userId, hash, recoveryHash]
+    );
     await client.query(`DELETE FROM refresh_tokens WHERE user_id = $1`, [userId]);
   });
   const fresh = await loadUser(db, userId);
   return {
     accessToken: tokens.signAccessToken(fresh),
     refreshToken: await tokens.issueRefreshToken(userId),
+    recoveryCode,
   };
+}
+
+const MAX_RECOVERY_TRIES = 5; // salah 5 kali: kunci 1 jam
+const RECOVERY_LOCK = '1 hour';
+const DUMMY_HASH = bcrypt.hashSync('tidak-ada', 10); // supaya waktu respons sama walau akun tidak ada
+
+/**
+ * Lupa password: ganti password dengan kode pemulihan. Kode lama langsung diganti kode baru (dikembalikan sekali),
+ * semua sesi keluar. Pesan galat sengaja sama untuk akun yang tidak ada / tanpa kode / kode salah.
+ */
+async function resetWithRecovery({ login, code, newPassword }) {
+  const id = v.str(login, 'ID pengguna', { max: 120 }).toLowerCase();
+  const next = v.str(newPassword, 'Password baru', { min: 6, max: 100 });
+  const normalized = normalizeRecoveryCode(code);
+  const fail = () => unauthorized('Kode pemulihan salah, atau akun tidak punya kode pemulihan', 'INVALID_RECOVERY');
+
+  const byId = /^\d{1,15}$/.test(id);
+  const { rows } = byId
+    ? await db.query(`SELECT * FROM users WHERE id = $1`, [id])
+    : await db.query(`SELECT * FROM users WHERE username = $1 OR email = $1`, [id]);
+  const user = rows[0];
+  if (!user || user.status === 'deleted' || !user.recovery_hash) {
+    await bcrypt.compare(normalized || 'x', DUMMY_HASH);
+    throw fail();
+  }
+  if (user.recovery_locked_until && new Date(user.recovery_locked_until) > new Date()) {
+    throw new ApiError(429, 'RECOVERY_LOCKED', 'Terlalu banyak percobaan. Coba lagi dalam 1 jam, atau hubungi admin.');
+  }
+  if (user.status !== 'active') throw forbidden('Akun ditangguhkan', 'SUSPENDED');
+  if (!normalized || !(await bcrypt.compare(normalized, user.recovery_hash))) {
+    await db.query(
+      `UPDATE users SET recovery_failed = recovery_failed + 1,
+         recovery_locked_until = CASE WHEN recovery_failed + 1 >= $2 THEN now() + interval '${RECOVERY_LOCK}' ELSE recovery_locked_until END
+       WHERE id = $1`,
+      [user.id, MAX_RECOVERY_TRIES]
+    );
+    throw fail();
+  }
+
+  const newCode = generateRecoveryCode();
+  const hash = await bcrypt.hash(next, 10);
+  await db.tx(async (client) => {
+    await client.query(
+      `UPDATE users SET password_hash = $2, password_set = true, must_change_password = false,
+         recovery_hash = $3, recovery_failed = 0, recovery_locked_until = NULL, updated_at = now() WHERE id = $1`,
+      [user.id, hash, await bcrypt.hash(normalizeRecoveryCode(newCode), 10)]
+    );
+    await client.query(`DELETE FROM refresh_tokens WHERE user_id = $1`, [user.id]);
+  });
+  return { recoveryCode: newCode };
+}
+
+/** Admin: atur ulang password pengguna ke password sementara (ditampilkan sekali). Pengguna wajib menggantinya setelah masuk. */
+async function adminResetPassword(userId) {
+  const { generateTempPassword } = require('../lib/recovery');
+  const user = await loadUser(db, userId);
+  if (user.role === 'admin') throw forbidden('Akun admin tidak bisa diatur ulang dari sini');
+  const temp = generateTempPassword();
+  const hash = await bcrypt.hash(temp, 10);
+  await db.tx(async (client) => {
+    await client.query(
+      `UPDATE users SET password_hash = $2, password_set = true, must_change_password = true, updated_at = now() WHERE id = $1`,
+      [userId, hash]
+    );
+    await client.query(`DELETE FROM refresh_tokens WHERE user_id = $1`, [userId]);
+  });
+  return { tempPassword: temp, userId: Number(userId) };
+}
+
+/** Buat kode pemulihan baru (kode lama tidak berlaku lagi). Wajib password; akun harus sudah punya password. */
+async function regenerateRecovery(userId, { password }) {
+  const user = await loadUser(db, userId);
+  if (user.password_set === false) throw badRequest('Atur password dulu sebelum membuat kode pemulihan', 'PASSWORD_REQUIRED');
+  await checkCurrentPassword(user, password);
+  const code = generateRecoveryCode();
+  await db.query(
+    `UPDATE users SET recovery_hash = $2, recovery_failed = 0, recovery_locked_until = NULL, updated_at = now() WHERE id = $1`,
+    [userId, await bcrypt.hash(normalizeRecoveryCode(code), 10)]
+  );
+  return { recoveryCode: code };
 }
 
 /** Keluar dari semua perangkat: semua refresh token dicabut. */
@@ -148,4 +237,7 @@ async function deleteAccount(userId, { confirm, password }) {
   return result;
 }
 
-module.exports = { changePassword, logoutAll, deleteAccount };
+module.exports = {
+  resetWithRecovery,
+  adminResetPassword,
+  regenerateRecovery, changePassword, logoutAll, deleteAccount };

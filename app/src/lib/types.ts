@@ -28,6 +28,10 @@ export interface User {
   verificationStatus?: 'none' | 'pending' | 'approved' | 'rejected';
   /** false = akun Login cepat yang belum pernah mengatur password */
   passwordSet?: boolean;
+  /** punya kode pemulihan untuk lupa password */
+  hasRecoveryCode?: boolean;
+  /** password sementara dari admin: wajib diganti */
+  mustChangePassword?: boolean;
   membership?: Membership;
 }
 

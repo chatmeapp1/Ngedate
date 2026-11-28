@@ -714,6 +714,11 @@ async function pageUsers(param) {
           if (await confirmModal(to === 'host' ? 'Jadikan host' : 'Kembalikan ke user', u.displayName + (to === 'host' ? ' langsung disetujui sebagai host.' : ' tidak lagi tampil sebagai host.'), 'Ya')
             && await act(() => patch('/api/admin/users/' + u.id + '/role', { role: to }), 'Peran diubah')) render();
         } }, u.role === 'host' ? 'Jadi user' : 'Jadi host'),
+        u.role !== 'admin' ? h('button', { class: 'btn sm', onclick: async () => {
+          if (!(await confirmModal('Atur ulang password', 'Password ' + u.displayName + ' diganti password sementara dan semua sesinya keluar. Lakukan hanya setelah memastikan yang meminta benar-benar pemilik akun (mis. tanyakan ID, tanggal lahir, riwayat top up, atau foto profil).', 'Atur ulang'))) return;
+          const r = await act(() => post('/api/admin/users/' + u.id + '/reset-password'));
+          if (r) await formModal({ title: 'Password sementara', submit: 'Tutup', fields: [{ name: 'p', label: 'Kirim password ini ke pemilik akun', value: r.tempPassword, hint: 'Hanya tampil sekali. Pengguna wajib menggantinya setelah masuk (Login via Akun dengan ID ' + u.id + ').' }] });
+        } }, '🔑 Atur ulang password') : null,
         h('button', { class: 'btn sm ' + (u.status === 'suspended' ? 'ok' : 'bad'), onclick: async () => {
           const to = u.status === 'suspended' ? 'active' : 'suspended';
           if (await confirmModal(to === 'suspended' ? 'Tangguhkan akun' : 'Aktifkan akun', u.displayName, 'Ya')

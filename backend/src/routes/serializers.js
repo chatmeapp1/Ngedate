@@ -38,6 +38,8 @@ function publicUser(u, { self = false } = {}) {
     out.agencyName = u.agency_name || null;
     out.verificationStatus = u.verification_status || 'none';
     out.passwordSet = u.password_set !== false;
+    out.hasRecoveryCode = !!u.recovery_hash;
+    out.mustChangePassword = !!u.must_change_password;
   }
   return out;
 }

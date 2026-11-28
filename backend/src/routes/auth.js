@@ -62,6 +62,20 @@ router.post('/login', limiter, wrap(async (req, res) => {
   res.json(await issueSession(user));
 }));
 
+// Lupa password: ID + kode pemulihan + password baru. Dibatasi percobaan; galat sama untuk semua kegagalan.
+router.post('/forgot/reset', limiter, wrap(async (req, res) => {
+  const b = req.body || {};
+  const out = await require('../services/account').resetWithRecovery({ login: b.login, code: b.code, newPassword: b.newPassword });
+  res.json({ ok: true, ...out });
+}));
+
+// Kontak admin untuk bantuan akun (publik, supaya terlihat di layar Lupa password)
+router.get('/support', wrap(async (req, res) => {
+  const { getSettings } = require('../services/settings');
+  const s = await getSettings();
+  res.json({ whatsapp: s.topup_contact || '' });
+}));
+
 // Login cepat tanpa username/password. Akun terikat ke device key dari aplikasi.
 router.post('/quick', limiter, wrap(async (req, res) => {
   const deviceKey = v.str(req.body.deviceKey, 'deviceKey', { min: 32, max: 128, pattern: /^[A-Za-z0-9_-]+$/ });

@@ -503,6 +503,13 @@ router.patch('/packages/:id', wrap(async (req, res) => {
   }
 }));
 
+// Atur ulang password pengguna (lupa password tanpa kode pemulihan): password sementara, tampil sekali
+router.post('/users/:id/reset-password', wrap(async (req, res) => {
+  const r = await require('../services/account').adminResetPassword(v.id(req.params.id));
+  realtime.disconnectUser(r.userId);
+  res.json({ tempPassword: r.tempPassword });
+}));
+
 // Moderasi foto/video privat host (dikirim di chat, dibuka pengguna dengan koin): lihat dan hapus yang melanggar
 router.get('/private-media', wrap(async (req, res) => {
   res.json(await require('../services/mediaReview').list(req.query.status));

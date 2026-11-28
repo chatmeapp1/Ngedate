@@ -41,6 +41,9 @@ export default function AccountLogin() {
       <Field label="Password" value={password} onChangeText={setPassword} secureTextEntry autoCapitalize="none" onSubmitEditing={submit} />
       {error ? <Text style={{ color: colors.danger }}>{error}</Text> : null}
       <GradientButton title="Masuk" onPress={submit} loading={loading} disabled={!userId || !password} />
+      <Link href="/forgot" style={{ textAlign: 'center', color: colors.primary, fontWeight: '700', paddingVertical: 4 }}>
+        Lupa password?
+      </Link>
       <Text style={{ textAlign: 'center', color: colors.textSub, lineHeight: 20 }}>
         ID pengguna ada di menu Saya. Akun baru dibuat otomatis lewat{' '}
         <Link href="/login" style={{ color: colors.primary, fontWeight: '800' }}>

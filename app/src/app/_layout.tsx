@@ -38,7 +38,10 @@ function AuthGate() {
       !user.verified &&
       user.hostStatus !== 'approved' &&
       ['none', 'rejected'].includes(user.verificationStatus ?? 'none');
-    if (needsProfile) {
+    // Password sementara dari admin: wajib diganti dulu
+    if (user.mustChangePassword) {
+      if (first !== 'account-settings' && !isPublic) router.replace('/account-settings');
+    } else if (needsProfile) {
       if (first !== 'onboarding' && !isPublic) router.replace('/onboarding');
     } else if (needsVerification) {
       if (first !== 'verification' && !isPublic) router.replace('/verification');

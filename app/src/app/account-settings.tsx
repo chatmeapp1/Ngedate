@@ -5,6 +5,7 @@ import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, St
 import { Text } from '@/components/I18nText';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LanguageSwitch } from '@/components/LanguageSwitch';
+import { RecoveryCodeModal } from '@/components/RecoveryCodeModal';
 import { Field, GradientButton, ScreenHeader } from '@/components/ui';
 import { useAuth } from '@/context/auth';
 import { api, errorMessage, setSession } from '@/lib/api';
@@ -14,6 +15,7 @@ import { colors, radius } from '@/lib/theme';
 interface SessionTokens {
   accessToken: string;
   refreshToken: string;
+  recoveryCode?: string | null;
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -39,6 +41,28 @@ export default function AccountSettings() {
   const [again, setAgain] = useState('');
   const [savingPass, setSavingPass] = useState(false);
   const [passError, setPassError] = useState<string | null>(null);
+
+  // --- kode pemulihan (lupa password)
+  const [shownCode, setShownCode] = useState<string | null>(null);
+  const [recoveryOpen, setRecoveryOpen] = useState(false);
+  const [recoveryPass, setRecoveryPass] = useState('');
+  const [recoveryBusy, setRecoveryBusy] = useState(false);
+  const [recoveryError, setRecoveryError] = useState<string | null>(null);
+  const makeRecovery = async () => {
+    setRecoveryError(null);
+    setRecoveryBusy(true);
+    try {
+      const r = await api.post<{ recoveryCode: string }>('/api/account/recovery-code', { password: recoveryPass });
+      setRecoveryOpen(false);
+      setRecoveryPass('');
+      await refreshMe();
+      setShownCode(r.recoveryCode);
+    } catch (e) {
+      setRecoveryError(errorMessage(e));
+    } finally {
+      setRecoveryBusy(false);
+    }
+  };
 
   // --- hapus akun ---
   const [deleting, setDeleting] = useState(false);
@@ -67,7 +91,9 @@ export default function AccountSettings() {
       setCurrent('');
       setNext('');
       setAgain('');
-      Alert.alert(passwordSet ? 'Password diubah' : 'Password diatur', `Sekarang kamu bisa masuk di HP lain lewat Login via Akun dengan ID ${user.id} dan password ini. Perangkat lain yang memakai akun ini otomatis keluar.`);
+      // Password pertama kali diatur: kode pemulihan ditampilkan sekali
+      if (r.recoveryCode) setShownCode(r.recoveryCode);
+      else Alert.alert(passwordSet ? 'Password diubah' : 'Password diatur', `Sekarang kamu bisa masuk di HP lain lewat Login via Akun dengan ID ${user.id} dan password ini. Perangkat lain yang memakai akun ini otomatis keluar.`);
     } catch (e) {
       setPassError(errorMessage(e));
     } finally {
@@ -98,6 +124,13 @@ export default function AccountSettings() {
       <ScreenHeader title="Pengaturan akun" />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 40 }} keyboardShouldPersistTaps="handled">
+          {user.mustChangePassword ? (
+            <View style={[s.note, { backgroundColor: '#FEF3C7', marginBottom: 12 }]}>
+              <Ionicons name="alert-circle-outline" size={18} color="#B45309" />
+              <Text style={[s.noteText, { color: '#92400E' }]}>Password kamu diatur ulang oleh admin. Ganti dengan password baru di bawah, memakai password sementara sebagai password saat ini.</Text>
+            </View>
+          ) : null}
+
           <Section title="Bahasa aplikasi">
             <LanguageSwitch />
             <Text style={s.hintLang}>Pilih bahasa aplikasi. Pesan chat bisa diterjemahkan ke bahasa ini.</Text>
@@ -142,6 +175,19 @@ export default function AccountSettings() {
             />
           </Section>
 
+          {passwordSet ? (
+            <Section title="Kode pemulihan">
+              <Text style={s.hintLang}>
+                {user.hasRecoveryCode
+                  ? 'Kode pemulihan dipakai untuk masuk lagi jika kamu lupa password. Membuat kode baru membuat kode lama tidak berlaku.'
+                  : 'Kamu belum punya kode pemulihan. Buat sekarang supaya bisa masuk lagi jika lupa password.'}
+              </Text>
+              <View style={{ marginTop: 10 }}>
+                <GradientButton title={user.hasRecoveryCode ? 'Buat kode baru' : 'Buat kode pemulihan'} onPress={() => setRecoveryOpen(true)} />
+              </View>
+            </Section>
+          ) : null}
+
           <Section title="Keamanan">
             <Pressable onPress={logoutAll} style={s.row}>
               <Ionicons name="phone-portrait-outline" size={22} color={colors.text} />
@@ -167,6 +213,21 @@ export default function AccountSettings() {
       </KeyboardAvoidingView>
 
       <DeleteSheet visible={deleting} onClose={() => setDeleting(false)} passwordSet={passwordSet} coins={user.coins ?? 0} diamonds={user.diamonds ?? 0} onDeleted={logout} />
+
+      <Modal visible={recoveryOpen} transparent animationType="fade" onRequestClose={() => setRecoveryOpen(false)}>
+        <View style={s.rBackdrop}>
+          <View style={s.rCard}>
+            <Text style={s.rTitle}>Buat kode pemulihan</Text>
+            <Text style={s.hintLang}>Masukkan password kamu untuk membuat kode baru.</Text>
+            <Field label="Password" value={recoveryPass} onChangeText={setRecoveryPass} secureTextEntry autoCapitalize="none" error={recoveryError} />
+            <GradientButton title="Buat kode" onPress={makeRecovery} loading={recoveryBusy} disabled={!recoveryPass} />
+            <Pressable onPress={() => setRecoveryOpen(false)} style={{ alignItems: 'center', paddingVertical: 6 }}>
+              <Text style={{ color: colors.textSub, fontWeight: '600' }}>Batal</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+      <RecoveryCodeModal code={shownCode} onClose={() => setShownCode(null)} />
     </View>
   );
 }
@@ -240,6 +301,9 @@ function DeleteSheet({
 }
 
 const s = StyleSheet.create({
+  rBackdrop: { flex: 1, backgroundColor: colors.overlay, alignItems: 'center', justifyContent: 'center', padding: 24 },
+  rCard: { width: '100%', maxWidth: 380, backgroundColor: '#fff', borderRadius: radius.lg, padding: 20, gap: 12 },
+  rTitle: { fontSize: 17, fontWeight: '700', color: colors.text },
   hintLang: { color: colors.textSub, fontSize: 12.5, lineHeight: 18, marginTop: 8 },
   section: { marginBottom: 18 },
   sectionTitle: { fontSize: 13, fontWeight: '800', color: colors.textSub, marginBottom: 8, marginLeft: 4, textTransform: 'uppercase', letterSpacing: 0.4 },
