@@ -226,6 +226,18 @@ export default function ChatRoom() {
     }
   };
 
+  // Keyboard terlihat atau tidak. KeyboardAvoidingView hanya aktif saat keyboard muncul: setelah keyboard ditutup di Android
+  // ia bisa menyisakan padding bawah (kolom ketik terlalu ke atas), jadi dimatikan saat keyboard tertutup.
+  const [kbShown, setKbShown] = useState(false);
+  useEffect(() => {
+    const show = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow', () => setKbShown(true));
+    const hide = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide', () => setKbShown(false));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+
   // Emoji: sisipkan di posisi kursor; panel menggantikan keyboard
   const [emojiOpen, setEmojiOpen] = useState(false);
   const inputRef = useRef<TextInput>(null);
@@ -411,7 +423,7 @@ export default function ChatRoom() {
   const status = typing ? 'sedang mengetik…' : lastSeen(peer?.lastSeenAt, peer?.online);
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.bg }} behavior="padding">
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.bg }} behavior="padding" enabled={kbShown}>
       {/* Header */}
       <View style={[s.header, { paddingTop: insets.top + 6 }]}>
         <Pressable hitSlop={10} onPress={() => router.back()} style={s.headerBtn}>
@@ -512,7 +524,7 @@ export default function ChatRoom() {
       ) : null}
 
       {/* Kolom tulis */}
-      <View style={[s.composer, { paddingBottom: emojiOpen ? 8 : insets.bottom + 8 }]}>
+      <View style={[s.composer, { paddingBottom: emojiOpen || kbShown ? 8 : insets.bottom + 8 }]}>
         {isUser ? (
           <Pressable onPress={openGift} style={s.giftBtn} hitSlop={6}>
             <Ionicons name="gift" size={22} color="#F59E0B" />
