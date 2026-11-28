@@ -146,8 +146,6 @@ export const EN: Record<string, string> = {
  "{0} koin akan dipotong dari saldomu.": "{0} coins will be deducted from your balance.",
  "Buka · {0} koin": "Unlock · {0} coins",
  "Koin tidak cukup": "Not enough coins",
- "Butuh {0} diamond, saldo kamu {1}.": "You need {0} diamonds, your balance is {1}.",
- "Saldo diamond kamu kurang untuk gift ini.": "Your diamond balance is too low for this gift.",
  "Buka media ini butuh {0} koin.": "Unlocking this media needs {0} coins.",
  "Nanti": "Later",
  "Gagal membuka": "Failed to unlock",

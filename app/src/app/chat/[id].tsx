@@ -178,7 +178,6 @@ export default function ChatRoom() {
             soundUrl: g.soundUrl,
             // Host melihat diamond yang ia terima, bukan harga gift
             hostIncome: isUserRef.current ? null : e.message.hostIncome,
-            label: e.message.hostGift ? (isUserRef.current ? '' : `${number(e.message.price)} 💎`) : null,
             blend: g.animationBlend,
             count: g.count,
             price: g.price,
@@ -541,11 +540,6 @@ export default function ChatRoom() {
           </Pressable>
         ) : null}
         {!isUser ? (
-          <Pressable onPress={openGift} style={s.giftBtn} hitSlop={6}>
-            <Ionicons name="gift" size={22} color="#F59E0B" />
-          </Pressable>
-        ) : null}
-        {!isUser ? (
           <Pressable onPress={() => setPrivateOpen(true)} style={s.giftBtn} hitSlop={6}>
             <Ionicons name="lock-closed" size={20} color={colors.primary} />
           </Pressable>
@@ -589,14 +583,15 @@ export default function ChatRoom() {
 
       {!isUser ? <PrivateMediaSheet visible={privateOpen} onClose={() => setPrivateOpen(false)} onPick={sendPrivate} /> : null}
 
-      <GiftSheet
-        visible={giftOpen}
-        onClose={() => setGiftOpen(false)}
-        getConversationId={getConvId}
-        hostName={peer?.displayName}
-        onSent={onGiftSent}
-        asHost={!isUser}
-      />
+      {isUser ? (
+        <GiftSheet
+          visible={giftOpen}
+          onClose={() => setGiftOpen(false)}
+          getConversationId={getConvId}
+          hostName={peer?.displayName}
+          onSent={onGiftSent}
+        />
+      ) : null}
     </KeyboardAvoidingView>
   );
 }
@@ -689,14 +684,7 @@ function Bubble({
             <Text style={s.giftName}>
               {m.gift?.name ?? 'Gift'} x{m.gift?.count ?? 1}
             </Text>
-            {m.hostGift ? (
-              hostView ? (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                  <Text style={{ fontSize: 12 }}>💎</Text>
-                  <Text style={s.giftPrice}>-{number(m.price)}</Text>
-                </View>
-              ) : null
-            ) : hostView ? (
+            {hostView ? (
               m.hostIncome != null ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                   <Text style={{ fontSize: 12 }}>💎</Text>

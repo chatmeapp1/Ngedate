@@ -20,8 +20,6 @@ export type GiftFx =
       videoUrl: string | null;
       /** diamond yang diterima host (tampil di layar host sebagai pengganti harga) */
       hostIncome: number | null;
-      /** teks pengganti harga (mis. gift dari host: biaya diamond untuk host, kosong untuk pengguna) */
-      label: string | null;
       /** suara gift (dari admin), diputar sekali saat gift tiba */
       soundUrl: string | null;
       /** video berlatar hitam: diputar dengan mode screen supaya tampak transparan */
@@ -60,7 +58,6 @@ export function playGift(args: {
   videoUrl?: string | null;
   soundUrl?: string | null;
   hostIncome?: number | null;
-  label?: string | null;
   blend?: boolean;
   count: number;
   price?: number | null;
@@ -79,7 +76,6 @@ export function playGift(args: {
     videoUrl: args.videoUrl ?? null,
     soundUrl: args.soundUrl ?? null,
     hostIncome: args.hostIncome ?? null,
-    label: args.label ?? null,
     blend: !!args.blend,
     count: args.count,
     price: unit,
@@ -105,7 +101,6 @@ export function playGiftMessage(m: Message, isHost: boolean, peerName?: string) 
     videoUrl: g.animationUrl,
     soundUrl: g.soundUrl,
     hostIncome: isHost ? m.hostIncome ?? null : null,
-    label: m.hostGift ? (isHost ? `${m.price} 💎` : '') : null,
     blend: g.animationBlend,
     count: g.count,
     price: g.price,

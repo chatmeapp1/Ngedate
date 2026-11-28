@@ -23,9 +23,7 @@ function mapMessage(r) {
     id: Number(r.id),
     conversationId: Number(r.conversation_id),
     senderId: r.sender_id === null ? null : Number(r.sender_id),
-    type: r.type === 'hostgift' ? 'gift' : r.type,
-    // gift kiriman host: harga dibayar host dalam diamond (kolom price), pengguna tidak menerima apa pun
-    hostGift: r.type === 'hostgift',
+    type: r.type,
     body: r.body,
     gift: r.gift_id
       ? {
@@ -580,50 +578,6 @@ async function sendGift(senderId, convIdRaw, giftIdRaw, countRaw) {
   });
 }
 
-const HOST_GIFT_DIVISOR = 10;
-
-/** Host mengirim gift ke pengguna: harga = harga koin / 10 dalam diamond, dipotong dari host. Pengguna hanya menerima animasi. */
-async function sendHostGift(hostId, convIdRaw, giftIdRaw, countRaw) {
-  const convId = v.id(convIdRaw, 'conversationId');
-  const giftId = v.id(giftIdRaw, 'giftId');
-  const count = v.int(countRaw ?? 1, 'Jumlah', { min: 1, max: MAX_GIFT_COUNT });
-  return db.tx(async (client) => {
-    const conv = await lockConversation(client, convId, hostId);
-    if (Number(conv.host_id) !== hostId) throw forbidden('Hanya host yang bisa mengirim gift ini');
-    await safety.assertNotBlocked(client, hostId, Number(conv.user_id));
-    const { rows } = await client.query(`SELECT * FROM gifts WHERE id = $1 AND active`, [giftId]);
-    if (!rows.length) throw notFound('Gift tidak ditemukan');
-    const gift = rows[0];
-    const cost = Math.ceil((Number(gift.price) * count) / HOST_GIFT_DIVISOR);
-    if (!Number.isSafeInteger(cost) || cost < 1) throw badRequest('Jumlah tidak valid');
-    const messageId = await insertMessage(client, {
-      conversationId: conv.id,
-      senderId: hostId,
-      type: 'hostgift',
-      body: `${gift.name} x${count}`,
-      giftId,
-      giftCount: count,
-      price: cost,
-      paymentStatus: 'free',
-    });
-    try {
-      await wallet.debitDiamonds(client, hostId, cost, 'gift_host_send', { type: 'message', id: messageId });
-    } catch (e) {
-      if (e.code === 'INSUFFICIENT_COINS') throw new ApiError(402, 'INSUFFICIENT_DIAMONDS', 'Diamond tidak cukup');
-      throw e;
-    }
-    await touchConversation(client, conv, false, `🎁 ${gift.name} x${count}`);
-    return {
-      conversationId: Number(conv.id),
-      userId: Number(conv.user_id),
-      hostId: Number(conv.host_id),
-      message: await fetchMessage(client, messageId),
-      systemMessage: null,
-      cost,
-    };
-  });
-}
-
 async function whatsappStatus(viewerId, convIdRaw) {
   const convId = v.id(convIdRaw, 'conversationId');
   const { rows } = await db.query(
@@ -745,7 +699,6 @@ module.exports = {
   sendPrivateMedia,
   unlockMedia,
   sendGift,
-  sendHostGift,
   whatsappStatus,
   listMessages,
   fetchMessage,

@@ -143,8 +143,6 @@ export interface Message {
   conversationId: number;
   senderId: number | null;
   type: 'text' | 'gift' | 'system' | 'image' | 'video';
-  /** gift kiriman host: price = biaya diamond host, pengguna tidak membayar */
-  hostGift?: boolean;
   body: string | null;
   gift: {
     id: number;

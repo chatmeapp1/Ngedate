@@ -221,12 +221,8 @@ function LuxuryGift({ fx, onDone }: { fx: GiftItem; onDone: (key: string) => voi
               {fx.name} x{fx.count}
             </Text>
             <Text style={s.luxSub}>
-              {[
-                fx.from ? `dari ${fx.from}` : '',
-                fx.label != null ? fx.label : fx.hostIncome != null ? `+${number(fx.hostIncome)} 💎` : `${number(fx.price * fx.count)} koin`,
-              ]
-                .filter(Boolean)
-                .join(' · ')}
+              {fx.from ? `dari ${fx.from} · ` : ''}
+              {fx.hostIncome != null ? `+${number(fx.hostIncome)} 💎` : `${number(fx.price * fx.count)} koin`}
             </Text>
           </LinearGradient>
         </Animated.View>
