@@ -4,7 +4,7 @@ const safety = require('./safety');
 const membership = require('./membership');
 const storage = require('../lib/storage');
 const { getSettings } = require('./settings');
-const { containsContact } = require('../lib/contactFilter');
+const { containsContact, splitNumberLeak } = require('../lib/contactFilter');
 const { ApiError, badRequest, forbidden, notFound } = require('../lib/errors');
 const v = require('../lib/validate');
 const realtime = require('../realtime');
@@ -276,6 +276,17 @@ async function sendText(senderId, convIdRaw, bodyRaw) {
     const settings = await getSettings(client);
     const senderIsUser = Number(conv.user_id) === senderId;
     await safety.assertNotBlocked(client, senderId, senderIsUser ? Number(conv.host_id) : Number(conv.user_id));
+
+    // Nomor yang dipecah ke banyak pesan pendek ("08", "54", "081", ...) dijumlahkan dari pesan terbaru pengirim yang sama
+    const { rows: recent } = await client.query(
+      `SELECT body FROM messages
+       WHERE conversation_id = $1 AND sender_id = $2 AND type = 'text' AND created_at > now() - interval '15 minutes'
+       ORDER BY id DESC LIMIT 10`,
+      [conv.id, senderId]
+    );
+    if (splitNumberLeak(recent.map((r) => r.body), body)) {
+      throw new ApiError(422, 'CONTACT_BLOCKED', 'Dilarang membagikan nomor HP, link, atau akun sosial media lewat chat');
+    }
 
     // Host boleh menyapa duluan (gratis), tapi tidak menumpuk pesan tanpa balasan dari user
     if (!senderIsUser) {
