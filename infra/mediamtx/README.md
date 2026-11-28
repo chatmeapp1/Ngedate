@@ -18,11 +18,11 @@ backend  /live-hls/live/<id>/index.m3u8  ◄── aplikasi penonton (expo-video
 
 ## Menjalankan di Termux (staging)
 
-1. Unduh MediaMTX untuk Android/ARM64 (biner Go statis) dari halaman rilis resmi:
-   `https://github.com/bluenviron/mediamtx/releases` → file `mediamtx_vX.Y.Z_linux_arm64.tar.gz`.
+1. Unduh MediaMTX untuk HP Android (ARM64, biner Go statis; nama file berakhiran `linux_arm64v8`) dari halaman rilis resmi:
+   `https://github.com/bluenviron/mediamtx/releases` → file `mediamtx_vX.Y.Z_linux_arm64v8.tar.gz`.
    ```bash
    mkdir -p ~/mediamtx && cd ~/mediamtx
-   tar xzf mediamtx_*_linux_arm64.tar.gz mediamtx
+   tar xzf mediamtx_*_linux_arm64v8.tar.gz mediamtx
    cp ~/ngedate/infra/mediamtx/mediamtx.yml .
    ```
    Bila `authHTTPAddress` di `mediamtx.yml` tidak memakai port backend kamu (default `3000`), ubah.
