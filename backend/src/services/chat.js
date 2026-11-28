@@ -470,8 +470,8 @@ async function sendPrivateMedia(senderId, convIdRaw, req) {
         mediaPrivate: true,
         mediaPrice: price,
         mediaFile: require('path').basename(file.path),
-        reviewStatus: 'pending', // admin harus menyetujui dulu; pengguna belum melihat dan belum diberi tahu
       });
+      await touchConversation(client, conv, false, kind === 'image' ? '🔒 Foto privat' : '🔒 Video privat');
       return {
         conversationId: Number(conv.id),
         userId: Number(conv.user_id),

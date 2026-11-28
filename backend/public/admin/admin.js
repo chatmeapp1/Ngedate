@@ -578,7 +578,7 @@ async function pageMoments() {
 }
 
 // ----- Media privat host -----
-const mediaFilt = { status: 'pending' };
+const mediaFilt = { status: 'approved' };
 // File media privat dilindungi: ambil dengan token admin lalu tampilkan lewat blob
 async function showPrivateMedia(m) {
   try {
@@ -594,8 +594,8 @@ async function showPrivateMedia(m) {
 
 async function pageMedia() {
   const list = await get('/api/admin/private-media?status=' + mediaFilt.status);
-  const root = h('div', {}, ...pageHead('Media privat host', 'Foto dan video privat yang dikirim host di chat harus disetujui sebelum pengguna melihatnya. Menolak atau menghapus langsung membuang file dari server. Koin yang sudah dibayar pengguna tidak dikembalikan otomatis.'));
-  root.append(h('div', { class: 'tabs' }, [['pending', 'Menunggu'], ['approved', 'Disetujui'], ['rejected', 'Ditolak']].map(([k, l]) =>
+  const root = h('div', {}, ...pageHead('Media privat host', 'Foto dan video privat yang dikirim host di chat langsung sampai ke pengguna. Di sini admin bisa melihat 100 media terbaru dan menghapus yang melanggar: file dibuang dari server, hilang dari chat pengguna, dan host diberi tahu. Koin yang sudah dibayar pengguna tidak dikembalikan otomatis.'));
+  root.append(h('div', { class: 'tabs' }, [['approved', 'Terkirim'], ['rejected', 'Dihapus']].map(([k, l]) =>
     h('button', { class: 'tab' + (mediaFilt.status === k ? ' on' : ''), onclick: () => { mediaFilt.status = k; render(); } }, l))));
   if (!list.length) { root.append(empty('Tidak ada media')); return root; }
   root.append(h('div', { class: 'grid g3' }, list.map((m) => h('div', { class: 'card' },
@@ -609,14 +609,9 @@ async function pageMedia() {
       m.status === 'approved' && m.unlocked ? h('div', { class: 'dim' }, 'Sudah dibuka pengguna') : null),
     h('div', { class: 'row', style: 'flex-wrap:wrap;gap:6px' },
       m.hasFile ? h('button', { class: 'btn pri sm', onclick: () => showPrivateMedia(m) }, 'Lihat') : null,
-      m.status === 'pending' ? h('button', { class: 'btn ok sm', onclick: async () => { if (await act(() => post('/api/admin/private-media/' + m.id + '/approve'), 'Disetujui')) render(); } }, 'Setujui') : null,
-      m.status === 'pending' ? h('button', { class: 'btn bad sm', onclick: async () => {
-        const r = await formModal({ title: 'Tolak media', submit: 'Tolak', danger: true, fields: [{ name: 'reason', label: 'Alasan', type: 'textarea' }] });
-        if (r && (await act(() => post('/api/admin/private-media/' + m.id + '/reject', { reason: r.reason }), 'Ditolak'))) render();
-      } }, 'Tolak') : null,
       m.status === 'approved' ? h('button', { class: 'btn bad sm', onclick: async () => {
-        if (!(await confirmModal('Hapus media', 'Media ini dihapus permanen dan hilang dari chat pengguna.' + (m.unlocked ? ' Pengguna sudah membayar untuk membukanya; koin tidak dikembalikan otomatis.' : ''), 'Hapus'))) return;
-        if (await act(() => post('/api/admin/private-media/' + m.id + '/reject', { reason: 'Dihapus admin' }), 'Dihapus')) render();
+        const r = await formModal({ title: 'Hapus media', submit: 'Hapus', danger: true, fields: [{ name: 'reason', label: 'Alasan (dikirim ke host)', type: 'textarea', value: 'Melanggar aturan konten' }] });
+        if (r && (await act(() => post('/api/admin/private-media/' + m.id + '/reject', { reason: r.reason }), 'Dihapus'))) render();
       } }, 'Hapus') : null)))));
   return root;
 }
@@ -1300,7 +1295,7 @@ const pages = {
   verifikasi: { title: 'Verifikasi wajah', icon: '🪪', fn: pageVerifikasi, badge: () => stats && stats.pending.verifications },
   foto: { title: 'Foto host', icon: '🖼️', fn: pagePhotos, badge: () => stats && stats.pending.photos + stats.pending.avatars },
   momen: { title: 'Momen host', icon: '📸', fn: pageMoments, badge: () => stats && stats.pending.moments },
-  media: { title: 'Media privat', icon: '🔒', fn: pageMedia, badge: () => stats && stats.pending.privateMedia },
+  media: { title: 'Media privat', icon: '🔒', fn: pageMedia },
   gaji: { title: 'Gaji pokok host', icon: '🧾', fn: pageSalary },
   pengguna: { title: 'Pengguna', icon: '👥', fn: pageUsers },
   topup: { title: 'Top up koin', icon: '💰', fn: pageTopup },

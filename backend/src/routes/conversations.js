@@ -89,9 +89,7 @@ router.post('/:id/media', storage.chatMedia, wrap(async (req, res) => {
 // Host mengirim foto/video privat (harga buka ditentukan host): multipart field "file" + "price" (koin)
 router.post('/:id/private-media', storage.privateMedia, wrap(async (req, res) => {
   const result = await chat.sendPrivateMedia(req.user.id, req.params.id, req);
-  // Menunggu persetujuan admin: hanya host yang melihatnya dulu; pengguna baru diberi tahu setelah disetujui
-  const conversation = await chat.getConversation(result.hostId, result.conversationId);
-  realtime.emitTo(result.hostId, 'message:new', { conversationId: result.conversationId, message: result.message, conversation });
+  await pushMessage(result, result.message);
   res.status(201).json({ message: result.message });
 }));
 

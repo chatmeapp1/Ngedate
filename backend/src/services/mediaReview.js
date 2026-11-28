@@ -1,17 +1,15 @@
 const fs = require('fs');
 const path = require('path');
 const db = require('../db');
-const chat = require('./chat');
 const storage = require('../lib/storage');
 const realtime = require('../realtime');
 const { notify } = require('./notifications');
 const { badRequest, notFound } = require('../lib/errors');
 
 /**
- * Review foto/video privat host oleh admin. Media baru berstatus 'pending': hanya host pengirim yang melihatnya.
- *   approve  -> tampil ke pengguna (pesan baru + belum dibaca), host diberi tahu
- *   reject   -> file dihapus dari server; pesan tidak pernah/tidak lagi tampil ke pengguna
- * "Hapus" untuk media yang sudah disetujui = reject. Koin yang sudah dibayar pengguna tidak dikembalikan otomatis.
+ * Moderasi foto/video privat host oleh admin SETELAH terkirim: media langsung sampai ke pengguna (tanpa menunggu),
+ * admin bisa melihat daftar media terbaru dan menghapus yang melanggar. Menghapus membuang file dari server,
+ * menyembunyikan pesan dari pengguna, dan memberi tahu host. Koin yang sudah dibayar pengguna tidak dikembalikan otomatis.
  */
 const SELECT = `SELECT m.id, m.type, m.media_price, m.media_file, m.review_status, m.review_reason, m.created_at, m.reviewed_at,
     m.conversation_id, c.host_id, c.user_id,
@@ -39,8 +37,8 @@ const map = (r) => ({
 });
 
 async function list(status) {
-  const st = ['pending', 'approved', 'rejected'].includes(status) ? status : 'pending';
-  const { rows } = await db.query(`${SELECT} AND m.review_status = $1 ORDER BY m.id ${st === 'pending' ? 'ASC' : 'DESC'} LIMIT 100`, [st]);
+  const st = status === 'rejected' ? 'rejected' : 'approved';
+  const { rows } = await db.query(`${SELECT} AND m.review_status = $1 ORDER BY m.id DESC LIMIT 100`, [st]);
   return rows.map(map);
 }
 
@@ -50,32 +48,6 @@ async function filePath(idRaw) {
   const { rows } = await db.query(`SELECT media_file, type FROM messages WHERE id = $1 AND media_private`, [id]);
   if (!rows.length || !rows[0].media_file) throw notFound('File tidak ditemukan');
   return { file: path.join(storage.PRIVATE_DIR, path.basename(rows[0].media_file)), type: rows[0].type };
-}
-
-async function approve(idRaw) {
-  const id = Number(idRaw);
-  const r = await db.tx(async (client) => {
-    const { rows } = await client.query(
-      `UPDATE messages SET review_status = 'approved', review_reason = NULL, reviewed_at = now()
-       WHERE id = $1 AND media_private AND review_status = 'pending' RETURNING conversation_id, type`,
-      [id]
-    );
-    if (!rows.length) throw notFound('Media tidak ditemukan atau sudah diproses');
-    // Baru sekarang pengguna menerima pesan ini (belum dibaca + pratinjau terakhir)
-    await client.query(
-      `UPDATE conversations SET last_message_at = now(), last_message_preview = $2, user_unread = user_unread + 1 WHERE id = $1`,
-      [rows[0].conversation_id, rows[0].type === 'image' ? '🔒 Foto privat' : '🔒 Video privat']
-    );
-    const { rows: c } = await client.query(`SELECT user_id, host_id FROM conversations WHERE id = $1`, [rows[0].conversation_id]);
-    return { conversationId: Number(rows[0].conversation_id), userId: Number(c[0].user_id), hostId: Number(c[0].host_id), type: rows[0].type };
-  });
-  const message = await chat.fetchMessage(db, id);
-  for (const uid of [r.userId, r.hostId]) {
-    const conversation = await chat.getConversation(uid, r.conversationId).catch(() => null);
-    if (conversation) realtime.emitTo(uid, 'message:new', { conversationId: r.conversationId, message, conversation });
-  }
-  realtime.emitTo(r.hostId, 'media:review', { conversationId: r.conversationId, messageId: id, status: 'approved', reason: null });
-  await notify(r.hostId, 'media', r.type === 'image' ? 'Foto privat disetujui' : 'Video privat disetujui', 'Media privatmu sudah disetujui dan terkirim ke pengguna.');
 }
 
 async function reject(idRaw, reasonRaw) {
@@ -95,7 +67,7 @@ async function reject(idRaw, reasonRaw) {
   const { rows: c } = await db.query(`SELECT user_id, host_id FROM conversations WHERE id = $1`, [row.conversation_id]);
   const evt = { conversationId: Number(row.conversation_id), messageId: id, status: 'rejected', reason };
   realtime.emitTo([Number(c[0].host_id), Number(c[0].user_id)], 'media:review', evt);
-  await notify(Number(c[0].host_id), 'media', row.type === 'image' ? 'Foto privat ditolak' : 'Video privat ditolak', `Alasan: ${reason}`);
+  await notify(Number(c[0].host_id), 'media', row.type === 'image' ? 'Foto privat dihapus admin' : 'Video privat dihapus admin', `Alasan: ${reason}`);
 }
 
-module.exports = { list, filePath, approve, reject };
+module.exports = { list, filePath, reject };
