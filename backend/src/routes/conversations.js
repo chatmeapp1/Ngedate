@@ -107,9 +107,18 @@ router.post('/:id/media/:messageId/unlock', wrap(async (req, res) => {
   res.json({ message: result.message, paid: result.paid, waUnlocked: !!result.unlockedWa, systemMessage: result.systemMessage });
 }));
 
-router.post('/:id/gifts', wrap(async (req, res) => {
-  const result = await chat.sendGift(req.user.id, req.params.id, req.body.giftId, req.body.count);
+router.post('/:id/gift-requests', wrap(async (req, res) => {
+  const result = await chat.sendGiftRequest(req.user.id, req.params.id, req.body.giftId);
   await pushMessage(result, result.message);
+  res.status(201).json({ message: result.message });
+}));
+
+router.post('/:id/gifts', wrap(async (req, res) => {
+  const result = await chat.sendGift(req.user.id, req.params.id, req.body.giftId, req.body.count, req.body.requestId);
+  await pushMessage(result, result.message);
+  if (result.fulfilledRequestId) {
+    realtime.emitTo([result.userId, result.hostId], 'giftreq:done', { conversationId: result.conversationId, messageId: result.fulfilledRequestId });
+  }
   if (result.systemMessage) {
     await pushMessage(result, result.systemMessage);
     realtime.emitTo(result.userId, 'wa:unlocked', { conversationId: result.conversationId });
@@ -120,6 +129,7 @@ router.post('/:id/gifts', wrap(async (req, res) => {
     systemMessage: result.systemMessage,
     giftTotal: result.giftTotal,
     waUnlocked: result.unlocked,
+    requestId: result.fulfilledRequestId,
   });
 }));
 

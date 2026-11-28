@@ -25,6 +25,8 @@ function mapMessage(r) {
     senderId: r.sender_id === null ? null : Number(r.sender_id),
     type: r.type,
     body: r.body,
+    // permintaan gift dari host: pending | done (sudah dikirim pengguna)
+    giftRequest: r.type === 'giftreq' ? r.gift_request_status : null,
     gift: r.gift_id
       ? {
           id: r.gift_id,
@@ -516,7 +518,7 @@ async function unlockMedia(userId, convIdRaw, messageIdRaw) {
   });
 }
 
-async function sendGift(senderId, convIdRaw, giftIdRaw, countRaw) {
+async function sendGift(senderId, convIdRaw, giftIdRaw, countRaw, requestIdRaw) {
   const convId = v.id(convIdRaw, 'conversationId');
   const giftId = v.id(giftIdRaw, 'giftId');
   const count = v.int(countRaw ?? 1, 'Jumlah', { min: 1, max: MAX_GIFT_COUNT });
@@ -562,6 +564,18 @@ async function sendGift(senderId, convIdRaw, giftIdRaw, countRaw) {
     const giftTotal = Number(upd[0].gift_total);
     await touchConversation(client, conv, true, `🎁 ${gift.name} x${count}`);
 
+    // Memenuhi permintaan gift dari host (jika gift yang dikirim sama dengan yang diminta)
+    let fulfilledRequestId = null;
+    if (requestIdRaw != null) {
+      const rq = await client.query(
+        `UPDATE messages SET gift_request_status = 'done'
+         WHERE id = $1 AND conversation_id = $2 AND type = 'giftreq' AND gift_request_status = 'pending' AND gift_id = $3
+         RETURNING id`,
+        [requestIdRaw, conv.id, giftId]
+      );
+      if (rq.rowCount) fulfilledRequestId = Number(rq.rows[0].id);
+    }
+
     // Cek syarat buka WhatsApp
     const { unlocked, systemMessage } = await maybeUnlockWa(client, conv, giftTotal);
 
@@ -574,6 +588,44 @@ async function sendGift(senderId, convIdRaw, giftIdRaw, countRaw) {
       giftTotal,
       unlocked,
       hostIncome: host,
+      fulfilledRequestId,
+    };
+  });
+}
+
+/** Host meminta gift: gratis untuk host, hanya satu permintaan menunggu per percakapan. Pengguna bebas menanggapi. */
+async function sendGiftRequest(hostId, convIdRaw, giftIdRaw) {
+  const convId = v.id(convIdRaw, 'conversationId');
+  const giftId = v.id(giftIdRaw, 'giftId');
+  return db.tx(async (client) => {
+    const conv = await lockConversation(client, convId, hostId);
+    if (Number(conv.host_id) !== hostId) throw forbidden('Hanya host yang bisa meminta gift');
+    await safety.assertNotBlocked(client, hostId, Number(conv.user_id));
+    const { rows } = await client.query(`SELECT * FROM gifts WHERE id = $1 AND active`, [giftId]);
+    if (!rows.length) throw notFound('Gift tidak ditemukan');
+    const gift = rows[0];
+    const pend = await client.query(
+      `SELECT 1 FROM messages WHERE conversation_id = $1 AND type = 'giftreq' AND gift_request_status = 'pending' LIMIT 1`,
+      [conv.id]
+    );
+    if (pend.rowCount) throw new ApiError(429, 'REQUEST_PENDING', 'Tunggu pengguna menanggapi permintaan sebelumnya');
+    const messageId = await insertMessage(client, {
+      conversationId: conv.id,
+      senderId: hostId,
+      type: 'giftreq',
+      body: `Permintaan gift ${gift.name}`,
+      giftId,
+      giftCount: 1,
+      price: 0,
+      paymentStatus: 'free',
+    });
+    await client.query(`UPDATE messages SET gift_request_status = 'pending' WHERE id = $1`, [messageId]);
+    await touchConversation(client, conv, false, `🎁 Meminta gift ${gift.name}`);
+    return {
+      conversationId: Number(conv.id),
+      userId: Number(conv.user_id),
+      hostId: Number(conv.host_id),
+      message: await fetchMessage(client, messageId),
     };
   });
 }
@@ -699,6 +751,7 @@ module.exports = {
   sendPrivateMedia,
   unlockMedia,
   sendGift,
+  sendGiftRequest,
   whatsappStatus,
   listMessages,
   fetchMessage,

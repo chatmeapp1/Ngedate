@@ -12,7 +12,7 @@ import { ApiError, api, errorMessage } from '@/lib/api';
 import { compact, number } from '@/lib/format';
 import { LUXURY_PRICE, playGift, playWaUnlocked } from '@/lib/giftFx';
 import { colors, radius } from '@/lib/theme';
-import type { Gift, SendGiftResult, WhatsappStatus } from '@/lib/types';
+import type { Gift, Message, SendGiftResult, WhatsappStatus } from '@/lib/types';
 
 const COUNTS = [1, 10, 99, 520];
 let cache: Gift[] | null = null;
@@ -29,12 +29,15 @@ export function GiftSheet({
   getConversationId,
   hostName,
   onSent,
+  asHost,
 }: {
   visible: boolean;
   onClose: () => void;
   getConversationId: () => Promise<number>;
   hostName?: string;
   onSent?: (r: SendGiftResult, conversationId: number) => void;
+  /** host: memilih gift untuk DIMINTA dari pengguna (gratis, tanpa potongan saldo) */
+  asHost?: boolean;
 }) {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
@@ -59,6 +62,23 @@ export function GiftSheet({
   const coins = user?.coins ?? 0;
   const total = selected ? selected.price * count : 0;
   const enough = coins >= total;
+
+  const request = async () => {
+    if (!selected || sending) return;
+    setSending(true);
+    try {
+      const convId = await getConversationId();
+      const r = await api.post<{ message: Message }>(`/api/conversations/${convId}/gift-requests`, { giftId: selected.id });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      onClose();
+      setSelected(null);
+      onSent?.({ message: r.message, systemMessage: null, giftTotal: 0, waUnlocked: false }, convId);
+    } catch (e) {
+      Alert.alert('Permintaan gagal dikirim', errorMessage(e));
+    } finally {
+      setSending(false);
+    }
+  };
 
   const send = async () => {
     if (!selected || sending) return;
@@ -113,7 +133,7 @@ export function GiftSheet({
       <View style={[s.sheet, { paddingBottom: insets.bottom + 12 }]}>
         <View style={s.handle} />
         <View style={s.header}>
-          <Text style={s.title}>Kirim Gift{hostName ? ` ke ${hostName}` : ''}</Text>
+          <Text style={s.title}>{asHost ? 'Minta Gift' : 'Kirim Gift'}{hostName ? `${asHost ? ' dari' : ' ke'} ${hostName}` : ''}</Text>
           <Pressable onPress={onClose} hitSlop={10}>
             <Ionicons name="close" size={24} color={colors.textSub} />
           </Pressable>
@@ -159,8 +179,8 @@ export function GiftSheet({
                     {g.name}
                   </Text>
                   <View style={s.priceRow}>
-                    <Coin size={11} />
-                    <Text style={s.price}>{compact(g.price)}</Text>
+                    {asHost ? <Text style={{ fontSize: 10 }}>💎</Text> : <Coin size={11} />}
+                    <Text style={s.price}>{compact(asHost ? g.hostIncome ?? 0 : g.price)}</Text>
                   </View>
                 </Pressable>
               );
@@ -169,6 +189,7 @@ export function GiftSheet({
           </ScrollView>
         )}
 
+        {!asHost ? (
         <View style={s.counts}>
           {COUNTS.map((c) => (
             <Pressable key={c} onPress={() => setCount(c)} style={[s.count, count === c && s.countOn]}>
@@ -176,18 +197,23 @@ export function GiftSheet({
             </Pressable>
           ))}
         </View>
+        ) : null}
 
         <View style={s.footer}>
-          <Pressable onPress={() => (onClose(), router.push('/topup'))} style={s.balance}>
-            <Coin size={16} />
-            <Text style={s.balanceText}>{number(coins)}</Text>
-            <Text style={s.topup}>Top up ›</Text>
-          </Pressable>
-          <GradientButton onPress={send} loading={sending} disabled={!selected} style={{ minWidth: 150 }}>
-            <Text style={s.sendText}>{selected ? `Kirim · ${compact(total)}` : 'Pilih gift'}</Text>
+          {asHost ? (
+            <Text style={s.hint}>Pengguna yang memutuskan mengirim atau tidak</Text>
+          ) : (
+            <Pressable onPress={() => (onClose(), router.push('/topup'))} style={s.balance}>
+              <Coin size={16} />
+              <Text style={s.balanceText}>{number(coins)}</Text>
+              <Text style={s.topup}>Top up ›</Text>
+            </Pressable>
+          )}
+          <GradientButton onPress={asHost ? request : send} loading={sending} disabled={!selected} style={{ minWidth: 150 }}>
+            <Text style={s.sendText}>{asHost ? (selected ? 'Permintaan' : 'Pilih gift') : selected ? `Kirim · ${compact(total)}` : 'Pilih gift'}</Text>
           </GradientButton>
         </View>
-        {selected && !enough ? <Text style={s.warn}>Saldo tidak cukup — top up dulu</Text> : null}
+        {!asHost && selected && !enough ? <Text style={s.warn}>Saldo tidak cukup — top up dulu</Text> : null}
       </View>
     </Modal>
   );
@@ -231,5 +257,6 @@ const s = StyleSheet.create({
   balanceText: { fontWeight: '800', fontSize: 16, color: colors.text },
   topup: { color: colors.primary, fontWeight: '700', marginLeft: 4 },
   sendText: { color: '#fff', fontWeight: '800', fontSize: 16 },
+  hint: { flex: 1, color: colors.textDim, fontSize: 12 },
   warn: { color: colors.danger, fontSize: 12, marginTop: 6, textAlign: 'right' },
 });

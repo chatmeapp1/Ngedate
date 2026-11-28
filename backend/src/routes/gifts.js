@@ -1,5 +1,6 @@
 const express = require('express');
 const db = require('../db');
+const { getSettings } = require('../services/settings');
 const { wrap } = require('../lib/errors');
 
 const router = express.Router();
@@ -23,7 +24,14 @@ function mapGift(g) {
 
 router.get('/', wrap(async (req, res) => {
   const { rows } = await db.query(`SELECT * FROM gifts WHERE active ORDER BY sort_order, price`);
-  res.json(rows.map(mapGift));
+  // Host melihat diamond yang akan ia terima dari tiap gift (bukan harga koin)
+  const share = req.user && req.user.role === 'host' ? Number((await getSettings(db)).gift_host_share) : null;
+  res.json(
+    rows.map((g) => ({
+      ...mapGift(g),
+      ...(share != null ? { hostIncome: Math.floor(Number(g.price) * share * (Number(g.host_multiplier) || 1)) } : {}),
+    }))
+  );
 }));
 
 module.exports = router;

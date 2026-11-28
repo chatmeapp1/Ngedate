@@ -142,7 +142,9 @@ export interface Message {
   id: number;
   conversationId: number;
   senderId: number | null;
-  type: 'text' | 'gift' | 'system' | 'image' | 'video';
+  type: 'text' | 'gift' | 'system' | 'image' | 'video' | 'giftreq';
+  /** permintaan gift dari host: pending | done */
+  giftRequest?: 'pending' | 'done' | null;
   body: string | null;
   gift: {
     id: number;
@@ -233,6 +235,8 @@ export interface Gift {
   category: string;
   sortOrder: number;
   active: boolean;
+  /** hanya untuk host: diamond yang akan diterima dari gift ini */
+  hostIncome?: number;
 }
 
 export interface SendGiftResult {
@@ -240,6 +244,7 @@ export interface SendGiftResult {
   systemMessage: Message | null;
   giftTotal: number;
   waUnlocked: boolean;
+  requestId?: number | null;
 }
 
 export interface Withdrawal {

@@ -23,7 +23,7 @@ import { compact, lastSeen, number } from '@/lib/format';
 import { playGift, playWaUnlocked } from '@/lib/giftFx';
 import { emitRealtime, onRealtime, onRealtimeConnect } from '@/lib/realtime';
 import { colors, gradients, radius } from '@/lib/theme';
-import type { Conversation, Host, Message, WhatsappStatus } from '@/lib/types';
+import type { Conversation, Host, Message, SendGiftResult, WhatsappStatus } from '@/lib/types';
 
 const PAGE = 30;
 
@@ -197,6 +197,9 @@ export default function ChatRoom() {
             : cur.map((m) => (m.id === e.messageId ? { ...m, mediaReview: e.status, mediaReviewReason: e.reason, mediaUrl: e.status === 'rejected' ? null : m.mediaUrl } : m))
         );
       }),
+      onRealtime<{ conversationId: number; messageId: number }>('giftreq:done', (e) => {
+        if (e.conversationId === convId) setMessages((cur) => cur.map((m) => (m.id === e.messageId ? { ...m, giftRequest: 'done' } : m)));
+      }),
       onRealtime<{ conversationId: number; messageId: number }>('media:unlocked', (e) => {
         if (e.conversationId === convId) setMessages((cur) => cur.map((m) => (m.id === e.messageId ? { ...m, mediaUnlocked: true } : m)));
       }),
@@ -307,6 +310,42 @@ export default function ChatRoom() {
 
   // Pengguna: buka foto/video privat dengan koin
   const [unlocking, setUnlocking] = useState<number | null>(null);
+  // Pengguna memenuhi permintaan gift dari host
+  const fulfillRequest = async (m: Message) => {
+    if (!m.gift || unlocking) return;
+    setUnlocking(m.id);
+    try {
+      const r = await api.post<SendGiftResult>(`/api/conversations/${convId}/gifts`, { giftId: m.gift.id, count: 1, requestId: m.id });
+      playGift({
+        messageId: r.message.id,
+        giftId: m.gift.id,
+        name: m.gift.name,
+        icon: m.gift.icon,
+        imageUrl: m.gift.imageUrl,
+        videoUrl: m.gift.animationUrl,
+        soundUrl: m.gift.soundUrl,
+        blend: m.gift.animationBlend,
+        count: 1,
+        price: m.gift.price,
+        category: m.gift.category,
+      });
+      setMessages((cur) => cur.map((x) => (x.id === m.id ? { ...x, giftRequest: 'done' } : x)));
+      onGiftSent(r);
+      refreshMe();
+    } catch (e) {
+      if (e instanceof ApiError && e.code === 'INSUFFICIENT_COINS') {
+        Alert.alert('Koin tidak cukup', `Gift ini butuh ${number(m.gift.price ?? 0)} koin.`, [
+          { text: 'Nanti', style: 'cancel' },
+          { text: 'Top up', onPress: () => router.push('/topup') },
+        ]);
+      } else {
+        Alert.alert('Gift gagal dikirim', errorMessage(e));
+      }
+    } finally {
+      setUnlocking(null);
+    }
+  };
+
   const unlockMedia = (m: Message) => {
     const price = m.mediaPrice ?? 0;
     Alert.alert(
@@ -502,7 +541,7 @@ export default function ChatRoom() {
           return (
             <View>
               {showDate ? <DateLabel iso={item.createdAt} /> : null}
-              <Bubble message={item} mine={item.senderId === myId} showPayment={isUser} hostView={!isUser} unlockingId={unlocking} onUnlock={unlockMedia} />
+              <Bubble message={item} mine={item.senderId === myId} showPayment={isUser} hostView={!isUser} unlockingId={unlocking} onUnlock={unlockMedia} onFulfill={fulfillRequest} />
             </View>
           );
         }}
@@ -535,6 +574,11 @@ export default function ChatRoom() {
       {/* Kolom tulis */}
       <View style={[s.composer, { paddingBottom: emojiOpen || kbShown ? 8 : insets.bottom + 8 }]}>
         {isUser ? (
+          <Pressable onPress={openGift} style={s.giftBtn} hitSlop={6}>
+            <Ionicons name="gift" size={22} color="#F59E0B" />
+          </Pressable>
+        ) : null}
+        {!isUser ? (
           <Pressable onPress={openGift} style={s.giftBtn} hitSlop={6}>
             <Ionicons name="gift" size={22} color="#F59E0B" />
           </Pressable>
@@ -583,15 +627,14 @@ export default function ChatRoom() {
 
       {!isUser ? <PrivateMediaSheet visible={privateOpen} onClose={() => setPrivateOpen(false)} onPick={sendPrivate} /> : null}
 
-      {isUser ? (
-        <GiftSheet
-          visible={giftOpen}
-          onClose={() => setGiftOpen(false)}
-          getConversationId={getConvId}
-          hostName={peer?.displayName}
-          onSent={onGiftSent}
-        />
-      ) : null}
+      <GiftSheet
+        visible={giftOpen}
+        onClose={() => setGiftOpen(false)}
+        getConversationId={getConvId}
+        hostName={peer?.displayName}
+        onSent={onGiftSent}
+        asHost={!isUser}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -649,6 +692,7 @@ function Bubble({
   hostView,
   unlockingId,
   onUnlock,
+  onFulfill,
 }: {
   message: Message;
   mine: boolean;
@@ -656,6 +700,7 @@ function Bubble({
   hostView: boolean;
   unlockingId: number | null;
   onUnlock: (m: Message) => void;
+  onFulfill: (m: Message) => void;
 }) {
   if (m.type === 'system') {
     return (
@@ -674,6 +719,33 @@ function Bubble({
           free: m.freeCard ? { icon: 'ticket-outline' as const, text: m.freeSource === 'checkin' ? 'Pesan gratis check-in' : 'Kartu gratis VIP', color: '#D9801A' } : null,
         }[m.paymentStatus]
       : null;
+
+  if (m.type === 'giftreq') {
+    const done = m.giftRequest === 'done';
+    return (
+      <View style={[s.row, mine ? s.rowMine : s.rowTheirs]}>
+        <View style={[s.reqCard, mine ? s.reqMine : s.reqTheirs]}>
+          <View style={{ flex: 1 }}>
+            <Text style={[s.reqText, mine && { color: '#fff' }]}>🎁 Sayang, bisakah kamu memberiku hadiah?</Text>
+            {mine ? (
+              <Text style={[s.reqStatus, done && { color: '#BBF7D0' }]}>{done ? 'Terkirim ✓' : 'Menunggu...'}</Text>
+            ) : done ? (
+              <Text style={[s.reqStatus, { color: colors.online }]}>Sudah kamu kirim ✓</Text>
+            ) : (
+              <Pressable onPress={() => onFulfill(m)} disabled={unlockingId === m.id} style={s.reqBtn}>
+                <Coin size={13} />
+                <Text style={s.reqBtnText}>{unlockingId === m.id ? 'Mengirim…' : `Kirim ${m.gift?.name ?? ''} · ${number(m.gift?.price ?? 0)}`}</Text>
+              </Pressable>
+            )}
+          </View>
+          <View style={s.reqIcon}>
+            <GiftIcon icon={m.gift?.icon} imageUrl={m.gift?.imageUrl} size={46} />
+          </View>
+        </View>
+        <Text style={[s.meta, mine && { textAlign: 'right' }]}>{time(m.createdAt)}</Text>
+      </View>
+    );
+  }
 
   if (m.type === 'gift') {
     return (
@@ -834,6 +906,14 @@ const s = StyleSheet.create({
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 3, paddingHorizontal: 4 },
   meta: { color: colors.textDim, fontSize: 11 },
   giftCard: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 20 },
+  reqCard: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 20, maxWidth: '86%' },
+  reqMine: { backgroundColor: colors.primary },
+  reqTheirs: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+  reqText: { fontWeight: '700', fontSize: 14, color: colors.text },
+  reqStatus: { marginTop: 6, fontWeight: '700', fontSize: 13, color: '#FDE047' },
+  reqIcon: { width: 62, height: 62, borderRadius: 14, backgroundColor: 'rgba(40,20,80,0.18)', alignItems: 'center', justifyContent: 'center' },
+  reqBtn: { marginTop: 8, flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start', backgroundColor: '#F59E0B', paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999 },
+  reqBtnText: { color: '#fff', fontWeight: '800', fontSize: 13 },
   giftName: { color: colors.text, fontWeight: '800', fontSize: 15 },
   giftPrice: { color: colors.textSub, fontWeight: '700', fontSize: 12 },
   priceRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 6, backgroundColor: colors.surfaceAlt },
